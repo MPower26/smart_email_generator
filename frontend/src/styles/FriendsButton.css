@@ -1,0 +1,90 @@
+/* Styles pour le bouton d'amis sticky */
+.friends-button {
+  position: fixed;
+  right: 20px;
+  bottom: 80px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.friends-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  font-size: 0.7rem;
+  padding: 0.25rem 0.4rem;
+}
+
+/* Styles pour les onglets */
+.friends-tabs {
+  display: flex;
+  margin-bottom: 1rem;
+}
+
+/* Styles pour le contenu */
+.friends-content {
+  margin-top: 1rem;
+}
+
+.friend-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #eee;
+}
+
+.friend-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.friend-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.friend-request {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #eee;
+}
+
+.request-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.request-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.sharing-toggle {
+  cursor: pointer;
+  color: #6c757d;
+}
+
+.sharing-toggle.active {
+  color: #28a745;
+}
+
+/* Animation pour les notifications */
+@keyframes fadeInOut {
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.text-danger, .text-success {
+  animation: fadeInOut 5s forwards;
+} 

@@ -1,0 +1,116 @@
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Roboto', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #1a1a1a;
+  color: #ffffff;
+}
+
+/* General styles */
+main {
+  padding: 20px 0;
+}
+
+/* Utility classes */
+.text-primary {
+  color: #D8400D !important;
+}
+
+.bg-primary {
+  background-color: #D8400D !important;
+}
+
+/* Card styles */
+.card {
+  margin-bottom: 20px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* Form styles */
+.form-section {
+  background-color: #333333;
+  border-radius: 10px;
+  padding: 25px;
+  margin-bottom: 30px;
+}
+
+.section-title {
+  margin-bottom: 15px;
+  color: #D8400D;
+}
+
+/* Email previews */
+.email-preview {
+  margin-bottom: 20px;
+}
+
+/* File upload container */
+.file-upload-container {
+  min-height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+/* Tabs styling */
+.nav-tabs .nav-link {
+  border: none;
+  padding: 10px 20px;
+  font-weight: 500;
+  border-radius: 5px 5px 0 0;
+}
+
+.nav-tabs .nav-link.active {
+  background-color: #333333;
+  color: #D8400D;
+}
+
+/* Feature styles */
+.feature-icon {
+  font-size: 2em;
+  margin-bottom: 15px;
+  color: #D8400D;
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+  .container {
+    padding: 0 15px;
+  }
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.email-preview pre {
+  white-space: pre-wrap;
+  font-family: inherit;
+  color: #ffffff;
+}
+
+.file-upload-container:hover {
+  border-color: #D8400D;
+}
+
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+} 
