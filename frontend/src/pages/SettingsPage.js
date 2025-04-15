@@ -4,7 +4,7 @@ import { getCacheInfo, clearCache } from '../services/emailApi';
 import { UserContext } from '../contexts/UserContext';
 
 const SettingsPage = () => {
-  const { userProfile, updateUserProfile } = useContext(UserContext);
+  const { userProfile, updateUserProfile, logout } = useContext(UserContext);
   const [profile, setProfile] = useState({
     name: '',
     email: '',
@@ -238,6 +238,15 @@ const SettingsPage = () => {
           </Card>
         </Col>
       </Row>
+
+      <Card className="mb-4">
+        <Card.Header>Compte</Card.Header>
+        <Card.Body>
+          <Button variant="danger" onClick={logout}>
+            Se déconnecter
+          </Button>
+        </Card.Body>
+      </Card>
     </Container>
   );
 };

@@ -1,9 +1,11 @@
 import React, { useState, useContext, useRef, useEffect } from 'react';
 import { Container, Card, Form, Button, Alert, Col, Row } from 'react-bootstrap';
 import { UserContext } from '../contexts/UserContext';
+import { useNavigate } from 'react-router-dom';
 
 const AuthScreen = () => {
   const { userProfile, authStep, setAuthStep, requestAuthCode, verifyAuthCode } = useContext(UserContext);
+  const navigate = useNavigate();
   
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -95,7 +97,9 @@ const AuthScreen = () => {
     
     try {
       const success = await verifyAuthCode(email, code);
-      if (!success) {
+      if (success) {
+        navigate('/');
+      } else {
         setError('Code invalide ou expiré');
       }
     } catch (err) {

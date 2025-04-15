@@ -3,6 +3,10 @@ import { Container, Row, Col, Card, Button } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 
 const HomePage = () => {
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <Container>
       {/* Hero Section */}
@@ -32,6 +36,7 @@ const HomePage = () => {
             to="/generate-emails" 
             size="lg" 
             variant="primary"
+            onClick={scrollToTop}
           >
             Get Started
           </Button>
@@ -41,46 +46,52 @@ const HomePage = () => {
       {/* Features Section */}
       <Row className="mb-5">
         <Col md={4} className="mb-4">
-          <Card className="h-100 feature-card">
-            <Card.Body className="text-center">
-              <div className="feature-icon">
-                <i className="bi bi-envelope-paper"></i>
-              </div>
-              <Card.Title>Email Generation</Card.Title>
-              <Card.Text>
-                Upload your contact list and generate personalized emails for each prospect.
-                Choose between AI-powered generation or custom templates.
-              </Card.Text>
-            </Card.Body>
-          </Card>
+          <Link to="/generate-emails" style={{ textDecoration: 'none' }} onClick={scrollToTop}>
+            <Card className="h-100 feature-card">
+              <Card.Body className="text-center">
+                <div className="feature-icon">
+                  <i className="bi bi-envelope-paper"></i>
+                </div>
+                <Card.Title>Email Generation</Card.Title>
+                <Card.Text>
+                  Upload your contact list and generate personalized emails for each prospect.
+                  Choose between AI-powered generation or custom templates.
+                </Card.Text>
+              </Card.Body>
+            </Card>
+          </Link>
         </Col>
         <Col md={4} className="mb-4">
-          <Card className="h-100 feature-card">
-            <Card.Body className="text-center">
-              <div className="feature-icon">
-                <i className="bi bi-file-earmark-text"></i>
-              </div>
-              <Card.Title>Template Management</Card.Title>
-              <Card.Text>
-                Create and manage reusable email templates with personalization variables.
-                Save your best-performing templates for future use.
-              </Card.Text>
-            </Card.Body>
-          </Card>
+          <Link to="/templates" style={{ textDecoration: 'none' }} onClick={scrollToTop}>
+            <Card className="h-100 feature-card">
+              <Card.Body className="text-center">
+                <div className="feature-icon">
+                  <i className="bi bi-file-earmark-text"></i>
+                </div>
+                <Card.Title>Template Management</Card.Title>
+                <Card.Text>
+                  Create and manage reusable email templates with personalization variables.
+                  Save your best-performing templates for future use.
+                </Card.Text>
+              </Card.Body>
+            </Card>
+          </Link>
         </Col>
         <Col md={4} className="mb-4">
-          <Card className="h-100 feature-card">
-            <Card.Body className="text-center">
-              <div className="feature-icon">
-                <i className="bi bi-gear"></i>
-              </div>
-              <Card.Title>Settings</Card.Title>
-              <Card.Text>
-                Configure your API keys, default templates, and other preferences
-                to customize your email generation experience.
-              </Card.Text>
-            </Card.Body>
-          </Card>
+          <Link to="/settings" style={{ textDecoration: 'none' }} onClick={scrollToTop}>
+            <Card className="h-100 feature-card">
+              <Card.Body className="text-center">
+                <div className="feature-icon">
+                  <i className="bi bi-gear"></i>
+                </div>
+                <Card.Title>Settings</Card.Title>
+                <Card.Text>
+                  Configure your API keys, default templates, and other preferences
+                  to customize your email generation experience.
+                </Card.Text>
+              </Card.Body>
+            </Card>
+          </Link>
         </Col>
       </Row>
     </Container>

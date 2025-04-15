@@ -43,7 +43,7 @@ export const UserProvider = ({ children }) => {
   // Demander un code d'authentification
   const requestAuthCode = async (email) => {
     try {
-      await axios.post(`${API_URL}/api/auth/request`, { email });
+      await axios.post(`${API_URL}/auth/request-code`, { email });
       // Stocker temporairement l'email 
       setUserProfile({ email });
       setAuthStep('code');
@@ -57,7 +57,7 @@ export const UserProvider = ({ children }) => {
   // Vérifier un code d'authentification
   const verifyAuthCode = async (email, code) => {
     try {
-      const response = await axios.post(`${API_URL}/api/auth/verify`, { email, code });
+      const response = await axios.post(`${API_URL}/auth/verify-code`, { email, code });
       setUserProfile(response.data);
       setAuthenticated(true);
       setAuthStep('profile');
