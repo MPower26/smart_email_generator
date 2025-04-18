@@ -9,6 +9,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,  // Include cookies in all requests
 });
 
 // Ajout d'un intercepteur pour gérer les erreurs
@@ -20,99 +21,66 @@ api.interceptors.response.use(
   }
 );
 
+// Add request interceptor to include authentication header
+api.interceptors.request.use(
+  (config) => {
+    // Get user profile from localStorage
+    const userProfile = localStorage.getItem('userProfile');
+    if (userProfile) {
+      try {
+        const profile = JSON.parse(userProfile);
+        if (profile && profile.email) {
+          // Set Authorization header with email
+          config.headers.Authorization = profile.email;
+        }
+      } catch (error) {
+        console.error('Error parsing user profile:', error);
+      }
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 // Service d'API pour les emails
 export const emailService = {
-  // Génération d'emails
+  // Get templates
+  getTemplates: () => api.get('/api/emails/templates'),
+  
+  // Generate emails
   generateEmails: (formData) => {
-    // S'assurer que use_ai est un booléen
-    const useAi = formData.get('use_ai') === 'true';
-    formData.set('use_ai', useAi);
-
-    // S'assurer que template_id est un nombre si présent
-    const templateId = formData.get('template_id');
-    if (templateId) {
-      formData.set('template_id', parseInt(templateId));
-    }
-
     return api.post('/api/emails/generate', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     });
   },
-
-  // Récupération des emails par stage
-  getEmailsByStage: (stage) => {
-    return api.get(`/api/emails/by-stage/${stage}`);
-  },
-
-  // Mise à jour du statut d'un email
-  updateEmailStatus: (emailId, status) => {
-    return api.put(`/api/emails/${emailId}/status`, { status });
-  },
-
-  // Mise à jour du stage d'un email
-  updateEmailStage: (emailId, stage) => {
-    return api.put(`/api/emails/${emailId}/stage`, { stage });
-  },
-
-  // Récupération d'informations sur le cache
-  getCacheInfo: () => {
-    return api.get('/api/emails/cache');
-  },
-
-  // Nettoyage du cache
-  clearCache: () => {
-    return api.delete('/api/emails/cache');
-  },
-
-  // Récupération des templates
-  getTemplates: () => {
-    return api.get('/api/templates');
-  },
-
-  // Création d'un template
-  createTemplate: (template) => {
-    return api.post('/api/templates', template);
-  },
-
-  // Mise à jour d'un template
-  updateTemplate: (templateId, template) => {
-    return api.put(`/api/templates/${templateId}`, template);
-  },
-
-  // Suppression d'un template
-  deleteTemplate: (templateId) => {
-    return api.delete(`/api/templates/${templateId}`);
-  }
+  
+  // Update email status (mark as sent, etc.)
+  updateEmailStatus: (emailId, data) => api.put(`/api/emails/${emailId}/status`, data),
+  
+  // Delete email
+  deleteEmail: (emailId) => api.delete(`/api/emails/${emailId}`),
 };
 
-// Service d'API pour les templates
+// Template operations
 export const templateService = {
-  // Récupération de tous les templates
-  getAllTemplates: () => {
-    return api.get('/templates');
-  },
-
-  // Récupération d'un template par ID
-  getTemplate: (templateId) => {
-    return api.get(`/templates/${templateId}`);
-  },
-
-  // Création d'un nouveau template
-  createTemplate: (template) => {
-    return api.post('/templates', template);
-  },
-
-  // Mise à jour d'un template
-  updateTemplate: (templateId, template) => {
-    return api.put(`/templates/${templateId}`, template);
-  },
-
-  // Suppression d'un template
-  deleteTemplate: (templateId) => {
-    return api.delete(`/templates/${templateId}`);
-  },
+  // Get all templates
+  getAllTemplates: () => api.get('/api/emails/templates'),
+  
+  // Get template by ID
+  getTemplate: (templateId) => api.get(`/api/emails/templates/${templateId}`),
+  
+  // Create template
+  createTemplate: (template) => api.post('/api/emails/templates', template),
+  
+  // Update template
+  updateTemplate: (templateId, template) => api.put(`/api/emails/templates/${templateId}`, template),
+  
+  // Delete template
+  deleteTemplate: (templateId) => api.delete(`/api/emails/templates/${templateId}`),
 };
 
 // Service d'API pour les amis et le partage de cache
@@ -153,4 +121,4 @@ export const friendService = {
   },
 };
 
-export default api; 
+export default api;

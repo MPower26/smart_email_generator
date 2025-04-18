@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Header
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 import random
@@ -7,9 +7,49 @@ from ..db.database import get_db
 from ..models.models import User, VerificationCode
 from ..services.email_service import send_verification_email
 from ..schemas.auth import VerificationRequest, VerificationResponse
+from typing import Optional
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# Dependency to get current user
+async def get_current_user(
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+):
+    logger.info(f"Auth header: {authorization}")
+    
+    if not authorization:
+        logger.error("Missing authorization header")
+        raise HTTPException(
+            status_code=401,
+            detail="Unauthorized - Missing credentials"
+        )
+    
+    # Simple auth for development - using email directly
+    email = authorization
+    logger.info(f"Looking up user with email: {email}")
+    
+    user = db.query(User).filter(User.email == email).first()
+    
+    if not user:
+        # For testing purposes, create a test user if it doesn't exist
+        logger.warning(f"Creating test user for email: {email}")
+        user = User(
+            email=email,
+            is_verified=True,
+            full_name="Test User",
+            company_name="Test Company", 
+            position="Test Position"
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        logger.info(f"Created test user with ID: {user.id}")
+    else:
+        logger.info(f"Found existing user with ID: {user.id}")
+    
+    return user
 
 @router.post("/request-code", response_model=VerificationResponse)
 async def request_verification_code(request: VerificationRequest, db: Session = Depends(get_db)):

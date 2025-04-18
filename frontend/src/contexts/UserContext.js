@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 
 // URL de base de l'API
@@ -6,6 +6,15 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 // Création du contexte
 export const UserContext = createContext();
+
+// Custom hook pour utiliser le contexte
+export const useUser = () => {
+  const context = useContext(UserContext);
+  if (!context) {
+    throw new Error('useUser must be used within a UserProvider');
+  }
+  return context;
+};
 
 // Provider du contexte
 export const UserProvider = ({ children }) => {

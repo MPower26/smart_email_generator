@@ -78,8 +78,9 @@ class GeneratedEmail(Base):
     subject = Column(String(255))
     content = Column(String)
     user_id = Column(Integer, ForeignKey("users.id"))
-    template_id = Column(Integer, ForeignKey("email_templates.id"))
+    template_id = Column(Integer, ForeignKey("email_templates.id"), nullable=True)
     status = Column(String(50))  # draft, sent, failed
+    stage = Column(String(50), default="outreach")  # outreach, followup, lastchance
     follow_up_status = Column(String(50))  # none, scheduled, sent
     follow_up_date = Column(DateTime(timezone=True), nullable=True)
     final_follow_up_date = Column(DateTime(timezone=True), nullable=True)

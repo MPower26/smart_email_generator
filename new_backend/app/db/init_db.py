@@ -1,5 +1,5 @@
-from sqlalchemy import inspect
-from ..db.database import engine, Base
+from sqlalchemy import inspect, text
+from ..db.database import engine, Base, SessionLocal
 from ..models.models import User, EmailTemplate, GeneratedEmail, VerificationCode
 
 def init_db():
@@ -13,6 +13,44 @@ def init_db():
     
     # Check tables again after creation
     existing_tables_after = set(inspector.get_table_names())
+    
+    # Check if generated_emails exists and has the stage column
+    if 'generated_emails' in existing_tables_after:
+        columns = {column['name'] for column in inspector.get_columns('generated_emails')}
+        
+        # Create a session to execute custom SQL
+        db = SessionLocal()
+        try:
+            # Add stage column if it doesn't exist
+            if 'stage' not in columns:
+                print("Adding stage column to generated_emails table...")
+                db.execute(text("ALTER TABLE generated_emails ADD COLUMN stage VARCHAR(50) DEFAULT 'outreach'"))
+                db.commit()
+                print("✅ Added stage column to generated_emails table")
+            
+            # Check if any emails exist with NULL stage and update them
+            result = db.execute(text("SELECT COUNT(*) FROM generated_emails WHERE stage IS NULL"))
+            null_stage_count = result.scalar()
+            
+            if null_stage_count > 0:
+                print(f"Updating {null_stage_count} emails with NULL stage...")
+                # Set default stage based on follow_up dates
+                db.execute(text("""
+                    UPDATE generated_emails 
+                    SET stage = CASE
+                        WHEN final_follow_up_date IS NOT NULL THEN 'lastchance'
+                        WHEN follow_up_date IS NOT NULL THEN 'followup'
+                        ELSE 'outreach'
+                    END
+                    WHERE stage IS NULL
+                """))
+                db.commit()
+                print("✅ Updated emails with NULL stage")
+        except Exception as e:
+            db.rollback()
+            print(f"❌ Error updating database: {str(e)}")
+        finally:
+            db.close()
     
     # Get list of new tables that were actually created
     new_tables = list(existing_tables_after - existing_tables_before)

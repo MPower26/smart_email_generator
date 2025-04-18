@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Container, Row, Col, Card, Form, Button, Alert, Tabs, Tab, Badge } from 'react-bootstrap';
 import FileUpload from '../components/FileUpload';
 import EmailPreview from '../components/EmailPreview';
@@ -11,17 +11,29 @@ const GenerateEmailsPage = () => {
   const [generationMethod, setGenerationMethod] = useState('ai');
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState('');
-  const [emails, setEmails] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('generation');
   const [emailStage, setEmailStage] = useState('outreach');
   
-  // Pour les onglets de suivi
+  // Stage-specific email arrays
   const [outreachEmails, setOutreachEmails] = useState([]);
   const [followupEmails, setFollowupEmails] = useState([]);
   const [lastChanceEmails, setLastChanceEmails] = useState([]);
   const [loadingEmails, setLoadingEmails] = useState(false);
+  const [lastAction, setLastAction] = useState({ id: null, type: null }); // { id: emailId, type: 'sent' | 'unmarked' }
+
+  // Track which tab's emails should be collapsed
+  const isTabCollapsed = (tabName) => {
+    // Return true if this is not the active tab, meaning emails should be collapsed
+    return activeTab !== tabName;
+  };
+
+  // Handle tab change
+  const handleTabChange = (tabKey) => {
+    setActiveTab(tabKey);
+    // No need for additional logic, the isCollapsed prop will trigger useEffect in EmailPreview
+  };
 
   // Handle file change
   const handleFileChange = (selectedFile) => {
@@ -48,27 +60,102 @@ const GenerateEmailsPage = () => {
   const loadEmailsByStage = async () => {
     setLoadingEmails(true);
     try {
-      const [outreach, followup, lastChance] = await Promise.all([
-        emailService.getEmailsByStage('outreach'),
-        emailService.getEmailsByStage('followup'),
-        emailService.getEmailsByStage('lastchance')
-      ]);
+      console.log('Loading emails by stage...');
       
-      setOutreachEmails(outreach.data || []);
-      setFollowupEmails(followup.data || []);
-      setLastChanceEmails(lastChance.data || []);
+      // Get the user profile for authentication
+      const userEmail = userProfile?.email;
+      console.log('Current user email for auth:', userEmail);
+      
+      if (!userEmail) {
+        console.error('No user email available for authentication');
+        setError('You must be logged in to view emails');
+        return;
+      }
+      
+      // Simple approach - fetch outreach emails directly
+      try {
+        const response = await fetch('http://localhost:8000/api/emails/by-stage/outreach', {
+          method: 'GET',
+          headers: {
+            'Authorization': userEmail
+          },
+          credentials: 'include'
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Outreach data:', data);
+          setOutreachEmails(data);
+        } else {
+          console.error('Failed to fetch outreach emails:', response.status);
+        }
+      } catch (err) {
+        console.error('Error fetching outreach emails:', err);
+      }
+      
+      // Fetch follow-up emails
+      try {
+        const response = await fetch('http://localhost:8000/api/emails/by-stage/followup', {
+          method: 'GET',
+          headers: {
+            'Authorization': userEmail
+          },
+          credentials: 'include'
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Follow-up data:', data);
+          setFollowupEmails(data);
+        } else {
+          console.error('Failed to fetch follow-up emails:', response.status);
+        }
+      } catch (err) {
+        console.error('Error fetching follow-up emails:', err);
+      }
+      
+      // Fetch last chance emails
+      try {
+        const response = await fetch('http://localhost:8000/api/emails/by-stage/lastchance', {
+          method: 'GET',
+          headers: {
+            'Authorization': userEmail
+          },
+          credentials: 'include'
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Last chance data:', data);
+          setLastChanceEmails(data);
+        } else {
+          console.error('Failed to fetch last chance emails:', response.status);
+        }
+      } catch (err) {
+        console.error('Error fetching last chance emails:', err);
+      }
+      
     } catch (err) {
-      console.error('Error loading emails by stage:', err);
+      console.error('General error loading emails:', err);
+      setError('Failed to load emails. Please try again.');
     } finally {
       setLoadingEmails(false);
     }
   };
 
-  // Load data when component mounts
+  // Load data when component mounts or user profile changes
   useEffect(() => {
     loadTemplates();
     loadEmailsByStage();
-  }, []);
+  }, [userProfile]);
+
+  // Debug user profile
+  useEffect(() => {
+    console.log('Current user profile:', userProfile);
+    // Check localStorage for debugging
+    const storedProfile = localStorage.getItem('userProfile');
+    console.log('Profile in localStorage:', storedProfile ? JSON.parse(storedProfile) : null);
+  }, [userProfile]);
 
   // Generate emails
   const handleGenerateEmails = async () => {
@@ -85,11 +172,11 @@ const GenerateEmailsPage = () => {
     formData.append('use_ai', generationMethod === 'ai');
     formData.append('stage', emailStage);
     
-    // Ajouter les informations du profil utilisateur si disponibles
+    // Add user profile information if available
     if (userProfile) {
-      if (userProfile.name) formData.append('your_name', userProfile.name);
+      if (userProfile.full_name) formData.append('your_name', userProfile.full_name);
       if (userProfile.position) formData.append('your_position', userProfile.position);
-      if (userProfile.companyName) formData.append('company_name', userProfile.companyName);
+      if (userProfile.company_name) formData.append('company_name', userProfile.company_name);
       if (userProfile.email) formData.append('your_contact', userProfile.email);
     }
     
@@ -101,12 +188,11 @@ const GenerateEmailsPage = () => {
       const response = await emailService.generateEmails(formData);
       
       if (response.data && response.data.emails) {
-        setEmails(response.data.emails);
-        setActiveTab('preview');
-        setLoading(false);
+        // Reload emails after generation is complete
+        await loadEmailsByStage();
         
-        // Recharger les emails après une génération réussie
-        loadEmailsByStage();
+        // Switch to appropriate tab based on the stage of generated emails
+        setActiveTab(emailStage);
       } else {
         throw new Error('Invalid response format from server');
       }
@@ -116,16 +202,20 @@ const GenerateEmailsPage = () => {
         err.response?.data?.detail || err.response?.data?.message || 
         'Failed to generate emails. Please check your file and try again.'
       );
+    } finally {
       setLoading(false);
     }
   };
 
-  // Export all emails
-  const handleExportAll = () => {
-    if (emails.length === 0) return;
+  // Export emails from a specific stage
+  const handleExportStage = (stageEmails, stageName) => {
+    if (stageEmails.length === 0) {
+      setError(`No ${stageName} emails to export.`);
+      return;
+    }
 
     let content = '';
-    emails.forEach(email => {
+    stageEmails.forEach(email => {
       content += `TO: ${email.to}\n`;
       content += `SUBJECT: ${email.subject}\n`;
       content += `BODY:\n${email.body}\n\n`;
@@ -136,44 +226,59 @@ const GenerateEmailsPage = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'generated-emails.txt';
+    a.download = `${stageName}-emails.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
   
-  // Marquer un email comme envoyé
-  const handleMarkAsSent = async (emailId, stage) => {
+  // Mark an email as sent (updates status in DB only)
+  const handleMarkAsSent = async (emailId) => {
+    setError(null); // Clear previous errors
     try {
       await emailService.updateEmailStatus(emailId, { status: 'sent' });
-      // Recharger les emails après
-      loadEmailsByStage();
+      setLastAction({ id: emailId, type: 'sent' }); // <-- Set action type to 'sent'
+      loadEmailsByStage(); // Reload to reflect status change
     } catch (err) {
       console.error('Error marking email as sent:', err);
       setError('Failed to update email status.');
+      setLastAction({ id: null, type: null }); // Clear highlight on error
     }
   };
-  
-  // Déplacer un email vers l'étape suivante (Outreach -> FollowUp -> LastChance)
-  const handleMoveToNextStage = async (emailId, currentStage) => {
-    let nextStage;
-    
-    if (currentStage === 'outreach') {
-      nextStage = 'followup';
-    } else if (currentStage === 'followup') {
-      nextStage = 'lastchance';
-    } else {
-      return; // Déjà dans la dernière étape
-    }
-    
+
+  // Unmark an email as sent (sets status back to draft)
+  const handleUnmarkAsSent = async (emailId) => {
+    setError(null); // Clear previous errors
     try {
-      await emailService.updateEmailStage(emailId, { stage: nextStage });
-      // Recharger les emails après
-      loadEmailsByStage();
+      await emailService.updateEmailStatus(emailId, { status: 'draft' });
+      setLastAction({ id: emailId, type: 'unmarked' }); // <-- Set action type to 'unmarked'
+      loadEmailsByStage(); // Reload to reflect status change
     } catch (err) {
-      console.error('Error moving email to next stage:', err);
-      setError('Failed to update email stage.');
+      console.error('Error unmarking email:', err);
+      setError('Failed to unmark email.');
+      setLastAction({ id: null, type: null }); // Clear highlight on error
+    }
+  };
+
+  // Delete an email
+  const handleDeleteEmail = async (emailId) => {
+    console.log(`[GenerateEmailsPage] handleDeleteEmail called for ID: ${emailId}`); // <-- Log entry
+    setError(null); // Clear previous errors
+    // Remove this line for now, error handling in child handles it
+    // setLastAction({ id: null, type: null }); 
+    try {
+      console.log(`[GenerateEmailsPage] Calling emailService.deleteEmail for ID: ${emailId}`);
+      await emailService.deleteEmail(emailId);
+      console.log(`[GenerateEmailsPage] deleteEmail service call finished for ID: ${emailId}`);
+      loadEmailsByStage(); // Reload to reflect deletion
+    } catch (err) {
+      console.error('[GenerateEmailsPage] Error deleting email:', err);
+      const errorDetail = err.response?.data?.detail || err.message || 'An unknown error occurred';
+      setError(`Failed to delete email: ${errorDetail}`);
+      // Re-throw so the preview component can handle its loading state
+      console.log('[GenerateEmailsPage] Re-throwing error after delete failure.');
+      throw new Error(`Failed to delete email: ${errorDetail}`); 
     }
   };
 
@@ -183,7 +288,7 @@ const GenerateEmailsPage = () => {
 
       <Tabs
         activeKey={activeTab}
-        onSelect={(k) => setActiveTab(k)}
+        onSelect={(k) => handleTabChange(k)}
         className="mb-4"
       >
         <Tab eventKey="generation" title="Generation">
@@ -284,191 +389,145 @@ const GenerateEmailsPage = () => {
           </Card>
         </Tab>
 
-        <Tab eventKey="preview" title="Preview">
+        <Tab eventKey="outreach" title={<span>Outreach {outreachEmails.length > 0 && <Badge bg="primary">{outreachEmails.length}</Badge>}</span>}>
           <Card>
             <Card.Body>
-              {emails.length > 0 ? (
+              {loadingEmails ? (
+                <div className="text-center p-4">
+                  <div className="spinner-border text-primary" role="status">
+                    <span className="visually-hidden">Loading...</span>
+                  </div>
+                </div>
+              ) : outreachEmails.length === 0 ? (
+                <div className="text-center p-4 bg-light rounded">
+                  <p className="mb-0">No outreach emails found. Generate emails with the "Initial Outreach" stage to see them here.</p>
+                </div>
+              ) : (
                 <>
-                  <div className="d-flex justify-content-between align-items-center mb-4">
-                    <h5>Generated Emails ({emails.length})</h5>
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <h5>Outreach Emails ({outreachEmails.length})</h5>
                     <Button 
-                      variant="success" 
-                      onClick={handleExportAll}
+                      variant="outline-secondary" 
+                      size="sm"
+                      onClick={() => handleExportStage(outreachEmails, 'outreach')}
                     >
-                      Export All
+                      Export Outreach Emails
                     </Button>
                   </div>
-                  
-                  {emails.map((email, index) => (
-                    <EmailPreview 
-                      key={index} 
-                      email={email} 
-                      index={index} 
-                    />
-                  ))}
+                  <div className="email-list">
+                    {[...outreachEmails]
+                      .sort((a, b) => (a.status === 'sent' ? 1 : 0) - (b.status === 'sent' ? 1 : 0))
+                      .map((email, index) => (
+                        <div key={index} className="mb-2">
+                          <EmailPreview 
+                            email={email} 
+                            onSend={handleMarkAsSent}
+                            onUnmarkSent={handleUnmarkAsSent}
+                            onDelete={handleDeleteEmail}
+                            isCollapsed={isTabCollapsed('outreach')}
+                            isSentHighlight={lastAction.type === 'sent' && lastAction.id === email.id}
+                            isUnmarkedHighlight={lastAction.type === 'unmarked' && lastAction.id === email.id}
+                          />
+                        </div>
+                      ))}
+                  </div>
                 </>
-              ) : (
-                <Alert variant="info">
-                  No emails generated. Please return to the 'Generation' tab to start.
-                </Alert>
               )}
             </Card.Body>
           </Card>
         </Tab>
         
-        <Tab eventKey="outreach" title={<span>Outreach <Badge bg="primary">{outreachEmails.length}</Badge></span>}>
+        <Tab eventKey="followup" title={<span>Follow-Up {followupEmails.length > 0 && <Badge bg="primary">{followupEmails.length}</Badge>}</span>}>
           <Card>
             <Card.Body>
-              <h5 className="mb-4">Initial Outreach Emails</h5>
               {loadingEmails ? (
-                <div className="text-center my-4">
+                <div className="text-center p-4">
                   <div className="spinner-border text-primary" role="status">
                     <span className="visually-hidden">Loading...</span>
                   </div>
                 </div>
-              ) : outreachEmails.length > 0 ? (
-                outreachEmails.map((email, index) => (
-                  <Card key={index} className="mb-3">
-                    <Card.Header className="d-flex justify-content-between align-items-center">
-                      <div>
-                        <strong>To:</strong> {email.to}
-                      </div>
-                      <div>
-                        <Badge bg={email.status === 'sent' ? 'success' : 'warning'}>
-                          {email.status || 'Not Sent'}
-                        </Badge>
-                      </div>
-                    </Card.Header>
-                    <Card.Body>
-                      <h6>Subject: {email.subject}</h6>
-                      <p className="email-body">{email.body}</p>
-                    </Card.Body>
-                    <Card.Footer className="d-flex justify-content-end">
-                      {email.status !== 'sent' && (
-                        <Button 
-                          variant="outline-success" 
-                          size="sm" 
-                          className="me-2"
-                          onClick={() => handleMarkAsSent(email.id, 'outreach')}
-                        >
-                          Mark as Sent
-                        </Button>
-                      )}
-                      <Button 
-                        variant="outline-primary" 
-                        size="sm"
-                        onClick={() => handleMoveToNextStage(email.id, 'outreach')}
-                      >
-                        Move to Follow-Up
-                      </Button>
-                    </Card.Footer>
-                  </Card>
-                ))
+              ) : followupEmails.length === 0 ? (
+                <div className="text-center p-4 bg-light rounded">
+                  <p className="mb-0">No follow-up emails found. Generate emails with the "Follow-Up" stage or move outreach emails to this stage.</p>
+                </div>
               ) : (
-                <Alert variant="info">No outreach emails found.</Alert>
+                <>
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <h5>Follow-Up Emails ({followupEmails.length})</h5>
+                    <Button 
+                      variant="outline-secondary" 
+                      size="sm"
+                      onClick={() => handleExportStage(followupEmails, 'followup')}
+                    >
+                      Export Follow-Up Emails
+                    </Button>
+                  </div>
+                  <div className="email-list">
+                    {[...followupEmails]
+                      .sort((a, b) => (a.status === 'sent' ? 1 : 0) - (b.status === 'sent' ? 1 : 0))
+                      .map((email, index) => (
+                        <div key={index} className="mb-2">
+                          <EmailPreview 
+                            email={email} 
+                            onSend={handleMarkAsSent}
+                            onUnmarkSent={handleUnmarkAsSent}
+                            onDelete={handleDeleteEmail}
+                            isCollapsed={isTabCollapsed('followup')}
+                            isSentHighlight={lastAction.type === 'sent' && lastAction.id === email.id}
+                            isUnmarkedHighlight={lastAction.type === 'unmarked' && lastAction.id === email.id}
+                          />
+                        </div>
+                      ))}
+                  </div>
+                </>
               )}
             </Card.Body>
           </Card>
         </Tab>
         
-        <Tab eventKey="followup" title={<span>Follow-Up <Badge bg="primary">{followupEmails.length}</Badge></span>}>
+        <Tab eventKey="lastChance" title={<span>Last Chance {lastChanceEmails.length > 0 && <Badge bg="primary">{lastChanceEmails.length}</Badge>}</span>}>
           <Card>
             <Card.Body>
-              <h5 className="mb-4">Follow-Up Emails</h5>
               {loadingEmails ? (
-                <div className="text-center my-4">
+                <div className="text-center p-4">
                   <div className="spinner-border text-primary" role="status">
                     <span className="visually-hidden">Loading...</span>
                   </div>
                 </div>
-              ) : followupEmails.length > 0 ? (
-                followupEmails.map((email, index) => (
-                  <Card key={index} className="mb-3">
-                    <Card.Header className="d-flex justify-content-between align-items-center">
-                      <div>
-                        <strong>To:</strong> {email.to}
-                      </div>
-                      <div>
-                        <Badge bg={email.status === 'sent' ? 'success' : 'warning'}>
-                          {email.status || 'Not Sent'}
-                        </Badge>
-                      </div>
-                    </Card.Header>
-                    <Card.Body>
-                      <h6>Subject: {email.subject}</h6>
-                      <p className="email-body">{email.body}</p>
-                    </Card.Body>
-                    <Card.Footer className="d-flex justify-content-end">
-                      {email.status !== 'sent' && (
-                        <Button 
-                          variant="outline-success" 
-                          size="sm" 
-                          className="me-2"
-                          onClick={() => handleMarkAsSent(email.id, 'followup')}
-                        >
-                          Mark as Sent
-                        </Button>
-                      )}
-                      <Button 
-                        variant="outline-primary" 
-                        size="sm"
-                        onClick={() => handleMoveToNextStage(email.id, 'followup')}
-                      >
-                        Move to Last Chance
-                      </Button>
-                    </Card.Footer>
-                  </Card>
-                ))
-              ) : (
-                <Alert variant="info">No follow-up emails found.</Alert>
-              )}
-            </Card.Body>
-          </Card>
-        </Tab>
-        
-        <Tab eventKey="lastchance" title={<span>Last Chance <Badge bg="primary">{lastChanceEmails.length}</Badge></span>}>
-          <Card>
-            <Card.Body>
-              <h5 className="mb-4">Last Chance Emails</h5>
-              {loadingEmails ? (
-                <div className="text-center my-4">
-                  <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Loading...</span>
-                  </div>
+              ) : lastChanceEmails.length === 0 ? (
+                <div className="text-center p-4 bg-light rounded">
+                  <p className="mb-0">No last chance emails found. Generate emails with the "Last Chance" stage or move follow-up emails to this stage.</p>
                 </div>
-              ) : lastChanceEmails.length > 0 ? (
-                lastChanceEmails.map((email, index) => (
-                  <Card key={index} className="mb-3">
-                    <Card.Header className="d-flex justify-content-between align-items-center">
-                      <div>
-                        <strong>To:</strong> {email.to}
-                      </div>
-                      <div>
-                        <Badge bg={email.status === 'sent' ? 'success' : 'warning'}>
-                          {email.status || 'Not Sent'}
-                        </Badge>
-                      </div>
-                    </Card.Header>
-                    <Card.Body>
-                      <h6>Subject: {email.subject}</h6>
-                      <p className="email-body">{email.body}</p>
-                    </Card.Body>
-                    <Card.Footer className="d-flex justify-content-end">
-                      {email.status !== 'sent' && (
-                        <Button 
-                          variant="outline-success" 
-                          size="sm" 
-                          className="me-2"
-                          onClick={() => handleMarkAsSent(email.id, 'lastchance')}
-                        >
-                          Mark as Sent
-                        </Button>
-                      )}
-                    </Card.Footer>
-                  </Card>
-                ))
               ) : (
-                <Alert variant="info">No last chance emails found.</Alert>
+                <>
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <h5>Last Chance Emails ({lastChanceEmails.length})</h5>
+                    <Button 
+                      variant="outline-secondary" 
+                      size="sm"
+                      onClick={() => handleExportStage(lastChanceEmails, 'lastchance')}
+                    >
+                      Export Last Chance Emails
+                    </Button>
+                  </div>
+                  <div className="email-list">
+                    {[...lastChanceEmails]
+                      .sort((a, b) => (a.status === 'sent' ? 1 : 0) - (b.status === 'sent' ? 1 : 0))
+                      .map((email, index) => (
+                        <div key={index} className="mb-2">
+                          <EmailPreview 
+                            email={email} 
+                            onSend={handleMarkAsSent}
+                            onUnmarkSent={handleUnmarkAsSent}
+                            onDelete={handleDeleteEmail}
+                            isCollapsed={isTabCollapsed('lastChance')}
+                            isSentHighlight={lastAction.type === 'sent' && lastAction.id === email.id}
+                            isUnmarkedHighlight={lastAction.type === 'unmarked' && lastAction.id === email.id}
+                          />
+                        </div>
+                      ))}
+                  </div>
+                </>
               )}
             </Card.Body>
           </Card>

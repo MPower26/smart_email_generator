@@ -181,7 +181,7 @@ const SettingsPage = () => {
               <h4 className="mb-0">Gestion du cache</h4>
             </Card.Header>
             <Card.Body>
-              <p className="text-muted">
+              <p className="text-white">
                 L'application stocke en cache les résultats de génération d'emails pour améliorer les performances. 
                 Vous pouvez vider le cache si nécessaire.
               </p>
@@ -226,12 +226,12 @@ const SettingsPage = () => {
               <h4 className="mb-0">À propos</h4>
             </Card.Header>
             <Card.Body>
-              <p><strong>Version de l'application:</strong> 1.0.0</p>
-              <p>
+              <p className="text-white"><strong>Version de l'application:</strong> 1.0.0</p>
+              <p className="text-white">
                 Cette application permet de générer des emails personnalisés à partir de listes de contacts,
                 en utilisant l'IA ou des templates prédéfinis.
               </p>
-              <p>
+              <p className="text-white">
                 Pour toute question ou assistance, veuillez contacter l'administrateur système.
               </p>
             </Card.Body>

@@ -171,7 +171,7 @@ const AuthScreen = () => {
             <Form onSubmit={handleCodeSubmit}>
               <Form.Group className="mb-3">
                 <Form.Label>Code d'authentification</Form.Label>
-                <p className="text-muted small mb-3">
+                <p className="text-white small mb-3">
                   Un code à 6 chiffres a été envoyé à {email}
                 </p>
                 
