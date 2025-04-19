@@ -4,6 +4,18 @@ import axios from 'axios';
 // URL de base de l'API
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
+// Helper function to set auth header
+const setAuthHeader = (email) => {
+  if (email) {
+    const authHeader = `Bearer ${email}`;
+    console.log('Setting auth header:', authHeader);
+    axios.defaults.headers.common['Authorization'] = authHeader;
+  } else {
+    console.log('Removing auth header');
+    delete axios.defaults.headers.common['Authorization'];
+  }
+};
+
 // Création du contexte
 export const UserContext = createContext();
 
@@ -27,15 +39,29 @@ export const UserProvider = ({ children }) => {
   useEffect(() => {
     // Check for existing email in localStorage
     const storedEmail = localStorage.getItem('userEmail');
+    console.log('Checking stored email:', storedEmail);
     if (storedEmail) {
       setUserProfile({ email: storedEmail });
       setAuthenticated(true);
       setAuthStep('profile');
-      // Set authorization header
-      axios.defaults.headers.common['Authorization'] = storedEmail;
+      setAuthHeader(storedEmail);
+      // Fetch the full user profile
+      fetchUserProfile();
     }
     setLoading(false);
   }, []);
+
+  const fetchUserProfile = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/users/me`);
+      console.log('Fetched user profile:', response.data);
+      setUserProfile(response.data);
+      return true;
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      return false;
+    }
+  };
 
   const requestAuthCode = async (email) => {
     try {
@@ -59,9 +85,10 @@ export const UserProvider = ({ children }) => {
       
       // Store email in localStorage
       localStorage.setItem('userEmail', email);
+      setAuthHeader(email);
       
-      // Set authorization header
-      axios.defaults.headers.common['Authorization'] = email;
+      // Fetch the full user profile after verification
+      await fetchUserProfile();
       
       return true;
     } catch (error) {
@@ -75,11 +102,32 @@ export const UserProvider = ({ children }) => {
     setAuthenticated(false);
     setAuthStep('email');
     localStorage.removeItem('userEmail');
-    delete axios.defaults.headers.common['Authorization'];
+    setAuthHeader(null);
   };
 
-  const updateUserProfile = (profile) => {
-    setUserProfile({...userProfile, ...profile});
+  const updateUserProfile = async (profileData) => {
+    try {
+      console.log('Current auth header:', axios.defaults.headers.common['Authorization']);
+      console.log('Updating profile with data:', profileData);
+      const response = await axios.put(`${API_URL}/api/users/settings`, profileData);
+      console.log('Profile update response:', response.data);
+      
+      // Update the user profile with the complete response data
+      if (response.data && response.data.user) {
+        setUserProfile(prev => ({
+          ...prev,
+          ...response.data.user
+        }));
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error updating user profile:', error);
+      if (error.response) {
+        console.error('Error response:', error.response.data);
+      }
+      return false;
+    }
   };
 
   return (

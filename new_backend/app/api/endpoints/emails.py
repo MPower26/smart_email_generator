@@ -4,14 +4,41 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 import logging
 import json
+import csv
+import io
 from fastapi import status
 
 from app.db.database import get_db
 from app.models.models import GeneratedEmail, User, EmailTemplate
 from app.api.auth import get_current_user
+from app.services.email_generator import EmailGenerator
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+@router.get("/cache")
+async def get_cache_info(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get information about the email cache"""
+    # For now, just return a simple response since we don't have actual caching
+    return {
+        "status": "active",
+        "size": 0,
+        "last_cleared": None
+    }
+
+@router.delete("/cache")
+async def clear_cache(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Clear the email cache"""
+    # For now, just return success since we don't have actual caching
+    return {
+        "message": "Cache cleared successfully"
+    }
 
 @router.get("/by-stage/{stage}", response_model=List[Dict[str, Any]])
 async def get_emails_by_stage(
@@ -132,24 +159,95 @@ async def get_templates(
 
 @router.post("/generate", response_model=Dict[str, Any])
 async def generate_emails(
-    file: Optional[UploadFile] = File(None),
-    use_ai: bool = Form(False),
-    stage: str = Form("outreach"),
-    template_id: Optional[int] = Form(None),
-    your_name: Optional[str] = Form(None),
-    your_position: Optional[str] = Form(None),
-    company_name: Optional[str] = Form(None),
-    your_contact: Optional[str] = Form(None),
+    file: UploadFile = File(...),
+    template_id: Optional[str] = Form(None),
+    stage: str = Form("outreach"),  # Add stage parameter with default value
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Generate emails based on CSV or AI"""
-    # This endpoint remains complex, ensure its implementation is correct
-    logger.info(f"Generate request for user {current_user.email} with stage {stage}")
-    # TODO: Replace placeholder response with actual generation logic
-    # For now, just acknowledging the request
-    # Ensure the actual generation logic fetches data, processes, saves to DB correctly
-    return {"message": "Email generation request received", "details": {"stage": stage, "use_ai": use_ai}}
+    """Generate emails based on Apollo contacts export"""
+    logger.info(f"Generate request for user {current_user.email}")
+    
+    try:
+        # Read and parse the CSV file
+        contents = await file.read()
+        csv_file = io.StringIO(contents.decode('utf-8'))
+        reader = csv.DictReader(csv_file)
+        contacts = list(reader)
+        
+        # Get template if provided
+        template = None
+        if template_id:
+            template = db.query(EmailTemplate).filter(
+                EmailTemplate.id == template_id,
+                EmailTemplate.user_id == current_user.id
+            ).first()
+            if not template:
+                raise HTTPException(status_code=404, detail="Template not found")
+        
+        # Initialize email generator
+        email_generator = EmailGenerator(db)
+        
+        # Generate emails for each contact
+        generated_emails = []
+        for contact in contacts:
+            # Skip contacts without email
+            if not contact.get('Email'):
+                continue
+                
+            # Format contact data for email generation
+            contact_data = {
+                "First Name": contact.get('First Name', ''),
+                "Last Name": contact.get('Last Name', ''),
+                "Email": contact.get('Email', ''),
+                "Title": contact.get('Title', ''),
+                "Company": contact.get('Company', ''),
+                "Industry": contact.get('Industry', ''),
+                "Keywords": contact.get('Keywords', ''),
+                "SEO Description": contact.get('SEO Description', ''),
+                "Website": contact.get('Website', ''),
+                "Company LinkedIn": contact.get('Company Linkedin Url', ''),
+                "Person LinkedIn": contact.get('Person Linkedin Url', ''),
+                "Location": f"{contact.get('City', '')}, {contact.get('State', '')}, {contact.get('Country', '')}",
+                "Company Size": contact.get('# Employees', ''),
+                "Revenue": contact.get('Annual Revenue', ''),
+                "Funding": contact.get('Total Funding', '')
+            }
+            
+            try:
+                email = email_generator.generate_personalized_email(
+                    contact_data,
+                    current_user,
+                    template,
+                    stage  # Pass the stage parameter
+                )
+                generated_emails.append(email)
+            except Exception as e:
+                logger.error(f"Error generating email for {contact.get('Email', '')}: {str(e)}")
+                continue
+        
+        # Format the emails for response
+        formatted_emails = []
+        for email in generated_emails:
+            content_lines = email.content.split('\n')
+            subject = content_lines[0].strip()
+            content = '\n'.join(content_lines[1:]).strip()
+            
+            formatted_emails.append({
+                "to": email.recipient_email,
+                "content": content,
+                "subject": subject
+            })
+        
+        return {
+            "message": "Emails generated successfully",
+            "emails": formatted_emails,
+            "count": len(generated_emails)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error generating emails: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.delete("/{email_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_email_endpoint(

@@ -1,16 +1,16 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { Container, Row, Col, Form, Button, Card, Alert, Spinner } from 'react-bootstrap';
-import { getCacheInfo, clearCache } from '../services/emailApi';
+import { emailService } from '../services/api';
 import { UserContext } from '../contexts/UserContext';
 
 const SettingsPage = () => {
   const { userProfile, updateUserProfile, logout } = useContext(UserContext);
   const [profile, setProfile] = useState({
-    name: '',
+    full_name: '',
     email: '',
     position: '',
-    companyName: '',
-    companyDescription: ''
+    company_name: '',
+    company_description: ''
   });
   const [cacheInfo, setCacheInfo] = useState(null);
   const [loadingCache, setLoadingCache] = useState(false);
@@ -22,11 +22,11 @@ const SettingsPage = () => {
   useEffect(() => {
     if (userProfile) {
       setProfile({
-        name: userProfile.name || '',
+        full_name: userProfile.full_name || '',
         email: userProfile.email || '',
         position: userProfile.position || '',
-        companyName: userProfile.companyName || '',
-        companyDescription: userProfile.companyDescription || ''
+        company_name: userProfile.company_name || '',
+        company_description: userProfile.company_description || ''
       });
     }
     fetchCacheInfo();
@@ -37,7 +37,7 @@ const SettingsPage = () => {
     setLoadingCache(true);
     setCacheError('');
     try {
-      const result = await getCacheInfo();
+      const result = await emailService.getCacheInfo();
       setCacheInfo(result);
     } catch (err) {
       console.error('Erreur lors du chargement des informations du cache:', err);
@@ -52,7 +52,7 @@ const SettingsPage = () => {
     setClearingCache(true);
     setCacheError('');
     try {
-      await clearCache();
+      await emailService.clearCache();
       fetchCacheInfo();
     } catch (err) {
       console.error('Erreur lors du vidage du cache:', err);
@@ -73,10 +73,35 @@ const SettingsPage = () => {
   };
 
   // Sauvegarder le profil utilisateur
-  const handleSaveProfile = () => {
-    updateUserProfile(profile);
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
+  const handleSaveProfile = async () => {
+    try {
+      const updateData = {};
+      
+      // Only include fields that have changed
+      if (profile.full_name !== userProfile?.full_name) {
+        updateData.full_name = profile.full_name;
+      }
+      if (profile.position !== userProfile?.position) {
+        updateData.position = profile.position;
+      }
+      if (profile.company_name !== userProfile?.company_name) {
+        updateData.company_name = profile.company_name;
+      }
+      if (profile.company_description !== userProfile?.company_description) {
+        updateData.company_description = profile.company_description;
+      }
+
+      // Only make the request if there are changes
+      if (Object.keys(updateData).length > 0) {
+        await updateUserProfile(updateData);
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 3000);
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      setCacheError('Failed to update profile. Please try again.');
+      setTimeout(() => setCacheError(''), 3000);
+    }
   };
 
   return (
@@ -99,8 +124,8 @@ const SettingsPage = () => {
                     <Form.Control
                       type="text"
                       placeholder="John Doe"
-                      name="name"
-                      value={profile.name}
+                      name="full_name"
+                      value={profile.full_name}
                       onChange={handleInputChange}
                     />
                   </Form.Group>
@@ -114,7 +139,11 @@ const SettingsPage = () => {
                       name="email"
                       value={profile.email}
                       onChange={handleInputChange}
+                      disabled
                     />
+                    <Form.Text className="text-muted">
+                      L'email ne peut pas être modifié
+                    </Form.Text>
                   </Form.Group>
                 </Col>
               </Row>
@@ -138,8 +167,8 @@ const SettingsPage = () => {
                     <Form.Control
                       type="text"
                       placeholder="Acme Inc."
-                      name="companyName"
-                      value={profile.companyName}
+                      name="company_name"
+                      value={profile.company_name}
                       onChange={handleInputChange}
                     />
                   </Form.Group>
@@ -152,8 +181,8 @@ const SettingsPage = () => {
                   as="textarea"
                   rows={3}
                   placeholder="Une brève description de votre entreprise, ses activités et sa proposition de valeur..."
-                  name="companyDescription"
-                  value={profile.companyDescription}
+                  name="company_description"
+                  value={profile.company_description}
                   onChange={handleInputChange}
                 />
               </Form.Group>

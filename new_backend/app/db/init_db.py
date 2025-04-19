@@ -14,6 +14,25 @@ def init_db():
     # Check tables again after creation
     existing_tables_after = set(inspector.get_table_names())
     
+    # Check if users table exists and has the company_description column
+    if 'users' in existing_tables_after:
+        columns = {column['name'] for column in inspector.get_columns('users')}
+        
+        # Create a session to execute custom SQL
+        db = SessionLocal()
+        try:
+            # Add company_description column if it doesn't exist
+            if 'company_description' not in columns:
+                print("Adding company_description column to users table...")
+                db.execute(text("ALTER TABLE users ADD company_description NVARCHAR(MAX)"))
+                db.commit()
+                print("✅ Added company_description column to users table")
+        except Exception as e:
+            db.rollback()
+            print(f"❌ Error updating users table: {str(e)}")
+        finally:
+            db.close()
+    
     # Check if generated_emails exists and has the stage column
     if 'generated_emails' in existing_tables_after:
         columns = {column['name'] for column in inspector.get_columns('generated_emails')}
@@ -24,7 +43,7 @@ def init_db():
             # Add stage column if it doesn't exist
             if 'stage' not in columns:
                 print("Adding stage column to generated_emails table...")
-                db.execute(text("ALTER TABLE generated_emails ADD COLUMN stage VARCHAR(50) DEFAULT 'outreach'"))
+                db.execute(text("ALTER TABLE generated_emails ADD stage NVARCHAR(50) DEFAULT 'outreach'"))
                 db.commit()
                 print("✅ Added stage column to generated_emails table")
             

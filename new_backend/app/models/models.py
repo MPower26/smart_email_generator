@@ -31,6 +31,7 @@ class User(Base):
     failed_verification_attempts = Column(Integer, default=0)
     last_verification_attempt = Column(DateTime(timezone=True), nullable=True)
     company_name = Column(String(255))
+    company_description = Column(Text)
     position = Column(String(255))
     full_name = Column(String(255))
     contact_info = Column(String(255))

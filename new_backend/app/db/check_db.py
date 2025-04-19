@@ -11,7 +11,14 @@ def check_database():
     print("\n=== USERS ===")
     if users:
         for user in users:
-            print(f"ID: {user.id}, Email: {user.email}")
+            print(f"ID: {user.id}")
+            print(f"Email: {user.email}")
+            print(f"Full Name: {user.full_name}")
+            print(f"Position: {user.position}")
+            print(f"Company Name: {user.company_name}")
+            print(f"Is Verified: {user.is_verified}")
+            print(f"Is Active: {user.is_active}")
+            print("---")
     else:
         print("No users found")
     

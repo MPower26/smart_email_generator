@@ -86,7 +86,7 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
       
       const mailtoLink = `mailto:${recipient}?subject=${subject}&body=${body}`;
       
-      if (mailtoLink.length > 2000) {
+      if (mailtoLink.length > 10000) {
           setError('Email content too long for mailto link. Marked as sent, but client might not open.');
           setTimeout(() => setError(null), 5000);
           // Decide if you still want to try opening

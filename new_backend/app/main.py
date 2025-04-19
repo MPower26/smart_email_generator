@@ -6,6 +6,7 @@ from app.api.endpoints import emails, friends
 from app.api import auth
 from app.db.database import engine
 from app.models.models import Base
+from app.routers import users
 
 # Configure logging
 logging.basicConfig(
@@ -30,6 +31,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(emails.router, prefix="/api/emails", tags=["Emails"])
 app.include_router(friends.router, prefix="/api/friends", tags=["Friends"])
+app.include_router(users.router, prefix="/api/users", tags=["Users"])
 
 @app.get("/")
 async def root():

@@ -1,208 +1,138 @@
-/* Styles for the sticky friends button */
 .friends-button {
   position: fixed;
-  right: 20px;
   bottom: 20px;
+  right: 20px;
   width: 60px;
   height: 60px;
   border-radius: 50%;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
   z-index: 1000;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-  transition: transform 0.2s ease;
-}
-
-.friends-button:hover {
-  transform: scale(1.1);
 }
 
 .friends-badge {
   position: absolute;
   top: -5px;
   right: -5px;
-  font-size: 0.7rem;
-  padding: 0.25rem 0.4rem;
+  font-size: 0.8rem;
 }
 
-/* Styles for the side panel */
-.offcanvas {
-  max-width: 400px;
-}
-
-/* Styles for the tabs */
-.friends-tabs {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 20px;
-}
-
-/* Styles for the friend list */
-.list-group-item {
-  background-color: transparent;
-  border-color: rgba(255, 255, 255, 0.1);
-  transition: background-color 0.2s ease;
-}
-
-.list-group-item:hover {
-  background-color: rgba(255, 255, 255, 0.05);
-}
-
-/* Styles for action buttons */
-.btn-link {
-  transition: transform 0.2s ease;
-}
-
-.btn-link:hover {
-  transform: scale(1.2);
-}
-
-/* Styles for alerts */
-.alert {
-  margin-bottom: 1rem;
-  animation: fadeIn 0.3s ease;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Dark theme styles */
-.offcanvas {
-  background-color: #1a1a1a;
-  color: #ffffff;
-}
-
-.offcanvas-header {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.offcanvas-title {
-  color: #ffffff;
-}
-
-.form-control {
-  background-color: #2a2a2a;
-  border-color: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
-}
-
-.form-control:focus {
-  background-color: #2a2a2a;
-  border-color: #0d6efd;
-  color: #ffffff;
-  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
-}
-
-.form-control::placeholder {
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.text-muted {
-  color: rgba(255, 255, 255, 0.6) !important;
-}
-
-/* Loading spinner styles */
-.spinner-border {
-  width: 1.5rem;
-  height: 1.5rem;
-  border-width: 0.15em;
-}
-
-/* Styles pour le contenu */
-.friends-content {
-  margin-top: 20px;
+.friends-panel {
+  width: 400px;
+  max-width: 90vw;
 }
 
 .friend-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 1rem;
+  padding: 10px;
   border-bottom: 1px solid #eee;
 }
 
-.friend-details {
+.friend-info {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 10px;
 }
 
 .friend-actions {
   display: flex;
-  gap: 0.5rem;
+  gap: 5px;
 }
 
-.friend-request {
+.friend-status {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.friend-email {
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.friend-sharing-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.friend-sharing-label {
+  font-size: 0.9rem;
+  margin-right: 5px;
+}
+
+.friend-request-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 1rem;
+  padding: 10px;
   border-bottom: 1px solid #eee;
 }
 
-.request-details {
+.friend-request-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.friend-request-info {
   display: flex;
   flex-direction: column;
 }
 
-.request-actions {
+.friend-request-email {
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.friend-request-date {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.add-friend-form {
+  padding: 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.add-friend-input-group {
   display: flex;
-  gap: 0.5rem;
+  gap: 10px;
 }
 
-.sharing-toggle {
-  cursor: pointer;
-  color: #6c757d;
+.add-friend-input {
+  flex: 1;
 }
 
-.sharing-toggle.active {
-  color: #28a745;
+.friends-tabs {
+  margin-bottom: 20px;
 }
 
-/* Animation pour les notifications */
-@keyframes fadeInOut {
-  0% { opacity: 0; }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  100% { opacity: 0; }
+.friends-tab-content {
+  padding: 20px 0;
 }
 
-.text-danger, .text-success {
-  animation: fadeInOut 5s forwards;
+.friends-loading {
+  display: flex;
+  justify-content: center;
+  padding: 20px;
 }
 
-/* Form check switch styling */
-.form-check-input {
-  width: 2rem !important;
-  height: 1rem !important;
-  margin-top: 0.25rem;
-  background-image: none;
-  cursor: pointer;
-}
-
-.form-check-input:checked {
-  background-color: #0d6efd;
-  border-color: #0d6efd;
-}
-
-.form-check-input:focus {
-  border-color: #0d6efd;
-  box-shadow: none;
-}
-
-/* Delete button styling */
-.delete-friend-btn {
+.friends-error {
   color: #dc3545;
+  padding: 10px;
+  margin: 10px 0;
+  border-radius: 4px;
+  background-color: #f8d7da;
 }
 
-.delete-friend-btn:hover {
-  color: #bb2d3b;
+.friends-success {
+  color: #198754;
+  padding: 10px;
+  margin: 10px 0;
+  border-radius: 4px;
+  background-color: #d1e7dd;
 } 

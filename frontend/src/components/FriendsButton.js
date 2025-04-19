@@ -335,12 +335,7 @@ const FriendsButton = () => {
         }}
       >
         <Offcanvas.Header closeButton>
-          <Offcanvas.Title className="d-flex align-items-center">
-            Friends Management
-            {loading && (
-              <Spinner animation="border" variant="primary" size="sm" className="ms-2" />
-            )}
-          </Offcanvas.Title>
+          <Offcanvas.Title>Friends</Offcanvas.Title>
         </Offcanvas.Header>
         <Offcanvas.Body>
           {/* Navigation between tabs */}
