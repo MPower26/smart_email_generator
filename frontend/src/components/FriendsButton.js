@@ -1,12 +1,9 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Button, Offcanvas, Form, ListGroup, Badge, Spinner } from 'react-bootstrap';
-import { FaUserFriends, FaUserPlus, FaCheck, FaTimes, FaToggleOn, FaToggleOff } from 'react-icons/fa';
-import axios from 'axios';
+import { Button, Offcanvas, Form, ListGroup, Badge, Spinner, Alert, FormCheck } from 'react-bootstrap';
+import { FaUserFriends, FaUserPlus, FaCheck, FaTimes } from 'react-icons/fa';
+import { friendService } from '../services/api';
 import { UserContext } from '../contexts/UserContext';
 import '../styles/FriendsButton.css';
-
-// URL de base de l'API
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 const FriendsButton = () => {
   const { userProfile, authenticated } = useContext(UserContext);
@@ -19,7 +16,6 @@ const FriendsButton = () => {
   const [friends, setFriends] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [newFriendEmail, setNewFriendEmail] = useState('');
-  const [newFriendName, setNewFriendName] = useState('');
   
   // States for error handling and loading
   const [loading, setLoading] = useState(false);
@@ -27,7 +23,12 @@ const FriendsButton = () => {
   const [success, setSuccess] = useState(null);
   
   // Close side panel
-  const handleClose = () => setShow(false);
+  const handleClose = () => {
+    setError(null);
+    setSuccess(null);
+    setLoading(false);
+    setShow(false);
+  };
   
   // Open side panel
   const handleShow = () => {
@@ -38,20 +39,24 @@ const FriendsButton = () => {
   
   // Load friends data
   const loadFriendsData = async () => {
+    if (!authenticated) {
+      setError("Authentication required");
+      return;
+    }
+    
     setLoading(true);
     setError(null);
     
     try {
-      // Récupérer la liste des amis
-      const friendsResponse = await axios.get(`${API_URL}/api/friends/list`);
+      // Get friends list
+      const friendsResponse = await friendService.getFriendsList();
       setFriends(friendsResponse.data || []);
       
-      // Récupérer les demandes d'amis
-      const requestsResponse = await axios.get(`${API_URL}/api/friends/requests`);
+      // Get pending requests
+      const requestsResponse = await friendService.getFriendRequests();
       setPendingRequests(requestsResponse.data || []);
     } catch (err) {
-      setError("Impossible de charger les données des amis");
-      console.error(err);
+      setError("Failed to load friends data");
     } finally {
       setLoading(false);
     }
@@ -61,8 +66,59 @@ const FriendsButton = () => {
   const handleSendRequest = async (e) => {
     e.preventDefault();
     
-    if (!newFriendEmail) {
-      setError("Veuillez entrer une adresse email");
+    if (!authenticated || !newFriendEmail) {
+      return;
+    }
+
+    // Clear any existing messages
+    setError(null);
+    setSuccess(null);
+
+    // Check if trying to add self
+    if (newFriendEmail.toLowerCase() === userProfile.email.toLowerCase()) {
+      setError("You cannot send a friend request to yourself");
+      return;
+    }
+
+    // Check if already friends or has pending request
+    const isAlreadyFriend = friends.some(friend => 
+      friend.email.toLowerCase() === newFriendEmail.toLowerCase()
+    );
+    
+    if (isAlreadyFriend) {
+      setError("You are already friends with this user");
+      return;
+    }
+
+    const hasPendingRequest = pendingRequests.some(request => 
+      request.email.toLowerCase() === newFriendEmail.toLowerCase()
+    );
+    
+    if (hasPendingRequest) {
+      setError("You already have a pending friend request with this user");
+      return;
+    }
+    
+    try {
+      await friendService.sendFriendRequest(newFriendEmail);
+      // Show success message
+      setSuccess("Friend request sent successfully");
+      // Clear the email input
+      setNewFriendEmail('');
+    } catch (err) {
+      console.error('[FriendsButton] Error sending friend request:', err);
+      if (err.response?.data?.detail) {
+        setError(err.response.data.detail);
+      } else {
+        setError("Failed to send friend request");
+      }
+    }
+  };
+  
+  // Accept friend request
+  const handleAcceptRequest = async (requestId) => {
+    if (!authenticated) {
+      setError("Authentication required");
       return;
     }
     
@@ -71,43 +127,13 @@ const FriendsButton = () => {
     setSuccess(null);
     
     try {
-      await axios.post(`${API_URL}/api/friends/request`, { 
-        friend_email: newFriendEmail 
-      });
-      setSuccess("Demande envoyée avec succès");
-      setNewFriendEmail('');
+      await friendService.respondToFriendRequest(requestId, 'accepted');
+      setSuccess("Friend request accepted");
       
       // Reload data
       await loadFriendsData();
     } catch (err) {
-      if (err.response && err.response.data && err.response.data.detail) {
-        setError(err.response.data.detail);
-      } else {
-        setError("Erreur lors de l'envoi de la demande");
-      }
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  // Accept friend request
-  const handleAcceptRequest = async (requestId) => {
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-    
-    try {
-      await axios.post(`${API_URL}/api/friends/respond`, {
-        request_id: requestId,
-        status: 'accepted'
-      });
-      setSuccess("Demande acceptée");
-      
-      // Reload data
-      await loadFriendsData();
-    } catch (err) {
-      setError("Erreur lors de l'acceptation de la demande");
+      setError("Failed to accept friend request");
       console.error(err);
     } finally {
       setLoading(false);
@@ -116,30 +142,8 @@ const FriendsButton = () => {
   
   // Reject friend request
   const handleRejectRequest = async (requestId) => {
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-    
-    try {
-      await axios.post(`${API_URL}/api/friends/respond`, {
-        request_id: requestId,
-        status: 'rejected'
-      });
-      setSuccess("Demande rejetée");
-      
-      // Reload data
-      await loadFriendsData();
-    } catch (err) {
-      setError("Erreur lors du rejet de la demande");
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  // Remove friend
-  const handleRemoveFriend = async (friendId) => {
-    if (!window.confirm("Êtes-vous sûr de vouloir supprimer cet ami ?")) {
+    if (!authenticated) {
+      setError("Authentication required");
       return;
     }
     
@@ -148,38 +152,94 @@ const FriendsButton = () => {
     setSuccess(null);
     
     try {
-      await axios.delete(`${API_URL}/api/friends/${friendId}`);
-      setSuccess("Ami supprimé avec succès");
+      await friendService.respondToFriendRequest(requestId, 'rejected');
+      setSuccess("Friend request rejected");
       
       // Reload data
       await loadFriendsData();
     } catch (err) {
-      setError("Erreur lors de la suppression de l'ami");
+      setError("Failed to reject friend request");
       console.error(err);
     } finally {
       setLoading(false);
     }
   };
   
-  // Enable/disable sharing with a friend
-  const handleToggleSharing = async (friendId, currentStatus) => {
+  // Remove friend
+  const handleRemoveFriend = async (friendId) => {
+    if (!authenticated) {
+      setError("Authentication required");
+      return;
+    }
+    
+    if (!window.confirm("Are you sure you want to remove this friend?")) {
+      return;
+    }
+    
     setLoading(true);
     setError(null);
     setSuccess(null);
     
     try {
-      await axios.post(`${API_URL}/api/friends/share/${friendId}`, { 
-        share: !currentStatus 
-      });
-      setSuccess(`Partage ${!currentStatus ? 'activé' : 'désactivé'}`);
+      // First, if the friend is currently sharing contacts, turn off sharing
+      const friend = friends.find(f => f.id === friendId);
+      if (friend && friend.combine_contacts) {
+        const toggleResponse = await friendService.toggleCacheSharing(friendId, false);
+        // Emit event with updated emails from toggle response
+        if (toggleResponse.data?.updated_emails) {
+          const event = new CustomEvent('emailsUpdated', {
+            detail: toggleResponse.data.updated_emails
+          });
+          window.dispatchEvent(event);
+        }
+      }
+      
+      // Then remove the friend
+      const removeResponse = await friendService.removeFriend(friendId);
+      
+      // If the backend returned updated emails from remove response, emit the event
+      if (removeResponse.data?.updated_emails) {
+        const event = new CustomEvent('emailsUpdated', {
+          detail: removeResponse.data.updated_emails
+        });
+        window.dispatchEvent(event);
+      }
+      
+      setSuccess("Friend removed successfully");
       
       // Reload data
       await loadFriendsData();
     } catch (err) {
-      setError("Erreur lors du changement du statut de partage");
+      setError("Failed to remove friend");
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+  
+  // Toggle sharing with a friend
+  const handleToggleSharing = async (friendId, currentStatus) => {
+    if (!authenticated) {
+      setError("Authentication required");
+      return;
+    }
+    
+    try {
+      const response = await friendService.toggleCacheSharing(friendId, !currentStatus);
+      
+      // Emit an event with the updated emails
+      if (response.data.updated_emails) {
+        const event = new CustomEvent('emailsUpdated', {
+          detail: response.data.updated_emails
+        });
+        window.dispatchEvent(event);
+      }
+      
+      // Reload friends data
+      await loadFriendsData();
+    } catch (err) {
+      setError("Failed to update sharing settings");
+      console.error(err);
     }
   };
   
@@ -190,17 +250,56 @@ const FriendsButton = () => {
     setSuccess(null);
   };
   
-  // Clear messages after delay
+  // Effect to handle authentication changes
   useEffect(() => {
-    if (error || success) {
-      const timer = setTimeout(() => {
-        setError(null);
-        setSuccess(null);
-      }, 5000);
-      
-      return () => clearTimeout(timer);
+    if (!authenticated) {
+      setShow(false);
+      setFriends([]);
+      setPendingRequests([]);
+      setError(null);
+      setSuccess(null);
+      setNewFriendEmail('');
+      setActiveTab('friends');
     }
+  }, [authenticated]);
+  
+  // Add cleanup function
+  useEffect(() => {
+    return () => {
+      setError(null);
+      setSuccess(null);
+      setLoading(false);
+    };
+  }, []);
+  
+  // Message cleanup effect
+  useEffect(() => {
+    let timer;
+    if (error || success) {
+      if (timer) {
+        clearTimeout(timer);
+      }
+      timer = setTimeout(() => {
+        requestAnimationFrame(() => {
+          setError(null);
+          setSuccess(null);
+        });
+      }, 3000);
+    }
+    
+    return () => {
+      if (timer) {
+        clearTimeout(timer);
+      }
+    };
   }, [error, success]);
+  
+  // Load friends data when panel is shown
+  useEffect(() => {
+    if (show && authenticated) {
+      loadFriendsData();
+    }
+  }, [show, authenticated]);
   
   // Don't render if not authenticated
   if (!authenticated) return null;
@@ -222,9 +321,26 @@ const FriendsButton = () => {
       </Button>
       
       {/* Side panel */}
-      <Offcanvas show={show} onHide={handleClose} placement="end">
+      <Offcanvas 
+        show={show}
+        onHide={handleClose} 
+        placement="end"
+        backdrop={true}
+        keyboard={true}
+        onExited={() => {
+          setError(null);
+          setSuccess(null);
+          setLoading(false);
+          setActiveTab('friends');
+        }}
+      >
         <Offcanvas.Header closeButton>
-          <Offcanvas.Title>Gestion des amis</Offcanvas.Title>
+          <Offcanvas.Title className="d-flex align-items-center">
+            Friends Management
+            {loading && (
+              <Spinner animation="border" variant="primary" size="sm" className="ms-2" />
+            )}
+          </Offcanvas.Title>
         </Offcanvas.Header>
         <Offcanvas.Body>
           {/* Navigation between tabs */}
@@ -234,7 +350,7 @@ const FriendsButton = () => {
               onClick={() => handleTabChange('friends')}
               className="me-2"
             >
-              Mes amis
+              My Friends
               {friends.length > 0 && <Badge bg="secondary" className="ms-2">{friends.length}</Badge>}
             </Button>
             <Button 
@@ -243,65 +359,67 @@ const FriendsButton = () => {
               className="me-2"
               disabled={pendingRequests.length === 0}
             >
-              Demandes
+              Requests
               {pendingRequests.length > 0 && <Badge bg="danger" className="ms-2">{pendingRequests.length}</Badge>}
             </Button>
             <Button 
               variant={activeTab === 'add' ? 'primary' : 'outline-primary'} 
               onClick={() => handleTabChange('add')}
             >
-              Ajouter
+              Add Friend
             </Button>
           </div>
           
           {/* Error and success messages */}
-          {error && <div className="text-danger mt-3">{error}</div>}
-          {success && <div className="text-success mt-3">{success}</div>}
-          
-          {/* Loading indicator */}
-          {loading && (
-            <div className="text-center mt-3">
-              <Spinner animation="border" variant="primary" />
-            </div>
-          )}
+          <div className="messages-container">
+            {error && (
+              <div className="alert alert-danger" role="alert">
+                {error}
+              </div>
+            )}
+            {success && (
+              <div className="alert alert-success" role="alert">
+                {success}
+              </div>
+            )}
+          </div>
           
           {/* Tab content */}
           <div className="friends-content mt-4">
             {/* My friends tab */}
             {activeTab === 'friends' && (
               <div>
-                <h5>Amis ({friends.length})</h5>
+                <h5>Friends ({friends.length})</h5>
                 {friends.length === 0 ? (
-                  <p className="text-muted">Vous n'avez pas encore d'amis.</p>
+                  <p className="text-muted">You don't have any friends yet.</p>
                 ) : (
                   <ListGroup>
                     {friends.map((friend) => (
-                      <ListGroup.Item key={friend.id} className="d-flex justify-content-between align-items-center">
-                        <div>
-                          <div className="fw-bold">{friend.friend_name || friend.friend_email}</div>
-                          <div className="text-muted small">{friend.friend_email}</div>
-                        </div>
-                        <div>
-                          <Button 
-                            variant="link" 
-                            className="me-2 p-0" 
-                            onClick={() => handleToggleSharing(friend.id, friend.share_cache)}
-                            disabled={loading}
-                          >
-                            {friend.share_cache ? (
-                              <FaToggleOn size={24} className="text-success" title="Désactiver le partage" />
-                            ) : (
-                              <FaToggleOff size={24} className="text-muted" title="Activer le partage" />
-                            )}
-                          </Button>
-                          <Button 
-                            variant="link" 
-                            className="p-0 text-danger" 
-                            onClick={() => handleRemoveFriend(friend.id)}
-                            disabled={loading}
-                          >
-                            <FaTimes size={18} title="Supprimer" />
-                          </Button>
+                      <ListGroup.Item key={friend.id}>
+                        <div className="d-flex justify-content-between align-items-center">
+                          <div>
+                            <div className="fw-bold">{friend.name || friend.email}</div>
+                            <div className="text-muted small">{friend.email}</div>
+                          </div>
+                          <div className="d-flex align-items-center">
+                            <div className="d-flex align-items-center switch-container">
+                              <FormCheck
+                                type="switch"
+                                id={`share-${friend.id}`}
+                                checked={friend.combine_contacts}
+                                onChange={() => handleToggleSharing(friend.id, friend.combine_contacts)}
+                                disabled={loading}
+                              />
+                            </div>
+                            <Button 
+                              variant="link" 
+                              className="ms-3 p-0 delete-friend-btn d-flex align-items-center" 
+                              onClick={() => handleRemoveFriend(friend.id)}
+                              disabled={loading}
+                            >
+                              <FaTimes size={18} />
+                            </Button>
+                          </div>
                         </div>
                       </ListGroup.Item>
                     ))}
@@ -313,16 +431,16 @@ const FriendsButton = () => {
             {/* Pending requests tab */}
             {activeTab === 'requests' && (
               <div>
-                <h5>Demandes en attente ({pendingRequests.length})</h5>
+                <h5>Friend Requests ({pendingRequests.length})</h5>
                 {pendingRequests.length === 0 ? (
-                  <p className="text-muted">Aucune demande en attente.</p>
+                  <p className="text-muted">No pending friend requests.</p>
                 ) : (
                   <ListGroup>
                     {pendingRequests.map((request) => (
                       <ListGroup.Item key={request.id} className="d-flex justify-content-between align-items-center">
                         <div>
-                          <div className="fw-bold">{request.sender_name || request.sender_email}</div>
-                          <div className="text-muted small">{request.sender_email}</div>
+                          <div className="fw-bold">{request.name || request.email}</div>
+                          <div className="text-muted small">{request.email}</div>
                         </div>
                         <div>
                           <Button 
@@ -331,7 +449,7 @@ const FriendsButton = () => {
                             onClick={() => handleAcceptRequest(request.id)}
                             disabled={loading}
                           >
-                            <FaCheck size={18} title="Accepter" />
+                            <FaCheck size={18} title="Accept" />
                           </Button>
                           <Button 
                             variant="link" 
@@ -339,7 +457,7 @@ const FriendsButton = () => {
                             onClick={() => handleRejectRequest(request.id)}
                             disabled={loading}
                           >
-                            <FaTimes size={18} title="Rejeter" />
+                            <FaTimes size={18} title="Reject" />
                           </Button>
                         </div>
                       </ListGroup.Item>
@@ -352,13 +470,13 @@ const FriendsButton = () => {
             {/* Add friend tab */}
             {activeTab === 'add' && (
               <div>
-                <h5>Ajouter un ami</h5>
+                <h5>Add a Friend</h5>
                 <Form onSubmit={handleSendRequest}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Adresse email</Form.Label>
+                    <Form.Label>Email Address</Form.Label>
                     <Form.Control 
                       type="email" 
-                      placeholder="ami@example.com" 
+                      placeholder="friend@example.com" 
                       value={newFriendEmail}
                       onChange={(e) => setNewFriendEmail(e.target.value)}
                       required
@@ -375,7 +493,7 @@ const FriendsButton = () => {
                       <Spinner animation="border" size="sm" />
                     ) : (
                       <>
-                        <FaUserPlus className="me-2" /> Envoyer la demande
+                        <FaUserPlus className="me-2" /> Send Friend Request
                       </>
                     )}
                   </Button>

@@ -20,50 +20,36 @@ export const useUser = () => {
 export const UserProvider = ({ children }) => {
   // État initial
   const [userProfile, setUserProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [authStep, setAuthStep] = useState('email'); // 'email', 'code', 'profile'
 
-  // Charger le profil utilisateur depuis le localStorage au démarrage
   useEffect(() => {
-    const storedProfile = localStorage.getItem('userProfile');
-    if (storedProfile) {
-      try {
-        const profile = JSON.parse(storedProfile);
-        setUserProfile(profile);
-        setAuthenticated(true);
-        setAuthStep('profile');
-      } catch (e) {
-        console.error('Error parsing stored profile:', e);
-        localStorage.removeItem('userProfile');
-        setAuthStep('email');
-      }
+    // Check for existing email in localStorage
+    const storedEmail = localStorage.getItem('userEmail');
+    if (storedEmail) {
+      setUserProfile({ email: storedEmail });
+      setAuthenticated(true);
+      setAuthStep('profile');
+      // Set authorization header
+      axios.defaults.headers.common['Authorization'] = storedEmail;
     }
     setLoading(false);
   }, []);
 
-  // Sauvegarder le profil dans le localStorage quand il change
-  useEffect(() => {
-    if (userProfile) {
-      localStorage.setItem('userProfile', JSON.stringify(userProfile));
-    }
-  }, [userProfile]);
-
-  // Demander un code d'authentification
   const requestAuthCode = async (email) => {
     try {
-      await axios.post(`${API_URL}/auth/request-code`, { email });
-      // Stocker temporairement l'email 
+      const response = await axios.post(`${API_URL}/auth/request-code`, { email });
+      // Store email temporarily
       setUserProfile({ email });
       setAuthStep('code');
       return true;
     } catch (error) {
-      console.error('Erreur lors de la demande de code:', error);
+      console.error('Error requesting auth code:', error);
       return false;
     }
   };
 
-  // Vérifier un code d'authentification
   const verifyAuthCode = async (email, code) => {
     try {
       const response = await axios.post(`${API_URL}/auth/verify-code`, { email, code });
@@ -71,30 +57,29 @@ export const UserProvider = ({ children }) => {
       setAuthenticated(true);
       setAuthStep('profile');
       
-      // Configurer l'en-tête d'autorisation pour les futures requêtes
+      // Store email in localStorage
+      localStorage.setItem('userEmail', email);
+      
+      // Set authorization header
       axios.defaults.headers.common['Authorization'] = email;
       
       return true;
     } catch (error) {
-      console.error('Erreur lors de la vérification du code:', error);
+      console.error('Error verifying auth code:', error);
       return false;
     }
   };
 
-  // Mettre à jour le profil utilisateur
-  const updateUserProfile = (profile) => {
-    setUserProfile({...userProfile, ...profile});
-  };
-
-  // Déconnexion
   const logout = () => {
     setUserProfile(null);
     setAuthenticated(false);
     setAuthStep('email');
-    localStorage.removeItem('userProfile');
-    
-    // Supprimer l'en-tête d'autorisation
+    localStorage.removeItem('userEmail');
     delete axios.defaults.headers.common['Authorization'];
+  };
+
+  const updateUserProfile = (profile) => {
+    setUserProfile({...userProfile, ...profile});
   };
 
   return (

@@ -13,7 +13,6 @@ const api = axios.create({
 
 // Points d'entrée API
 const EMAIL_API = `${API_URL}/emails`;
-const FRIENDS_API = `${API_URL}/friends`;
 
 // Fonction pour générer des emails
 export const generateEmails = async (contactsData, userInfo = null, templateId = null) => {

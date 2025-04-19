@@ -12,34 +12,27 @@ const api = axios.create({
   withCredentials: true,  // Include cookies in all requests
 });
 
+// Add request interceptor to include authentication header
+api.interceptors.request.use(
+  (config) => {
+    // Get email from localStorage
+    const email = localStorage.getItem('userEmail');
+    if (email) {
+      // Set Authorization header with email
+      config.headers.Authorization = email;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 // Ajout d'un intercepteur pour gérer les erreurs
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     console.error('API Error:', error.response || error.message);
-    return Promise.reject(error);
-  }
-);
-
-// Add request interceptor to include authentication header
-api.interceptors.request.use(
-  (config) => {
-    // Get user profile from localStorage
-    const userProfile = localStorage.getItem('userProfile');
-    if (userProfile) {
-      try {
-        const profile = JSON.parse(userProfile);
-        if (profile && profile.email) {
-          // Set Authorization header with email
-          config.headers.Authorization = profile.email;
-        }
-      } catch (error) {
-        console.error('Error parsing user profile:', error);
-      }
-    }
-    return config;
-  },
-  (error) => {
     return Promise.reject(error);
   }
 );
@@ -87,37 +80,42 @@ export const templateService = {
 export const friendService = {
   // Envoi d'une demande d'ami
   sendFriendRequest: (email) => {
-    return api.post('/friends/request', { email });
+    return api.post('/api/friends/request', { email });
   },
 
   // Récupération des demandes d'amis
   getFriendRequests: () => {
-    return api.get('/friends/requests');
+    return api.get('/api/friends/requests');
   },
 
   // Réponse à une demande d'ami
   respondToFriendRequest: (requestId, status) => {
-    return api.post('/friends/respond', { request_id: requestId, status });
+    return api.post(`/api/friends/respond/${requestId}`, { status });
   },
 
   // Récupération de la liste des amis
   getFriendsList: () => {
-    return api.get('/friends/list');
+    return api.get('/api/friends/list');
   },
 
   // Activation/désactivation du partage de cache avec un ami
-  toggleCacheSharing: (friendId, share) => {
-    return api.post(`/friends/share/${friendId}`, { share });
+  toggleCacheSharing: (friendId, shareEnabled) => {
+    return api.post(`/api/friends/share/${friendId}`, { share_enabled: shareEnabled });
+  },
+
+  // Suppression d'un ami
+  removeFriend: (friendId) => {
+    return api.delete(`/api/friends/${friendId}`);
   },
 
   // Récupération des emails partagés
   getSharedEmails: () => {
-    return api.get('/friends/shared-emails');
+    return api.get('/api/friends/shared-emails');
   },
 
   // Partage d'un email avec les amis
   shareEmail: (email) => {
-    return api.post('/friends/share-email', { email });
+    return api.post('/api/friends/share-email', { email });
   },
 };
 

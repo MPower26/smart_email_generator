@@ -1,10 +1,10 @@
-import React, { useState, useContext, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Container, Card, Form, Button, Alert, Col, Row } from 'react-bootstrap';
-import { UserContext } from '../contexts/UserContext';
+import { useUser } from '../contexts/UserContext';
 import { useNavigate } from 'react-router-dom';
 
 const AuthScreen = () => {
-  const { userProfile, authStep, setAuthStep, requestAuthCode, verifyAuthCode } = useContext(UserContext);
+  const { userProfile, authStep, setAuthStep, requestAuthCode, verifyAuthCode } = useUser();
   const navigate = useNavigate();
   
   const [email, setEmail] = useState('');
@@ -13,7 +13,7 @@ const AuthScreen = () => {
   const [error, setError] = useState('');
   const [codeInputs, setCodeInputs] = useState(['', '', '', '', '', '']);
   
-  // Initialiser les refs pour les champs de code (hors du callback)
+  // Initialize refs for code inputs
   const codeRef1 = useRef(null);
   const codeRef2 = useRef(null);
   const codeRef3 = useRef(null);
@@ -22,20 +22,20 @@ const AuthScreen = () => {
   const codeRef6 = useRef(null);
   const codeRefs = [codeRef1, codeRef2, codeRef3, codeRef4, codeRef5, codeRef6];
   
-  // Si on est à l'étape du code, récupérer l'email du profil
+  // If we're at the code step, get email from profile
   useEffect(() => {
     if (authStep === 'code' && userProfile && userProfile.email) {
       setEmail(userProfile.email);
     }
   }, [authStep, userProfile]);
   
-  // Gérer le focus automatique sur les champs de code
+  // Handle code input with auto-focus
   const handleCodeInput = (index, value) => {
     if (value.length > 1) {
-      value = value.slice(0, 1); // Limiter à un caractère
+      value = value.slice(0, 1); // Limit to one character
     }
     
-    // Vérifier que c'est un chiffre
+    // Verify it's a number
     if (value && !/^\d+$/.test(value)) {
       return;
     }
@@ -44,20 +44,36 @@ const AuthScreen = () => {
     newInputs[index] = value;
     setCodeInputs(newInputs);
     
-    // Focus sur le champ suivant si on a entré un chiffre
+    // Focus next field if we entered a number
     if (value && index < 5) {
       codeRefs[index + 1].current.focus();
     }
     
-    // Assembler le code complet
+    // Assemble full code
     const fullCode = newInputs.join('');
     setCode(fullCode);
   };
   
-  // Gérer les touches spéciales (retour arrière, etc)
+  // Handle paste event
+  const handlePaste = (e) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text');
+    
+    // Only accept if it's a 6-digit number
+    if (/^\d{6}$/.test(pastedData)) {
+      const digits = pastedData.split('');
+      setCodeInputs(digits);
+      setCode(pastedData);
+      
+      // Focus the last input
+      codeRefs[5].current.focus();
+    }
+  };
+  
+  // Handle special keys (backspace, etc)
   const handleKeyDown = (index, e) => {
     if (e.key === 'Backspace' && index > 0 && !codeInputs[index]) {
-      // Si le champ actuel est vide et qu'on appuie sur backspace, aller au champ précédent
+      // If current field is empty and backspace is pressed, go to previous field
       codeRefs[index - 1].current.focus();
     }
   };
@@ -65,7 +81,7 @@ const AuthScreen = () => {
   const handleEmailSubmit = async (e) => {
     e.preventDefault();
     if (!email) {
-      setError('Veuillez entrer votre adresse email');
+      setError('Please enter your email address');
       return;
     }
     
@@ -75,10 +91,10 @@ const AuthScreen = () => {
     try {
       const success = await requestAuthCode(email);
       if (!success) {
-        setError('Impossible d\'envoyer le code d\'authentification');
+        setError('Unable to send verification code');
       }
     } catch (err) {
-      setError('Une erreur est survenue. Veuillez réessayer.');
+      setError('An error occurred. Please try again.');
       console.error(err);
     } finally {
       setLoading(false);
@@ -88,7 +104,7 @@ const AuthScreen = () => {
   const handleCodeSubmit = async (e) => {
     e.preventDefault();
     if (code.length !== 6) {
-      setError('Veuillez entrer le code à 6 chiffres');
+      setError('Please enter the 6-digit code');
       return;
     }
     
@@ -100,17 +116,17 @@ const AuthScreen = () => {
       if (success) {
         navigate('/');
       } else {
-        setError('Code invalide ou expiré');
+        setError('Invalid or expired code');
       }
     } catch (err) {
-      setError('Une erreur est survenue. Veuillez réessayer.');
+      setError('An error occurred. Please try again.');
       console.error(err);
     } finally {
       setLoading(false);
     }
   };
   
-  // Demander un nouveau code
+  // Request new code
   const handleResendCode = async () => {
     setLoading(true);
     setError('');
@@ -118,14 +134,14 @@ const AuthScreen = () => {
     try {
       const success = await requestAuthCode(email);
       if (!success) {
-        setError('Impossible d\'envoyer le code d\'authentification');
+        setError('Unable to send verification code');
       } else {
-        // Réinitialiser les champs de code
+        // Reset code fields
         setCodeInputs(['', '', '', '', '', '']);
         setCode('');
       }
     } catch (err) {
-      setError('Une erreur est survenue. Veuillez réessayer.');
+      setError('An error occurred. Please try again.');
       console.error(err);
     } finally {
       setLoading(false);
@@ -143,16 +159,16 @@ const AuthScreen = () => {
           {authStep === 'email' && (
             <Form onSubmit={handleEmailSubmit}>
               <Form.Group className="mb-3">
-                <Form.Label>Adresse email</Form.Label>
+                <Form.Label>Email Address</Form.Label>
                 <Form.Control
                   type="email"
-                  placeholder="Entrez votre email"
+                  placeholder="Enter your email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
                 />
                 <Form.Text className="text-muted">
-                  Vous recevrez un code d'authentification sur cette adresse.
+                  You will receive a verification code at this address.
                 </Form.Text>
               </Form.Group>
               
@@ -162,7 +178,7 @@ const AuthScreen = () => {
                 className="w-100 mt-3" 
                 disabled={loading}
               >
-                {loading ? 'Envoi en cours...' : 'Recevoir un code'}
+                {loading ? 'Sending...' : 'Get Verification Code'}
               </Button>
             </Form>
           )}
@@ -170,9 +186,9 @@ const AuthScreen = () => {
           {authStep === 'code' && (
             <Form onSubmit={handleCodeSubmit}>
               <Form.Group className="mb-3">
-                <Form.Label>Code d'authentification</Form.Label>
-                <p className="text-white small mb-3">
-                  Un code à 6 chiffres a été envoyé à {email}
+                <Form.Label>Verification Code</Form.Label>
+                <p className="text-muted small mb-3">
+                  A 6-digit code has been sent to {email}
                 </p>
                 
                 <Row className="g-2 mb-3">
@@ -185,6 +201,7 @@ const AuthScreen = () => {
                         value={digit}
                         onChange={(e) => handleCodeInput(index, e.target.value)}
                         onKeyDown={(e) => handleKeyDown(index, e)}
+                        onPaste={handlePaste}
                         ref={codeRefs[index]}
                         required
                       />
@@ -199,7 +216,7 @@ const AuthScreen = () => {
                     disabled={loading}
                     className="p-0 text-decoration-none"
                   >
-                    Renvoyer le code
+                    Resend Code
                   </Button>
                 </div>
               </Form.Group>
@@ -210,7 +227,7 @@ const AuthScreen = () => {
                 className="w-100 mt-3" 
                 disabled={loading || code.length !== 6}
               >
-                {loading ? 'Vérification...' : 'Vérifier le code'}
+                {loading ? 'Verifying...' : 'Verify Code'}
               </Button>
               
               <Button 
@@ -219,7 +236,7 @@ const AuthScreen = () => {
                 onClick={() => setAuthStep('email')}
                 disabled={loading}
               >
-                Modifier l'email
+                Change Email
               </Button>
             </Form>
           )}

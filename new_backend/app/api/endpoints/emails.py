@@ -22,24 +22,56 @@ async def get_emails_by_stage(
     """Get emails for the current user filtered by stage"""
     logger.info(f"Getting emails for user {current_user.email} (ID: {current_user.id}) in stage {stage}")
     logger.info(f"Current user details - ID: {current_user.id}, Email: {current_user.email}")
+    
+    # Get user's own emails
     emails = db.query(GeneratedEmail).filter(
         GeneratedEmail.user_id == current_user.id,
         GeneratedEmail.stage == stage
     ).all()
-    logger.info(f"Raw query found {len(emails)} emails")
-    for email in emails:
-        logger.info(f"Email ID: {email.id}, User ID: {email.user_id}, Stage: {email.stage}")
+    
+    # Get friends who have sharing enabled
+    friends_with_sharing = []
+    for friend in current_user.friends:
+        if friend.combine_contacts:
+            friends_with_sharing.append(friend.id)
+    
+    # Get shared emails from friends
+    shared_emails = []
+    if friends_with_sharing:
+        shared_emails = db.query(GeneratedEmail).filter(
+            GeneratedEmail.user_id.in_(friends_with_sharing),
+            GeneratedEmail.stage == stage,
+            GeneratedEmail.status == 'sent'
+        ).all()
+    
     result = []
     for email in emails:
+        # Check if any friend has sent an email to the same recipient in the same stage
+        shared_by = None
+        for shared_email in shared_emails:
+            if (shared_email.recipient_email == email.recipient_email and 
+                shared_email.stage == email.stage):
+                shared_by = db.query(User).get(shared_email.user_id).email
+                # Only mark as sent by friend if not already sent
+                if email.status != 'sent':
+                    email.status = 'sent by friend'
+                    email.sent_at = shared_email.sent_at
+                break
+        
         email_dict = {
             "id": email.id,
             "to": email.recipient_email,
             "subject": email.subject,
             "body": email.content,
             "status": email.status,
-            "stage": email.stage
+            "stage": email.stage,
+            "shared_by": shared_by
         }
         result.append(email_dict)
+    
+    # Commit any changes to the database
+    db.commit()
+    
     response_json = json.dumps(result)
     logger.info(f"Response JSON for stage {stage}: {response_json}")
     return result
@@ -60,13 +92,13 @@ async def update_email_status(
         raise HTTPException(status_code=404, detail="Email not found")
     
     new_status = data.get("status")
-    if new_status not in ['draft', 'sent']: # Allow only draft or sent
-         raise HTTPException(status_code=400, detail="Invalid status value. Must be 'draft' or 'sent'.")
+    if new_status not in ['draft', 'sent', 'sent by friend']: # Allow draft, sent, or sent by friend
+         raise HTTPException(status_code=400, detail="Invalid status value. Must be 'draft', 'sent', or 'sent by friend'.")
          
     email.status = new_status
     
-    # Set sent_at timestamp only when marking as sent
-    if email.status == "sent" and not email.sent_at:
+    # Set sent_at timestamp only when marking as sent or sent by friend
+    if email.status in ["sent", "sent by friend"] and not email.sent_at:
         email.sent_at = datetime.utcnow()
     elif email.status == "draft": # Clear sent_at if reverting to draft
         email.sent_at = None

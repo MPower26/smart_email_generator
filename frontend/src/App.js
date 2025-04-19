@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Container } from 'react-bootstrap';
 import Navigation from './components/Navigation';
@@ -8,12 +8,12 @@ import TemplatesPage from './pages/TemplatesPage';
 import SettingsPage from './pages/SettingsPage';
 import FriendsButton from './components/FriendsButton';
 import AuthScreen from './components/AuthScreen';
-import { UserProvider, UserContext } from './contexts/UserContext';
+import { UserProvider, useUser } from './contexts/UserContext';
 import './App.css';
 
 // Composant de routes protégées
 const ProtectedRoutes = () => {
-  const { authenticated, loading } = useContext(UserContext);
+  const { authenticated, loading } = useUser();
   
   // Si le chargement est en cours, on n'affiche rien
   if (loading) {

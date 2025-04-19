@@ -147,6 +147,53 @@ const GenerateEmailsPage = () => {
   useEffect(() => {
     loadTemplates();
     loadEmailsByStage();
+
+    // Add event listener for email updates from friend sharing
+    const handleEmailsUpdated = (event) => {
+      const updatedEmails = event.detail;
+      
+      // Update each email in the appropriate list
+      updatedEmails.forEach(updatedEmail => {
+        switch (updatedEmail.stage) {
+          case 'outreach':
+            setOutreachEmails(prevEmails => {
+              const newEmails = [...prevEmails];
+              const index = newEmails.findIndex(e => e.id === updatedEmail.id);
+              if (index !== -1) {
+                newEmails[index] = updatedEmail;
+              }
+              return newEmails;
+            });
+            break;
+          case 'followup':
+            setFollowupEmails(prevEmails => {
+              const newEmails = [...prevEmails];
+              const index = newEmails.findIndex(e => e.id === updatedEmail.id);
+              if (index !== -1) {
+                newEmails[index] = updatedEmail;
+              }
+              return newEmails;
+            });
+            break;
+          case 'lastchance':
+            setLastChanceEmails(prevEmails => {
+              const newEmails = [...prevEmails];
+              const index = newEmails.findIndex(e => e.id === updatedEmail.id);
+              if (index !== -1) {
+                newEmails[index] = updatedEmail;
+              }
+              return newEmails;
+            });
+            break;
+        }
+      });
+    };
+
+    window.addEventListener('emailsUpdated', handleEmailsUpdated);
+
+    return () => {
+      window.removeEventListener('emailsUpdated', handleEmailsUpdated);
+    };
   }, [userProfile]);
 
   // Debug user profile
@@ -416,7 +463,13 @@ const GenerateEmailsPage = () => {
                   </div>
                   <div className="email-list">
                     {[...outreachEmails]
-                      .sort((a, b) => (a.status === 'sent' ? 1 : 0) - (b.status === 'sent' ? 1 : 0))
+                      .sort((a, b) => {
+                        // First sort by status
+                        const statusOrder = { 'sent': 0, 'draft': 1, 'sent by friend': 2 };
+                        const statusA = statusOrder[a.status] || 3;
+                        const statusB = statusOrder[b.status] || 3;
+                        return statusA - statusB;
+                      })
                       .map((email, index) => (
                         <div key={index} className="mb-2">
                           <EmailPreview 
@@ -464,7 +517,13 @@ const GenerateEmailsPage = () => {
                   </div>
                   <div className="email-list">
                     {[...followupEmails]
-                      .sort((a, b) => (a.status === 'sent' ? 1 : 0) - (b.status === 'sent' ? 1 : 0))
+                      .sort((a, b) => {
+                        // First sort by status
+                        const statusOrder = { 'sent': 0, 'draft': 1, 'sent by friend': 2 };
+                        const statusA = statusOrder[a.status] || 3;
+                        const statusB = statusOrder[b.status] || 3;
+                        return statusA - statusB;
+                      })
                       .map((email, index) => (
                         <div key={index} className="mb-2">
                           <EmailPreview 
@@ -512,7 +571,13 @@ const GenerateEmailsPage = () => {
                   </div>
                   <div className="email-list">
                     {[...lastChanceEmails]
-                      .sort((a, b) => (a.status === 'sent' ? 1 : 0) - (b.status === 'sent' ? 1 : 0))
+                      .sort((a, b) => {
+                        // First sort by status
+                        const statusOrder = { 'sent': 0, 'draft': 1, 'sent by friend': 2 };
+                        const statusA = statusOrder[a.status] || 3;
+                        const statusB = statusOrder[b.status] || 3;
+                        return statusA - statusB;
+                      })
                       .map((email, index) => (
                         <div key={index} className="mb-2">
                           <EmailPreview 

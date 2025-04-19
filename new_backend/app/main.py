@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 
-from app.api.endpoints import emails
+from app.api.endpoints import emails, friends
 from app.api import auth
 from app.db.database import engine
 from app.models.models import Base
@@ -29,6 +29,7 @@ app.add_middleware(
 # Include API routers
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(emails.router, prefix="/api/emails", tags=["Emails"])
+app.include_router(friends.router, prefix="/api/friends", tags=["Friends"])
 
 @app.get("/")
 async def root():

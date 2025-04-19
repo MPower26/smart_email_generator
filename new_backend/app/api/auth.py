@@ -26,8 +26,23 @@ async def get_current_user(
             detail="Unauthorized - Missing credentials"
         )
     
-    # Simple auth for development - using email directly
-    email = authorization
+    # Extract email from Authorization header
+    try:
+        email = authorization.strip()
+        if email.startswith('Bearer '):
+            email = email.split(' ')[1].strip()
+            # If it's a token, extract the email part
+            if ':' in email:
+                email = email.split(':')[0].strip()
+        
+        logger.info(f"Using email: {email}")
+    except Exception as e:
+        logger.error(f"Error parsing authorization header: {e}")
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid authorization format"
+        )
+    
     logger.info(f"Looking up user with email: {email}")
     
     user = db.query(User).filter(User.email == email).first()
@@ -166,10 +181,14 @@ async def verify_code(request: VerificationRequest, db: Session = Depends(get_db
         
         db.commit()
         
-        return VerificationResponse(
-            message="Email verified successfully",
-            email=request.email
-        )
+        # Generate a simple token (in production, use JWT or similar)
+        token = f"{user.email}:{datetime.utcnow().timestamp()}"
+        
+        return {
+            "message": "Email verified successfully",
+            "email": request.email,
+            "token": token
+        }
         
     except HTTPException:
         raise
