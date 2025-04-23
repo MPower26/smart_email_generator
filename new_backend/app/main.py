@@ -21,7 +21,8 @@ app = FastAPI(title="Smart Email Generator API")
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # React frontend URL
+    allow_origins=["http://localhost:3000",
+                   "https://jolly-bush-0bae83703.6.azurestaticapps.net"],  # React frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
