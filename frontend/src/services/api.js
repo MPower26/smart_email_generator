@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Use the configured URL in .env or default URL
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://smart-email-backend-d8dcejbqe5h9bdcq.azurewebsites.net';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net';
 
 // Create axios instance with base configuration
 const api = axios.create({
