@@ -1,9 +1,9 @@
 import axios from 'axios';
 
-// Utiliser l'URL configurée dans .env ou une URL par défaut
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+// Use the configured URL in .env or default URL
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://smart-email-backend-d8dcejbqe5h9bdcq.azurewebsites.net';
 
-// Créer une instance axios avec la configuration de base
+// Create axios instance with base configuration
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -28,7 +28,7 @@ api.interceptors.request.use(
   }
 );
 
-// Ajout d'un intercepteur pour gérer les erreurs
+// Add response interceptor to handle errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
