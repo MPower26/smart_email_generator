@@ -68,6 +68,11 @@ jobs:
         with:
           name: python-app
           
+      - name: Make startup script executable
+        run: |
+          cd ${{ env.WORKING_DIRECTORY }}
+          chmod +x startup.sh
+          
       - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v2
