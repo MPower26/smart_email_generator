@@ -8,6 +8,9 @@ const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET,PUT,POST,DELETE,PATCH,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   },
   withCredentials: true,  // Include cookies in all requests
 });
@@ -33,6 +36,11 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     console.error('API Error:', error.response || error.message);
+    if (error.response) {
+      console.error('Response data:', error.response.data);
+      console.error('Response status:', error.response.status);
+      console.error('Response headers:', error.response.headers);
+    }
     return Promise.reject(error);
   }
 );
