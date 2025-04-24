@@ -7,7 +7,13 @@ services:
     env:
       - name: PYTHON_VERSION
         value: "3.9"
+      - name: WEBSITES_PORT
+        value: "8000"
       - name: SCM_DO_BUILD_DURING_DEPLOYMENT
         value: "true"
       - name: WEBSITE_RUN_FROM_PACKAGE
-        value: "1" 
+        value: "1"
+      - name: PYTHONPATH
+        value: "/home/site/wwwroot"
+      - name: PATH
+        value: "/home/venv/bin:${PATH}" 
