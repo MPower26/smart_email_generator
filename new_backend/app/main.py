@@ -41,6 +41,7 @@ async def root():
 
 @app.get("/health")
 async def health_check():
+    """Health check endpoint for monitoring the API status"""
     return {"status": "healthy"}
 
 # Dev-only login endpoint (for testing)

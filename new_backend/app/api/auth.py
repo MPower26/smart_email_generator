@@ -185,7 +185,7 @@ async def verify_code(request: VerificationRequest, db: Session = Depends(get_db
         token = f"{user.email}:{datetime.utcnow().timestamp()}"
         
         return {
-            "message": "Email verified successfully",
+            "message": "Email verification successful",
             "email": request.email,
             "token": token
         }
