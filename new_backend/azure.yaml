@@ -1,0 +1,13 @@
+name: smart-email-backend
+services:
+  - name: smart-email-backend
+    project: .
+    language: python
+    host: appservice
+    env:
+      - name: PYTHON_VERSION
+        value: "3.9"
+      - name: SCM_DO_BUILD_DURING_DEPLOYMENT
+        value: "true"
+      - name: WEBSITE_RUN_FROM_PACKAGE
+        value: "1" 

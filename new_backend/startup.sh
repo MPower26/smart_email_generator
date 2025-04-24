@@ -1,15 +1,20 @@
+#!/bin/bash
+
+echo "Starting application setup..."
 
 # Set environment variables
 export PYTHONUNBUFFERED=1
-export WEBSITE_HOSTNAME=localhost:8000
-export PORT=8000
+export PORT=${PORT:-8000}
 
-# Change to the application directory
-cd /home/site/wwwroot
+# Print diagnostic information
+echo "Current directory: $(pwd)"
+echo "Directory contents: $(ls -la)"
 
-# Install dependencies
+# Install Python dependencies
+echo "Installing dependencies..."
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 
-# Start the application
-gunicorn app.main:app --config gunicorn.conf.py
+# Start the FastAPI application with uvicorn
+echo "Starting FastAPI application..."
+uvicorn app.main:app --host 0.0.0.0 --port $PORT
