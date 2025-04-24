@@ -4,16 +4,15 @@ services:
     project: .
     language: python
     host: appservice
+    runtime: python|3.9
     env:
-      - name: PYTHON_VERSION
-        value: "3.9"
       - name: WEBSITES_PORT
         value: "8000"
       - name: SCM_DO_BUILD_DURING_DEPLOYMENT
         value: "true"
       - name: WEBSITE_RUN_FROM_PACKAGE
         value: "1"
-      - name: PYTHONPATH
-        value: "/home/site/wwwroot"
-      - name: PATH
-        value: "/home/venv/bin:${PATH}" 
+      - name: PYTHON_ENABLE_GUNICORN
+        value: "true"
+      - name: PYTHON_PATH
+        value: "/usr/local/bin" 
