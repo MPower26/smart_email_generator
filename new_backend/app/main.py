@@ -21,12 +21,15 @@ app = FastAPI(title="Smart Email Generator API")
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000",
-                   "https://jolly-bush-0bae83703.6.azurestaticapps.net",
-                   "https://smart-email-frontend.azurestaticapps.net"],  # Updated frontend URL
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "https://jolly-bush-0bae83703.6.azurestaticapps.net"
+    ],
+    allow_credentials=False,  # Changed to False since we're not using cookies
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=600,  # Cache preflight requests for 10 minutes
 )
 
 # Include API routers

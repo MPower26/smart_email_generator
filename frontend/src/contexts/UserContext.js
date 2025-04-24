@@ -65,13 +65,29 @@ export const UserProvider = ({ children }) => {
 
   const requestAuthCode = async (email) => {
     try {
+      console.log('=== Auth Code Request Debug ===');
+      console.log('API URL:', API_URL);
+      console.log('Full request URL:', `${API_URL}/auth/request-code`);
+      console.log('Email:', email);
+      
       const response = await axios.post(`${API_URL}/auth/request-code`, { email });
+      console.log('Response:', response.data);
+      
       // Store email temporarily
       setUserProfile({ email });
       setAuthStep('code');
       return true;
     } catch (error) {
-      console.error('Error requesting auth code:', error);
+      console.error('=== Auth Code Request Error ===');
+      console.error('Error:', error.message);
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+        console.error('Response headers:', error.response.headers);
+      } else if (error.request) {
+        console.error('Request made but no response received');
+        console.error('Request:', error.request);
+      }
       return false;
     }
   };

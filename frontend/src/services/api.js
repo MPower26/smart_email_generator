@@ -8,11 +8,8 @@ const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET,PUT,POST,DELETE,PATCH,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   },
-  withCredentials: true,  // Include cookies in all requests
+  withCredentials: false  // Changed to false since we're not using cookies
 });
 
 // Add request interceptor to include authentication header
@@ -22,8 +19,14 @@ api.interceptors.request.use(
     const email = localStorage.getItem('userEmail');
     if (email) {
       // Set Authorization header with email
-      config.headers.Authorization = email;
+      config.headers.Authorization = `Bearer ${email}`;
     }
+    console.log('Request config:', {
+      url: config.url,
+      method: config.method,
+      headers: config.headers,
+      baseURL: config.baseURL
+    });
     return config;
   },
   (error) => {
