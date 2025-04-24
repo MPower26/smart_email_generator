@@ -14,5 +14,6 @@ services:
         value: "1"
       - name: PYTHON_ENABLE_GUNICORN
         value: "true"
-      - name: PYTHON_PATH
-        value: "/usr/local/bin" 
+      - name: PYTHONPATH
+        value: "/home/site/wwwroot"
+    startup_command: /home/site/wwwroot/deploy.sh 
