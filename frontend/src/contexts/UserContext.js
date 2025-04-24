@@ -70,8 +70,22 @@ export const UserProvider = ({ children }) => {
       console.log('Full request URL:', `${API_URL}/auth/request-code`);
       console.log('Email:', email);
       
-      const response = await axios.post(`${API_URL}/auth/request-code`, { email });
-      console.log('Response:', response.data);
+      const response = await axios.post(
+        `${API_URL}/auth/request-code`, 
+        { email },
+        {
+          timeout: 30000, // 30 second timeout
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      console.log('Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        data: response.data
+      });
       
       // Store email temporarily
       setUserProfile({ email });
@@ -79,15 +93,42 @@ export const UserProvider = ({ children }) => {
       return true;
     } catch (error) {
       console.error('=== Auth Code Request Error ===');
-      console.error('Error:', error.message);
+      console.error('Error type:', error.name);
+      console.error('Error message:', error.message);
+      
+      if (error.code === 'ECONNABORTED') {
+        console.error('Request timed out after 30 seconds');
+      }
+      
       if (error.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
         console.error('Response status:', error.response.status);
         console.error('Response data:', error.response.data);
         console.error('Response headers:', error.response.headers);
       } else if (error.request) {
-        console.error('Request made but no response received');
-        console.error('Request:', error.request);
+        // The request was made but no response was received
+        console.error('No response received');
+        console.error('Request details:', {
+          method: error.request.method,
+          url: error.request.url,
+          headers: error.request.headers
+        });
       }
+      
+      // Show a more specific error message to the user
+      let errorMessage = 'Failed to send verification code. ';
+      if (error.code === 'ECONNABORTED') {
+        errorMessage += 'Request timed out. Please try again.';
+      } else if (error.response) {
+        errorMessage += error.response.data.detail || 'Server error occurred.';
+      } else if (error.request) {
+        errorMessage += 'No response from server. Please check your connection.';
+      } else {
+        errorMessage += 'An unexpected error occurred.';
+      }
+      console.error('User-friendly error message:', errorMessage);
+      
       return false;
     }
   };

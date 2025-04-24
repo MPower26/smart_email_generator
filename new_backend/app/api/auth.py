@@ -69,73 +69,123 @@ async def get_current_user(
 @router.post("/request-code", response_model=VerificationResponse)
 async def request_verification_code(request: VerificationRequest, db: Session = Depends(get_db)):
     try:
+        logger.info("========= VERIFICATION REQUEST START =========")
+        logger.info(f"Timestamp: {datetime.utcnow().isoformat()}")
         logger.info(f"Received verification request for email: {request.email}")
         
+        # Log database connection status
+        try:
+            db.execute("SELECT 1")
+            logger.info("Database connection test: SUCCESS")
+        except Exception as db_error:
+            logger.error(f"Database connection test: FAILED - {str(db_error)}")
+            raise HTTPException(
+                status_code=500,
+                detail="Database connection error"
+            )
+        
         # Check if user exists
-        user = db.query(User).filter(User.email == request.email).first()
+        try:
+            user = db.query(User).filter(User.email == request.email).first()
+            logger.info(f"User lookup: {'Found' if user else 'Not found'}")
+        except Exception as user_error:
+            logger.error(f"User lookup error: {str(user_error)}")
+            raise HTTPException(
+                status_code=500,
+                detail="Error looking up user"
+            )
         
         # If user doesn't exist, create new user
         if not user:
-            user = User(
-                email=request.email,
-                is_verified=False,
-                failed_verification_attempts=0,
-                last_verification_attempt=None
-            )
-            db.add(user)
-            db.commit()
-            db.refresh(user)
-            logger.info(f"Created new user for email: {request.email}")
+            try:
+                user = User(
+                    email=request.email,
+                    is_verified=False,
+                    failed_verification_attempts=0,
+                    last_verification_attempt=None
+                )
+                db.add(user)
+                db.commit()
+                db.refresh(user)
+                logger.info(f"Created new user with email: {request.email}")
+            except Exception as create_error:
+                logger.error(f"User creation error: {str(create_error)}")
+                raise HTTPException(
+                    status_code=500,
+                    detail="Error creating new user"
+                )
         
-        # Check if user has exceeded verification attempts
+        # Check verification attempts
         if user.failed_verification_attempts >= 5:
             if user.last_verification_attempt and (datetime.utcnow() - user.last_verification_attempt) < timedelta(minutes=30):
+                logger.warning(f"Too many attempts for {request.email} - Last attempt: {user.last_verification_attempt}")
                 raise HTTPException(
                     status_code=429,
                     detail="Too many verification attempts. Please try again later."
                 )
             else:
-                # Reset attempts after 30 minutes
                 user.failed_verification_attempts = 0
+                logger.info(f"Reset verification attempts for {request.email}")
         
-        # Generate verification code
-        code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
-        expires_at = datetime.utcnow() + timedelta(minutes=15)
-        
-        # Create verification code record
-        verification_code = VerificationCode(
-            user_id=user.id,
-            code=code,
-            expires_at=expires_at,
-            is_used=False,
-            attempts=0
-        )
-        db.add(verification_code)
-        db.commit()
+        # Generate and store verification code
+        try:
+            code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+            expires_at = datetime.utcnow() + timedelta(minutes=15)
+            
+            verification_code = VerificationCode(
+                user_id=user.id,
+                code=code,
+                expires_at=expires_at,
+                is_used=False,
+                attempts=0
+            )
+            db.add(verification_code)
+            db.commit()
+            logger.info("Verification code created and stored")
+        except Exception as code_error:
+            logger.error(f"Error creating verification code: {str(code_error)}")
+            raise HTTPException(
+                status_code=500,
+                detail="Error generating verification code"
+            )
         
         # Send verification email
         try:
+            logger.info("Attempting to send verification email...")
+            from ..config.settings import EMAIL_CONFIG
+            logger.info(f"Email configuration loaded - Sender: {EMAIL_CONFIG['sender_email']}")
+            
             await send_verification_email(request.email, code)
-            logger.info(f"Verification code sent to {request.email}")
-        except Exception as e:
-            logger.error(f"Failed to send verification email: {str(e)}")
+            logger.info("Verification email sent successfully")
+        except Exception as email_error:
+            logger.error(f"Email sending error: {str(email_error)}", exc_info=True)
+            # Try to rollback verification code
+            try:
+                db.delete(verification_code)
+                db.commit()
+                logger.info("Rolled back verification code due to email error")
+            except Exception as rollback_error:
+                logger.error(f"Rollback error: {str(rollback_error)}")
+            
             raise HTTPException(
                 status_code=500,
-                detail="Failed to send verification email"
+                detail=f"Failed to send verification email: {str(email_error)}"
             )
         
+        logger.info("========= VERIFICATION REQUEST END =========")
         return VerificationResponse(
             message="Verification code sent successfully",
             email=request.email
         )
         
     except HTTPException:
+        logger.error("Request failed with HTTPException", exc_info=True)
         raise
     except Exception as e:
-        logger.error(f"Error in request_verification_code: {str(e)}")
+        logger.error(f"Unexpected error in request_verification_code: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail="Internal server error"
+            detail=f"Internal server error: {str(e)}"
         )
 
 @router.post("/verify-code", response_model=VerificationResponse)
