@@ -47,7 +47,13 @@ jobs:
           ls -la
           echo "Working directory: ${{ env.WORKING_DIRECTORY }}"
           ls -la ${{ env.WORKING_DIRECTORY }}
-          cat ${{ env.WORKING_DIRECTORY }}/requirements.txt
+          if [ -f "${{ env.WORKING_DIRECTORY }}/requirements.txt" ]; then
+            echo "requirements.txt exists"
+            cat ${{ env.WORKING_DIRECTORY }}/requirements.txt
+          else
+            echo "requirements.txt does not exist"
+            exit 1
+          fi
       
       - name: Install dependencies
         run: |
@@ -55,7 +61,12 @@ jobs:
           pwd
           ls -la
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          if [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt
+          else
+            echo "requirements.txt not found in current directory"
+            exit 1
+          fi
           ls -la  # This will help us verify the files are present
 
       # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
