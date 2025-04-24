@@ -41,11 +41,19 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       
+      - name: Verify directory structure
+        run: |
+          pwd
+          ls -la
+          echo "Working directory: ${{ env.WORKING_DIRECTORY }}"
+          ls -la ${{ env.WORKING_DIRECTORY }}
+      
       - name: Install dependencies
         run: |
           cd ${{ env.WORKING_DIRECTORY }}
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          ls -la  # This will help us verify the files are present
 
       # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
       
