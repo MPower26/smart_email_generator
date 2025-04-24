@@ -12,6 +12,7 @@ from app.db.database import get_db
 from app.models.models import GeneratedEmail, User, EmailTemplate
 from app.api.auth import get_current_user
 from app.services.email_generator import EmailGenerator
+from app.services.email_service import send_verification_email
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -278,4 +279,29 @@ async def delete_email_endpoint(
     logger.info(f"Successfully deleted email ID: {email_id}")
     
     # Return No Content response
-    return Response(status_code=status.HTTP_204_NO_CONTENT) 
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+@router.post("/verify", status_code=status.HTTP_200_OK)
+async def send_verification_code(
+    email: str = Body(..., embed=True),
+    background_tasks: BackgroundTasks = None,
+    db: Session = Depends(get_db)
+):
+    """Send a verification code to the specified email address"""
+    try:
+        # Generate a verification code (you might want to implement your own logic)
+        verification_code = "123456"  # Replace with actual code generation
+        
+        # Send the verification email in the background if background_tasks is provided
+        if background_tasks:
+            background_tasks.add_task(send_verification_email, email, verification_code)
+        else:
+            await send_verification_email(email, verification_code)
+            
+        return {"message": "Verification email sent successfully"}
+    except Exception as e:
+        logger.error(f"Failed to send verification email: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send verification email"
+        ) 
