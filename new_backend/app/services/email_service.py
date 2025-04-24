@@ -1,7 +1,7 @@
-import os
 import logging
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email, To, Content
+from ..config.settings import EMAIL_CONFIG
 
 logger = logging.getLogger(__name__)
 
@@ -12,19 +12,14 @@ class EmailServiceError(Exception):
 # Placeholder for verification email sending
 async def send_verification_email(recipient_email: str, code: str):
     """Sends a verification code email using SendGrid."""
-    SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
-    SENDER_EMAIL = os.getenv("SENDER_EMAIL")
-    FROM_NAME = os.getenv("SENDGRID_FROM_NAME", "Smart Email Generator")
-    TEMPLATE_ID = os.getenv("SENDGRID_TEMPLATE_ID")
-    
-    if not all([SENDGRID_API_KEY, SENDER_EMAIL]):
-        logger.error("Email service configuration missing: SENDGRID_API_KEY or SENDER_EMAIL not set")
-        raise EmailServiceError("Email service not properly configured")
-
     try:
-        from_email = Email(SENDER_EMAIL, FROM_NAME)
-        to_email = To(recipient_email)
+        # Create the email
+        message = Mail()
+        message.from_email = Email(EMAIL_CONFIG['sender_email'], EMAIL_CONFIG['from_name'])
+        message.to = To(recipient_email)
+        message.subject = 'Your Smart Email Generator Verification Code'
         
+        # HTML content for the email
         html_content = f'''
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                 <h2>Verify Your Email</h2>
@@ -33,31 +28,29 @@ async def send_verification_email(recipient_email: str, code: str):
                 <p>This code will expire in 15 minutes.</p>
                 <p>If you didn't request this code, please ignore this email.</p>
                 <hr>
-                <p style="color: #666; font-size: 12px;">This email was sent by {FROM_NAME}</p>
+                <p style="color: #666; font-size: 12px;">This email was sent by {EMAIL_CONFIG['from_name']}</p>
             </div>
         '''
-        
-        message = Mail(
-            from_email=from_email,
-            to_emails=to_email,
-            subject='Your Smart Email Generator Verification Code',
-            html_content=html_content
-        )
+        message.content = Content("text/html", html_content)
 
-        # If a template ID is configured, use it
-        if TEMPLATE_ID:
-            message.template_id = TEMPLATE_ID
+        # If a valid template ID is configured, use it
+        if EMAIL_CONFIG['template_id'] and EMAIL_CONFIG['template_id'] != "your_template_id_here":
+            message.template_id = EMAIL_CONFIG['template_id']
             message.dynamic_template_data = {
                 'verification_code': code
             }
         
-        sg = SendGridAPIClient(SENDGRID_API_KEY)
-        response = sg.send(message)
-        
-        if response.status_code not in range(200, 300):
-            error_msg = f"SendGrid API returned status code {response.status_code}"
-            logger.error(error_msg)
-            raise EmailServiceError(error_msg)
+        # Send the email
+        sg = SendGridAPIClient(EMAIL_CONFIG['api_key'])
+        try:
+            response = sg.send(message)
+            if response.status_code not in range(200, 300):
+                error_msg = f"SendGrid API returned status code {response.status_code}"
+                logger.error(error_msg)
+                raise EmailServiceError(error_msg)
+        except Exception as e:
+            logger.error(f"SendGrid API error: {str(e)}")
+            raise EmailServiceError(f"SendGrid API error: {str(e)}") from e
             
         logger.info(f"Verification email sent successfully to {recipient_email}")
         return True
