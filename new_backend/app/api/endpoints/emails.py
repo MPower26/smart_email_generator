@@ -6,6 +6,7 @@ import logging
 import json
 import csv
 import io
+import os
 from fastapi import status
 
 from app.db.database import get_db
@@ -13,6 +14,7 @@ from app.models.models import GeneratedEmail, User, EmailTemplate
 from app.api.auth import get_current_user
 from app.services.email_generator import EmailGenerator
 from app.services.email_service import send_verification_email
+from app.config.settings import EMAIL_CONFIG
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -289,19 +291,93 @@ async def send_verification_code(
 ):
     """Send a verification code to the specified email address"""
     try:
+        logger.info(f"Sending verification code to email: {email}")
         # Generate a verification code (you might want to implement your own logic)
         verification_code = "123456"  # Replace with actual code generation
         
+        logger.info("Email config: " + json.dumps({
+            "sender_email": EMAIL_CONFIG['sender_email'],
+            "from_name": EMAIL_CONFIG['from_name'],
+            "api_key_present": bool(EMAIL_CONFIG['api_key']),
+            "template_id": EMAIL_CONFIG['template_id']
+        }))
+        
         # Send the verification email in the background if background_tasks is provided
         if background_tasks:
+            logger.info("Adding send_verification_email to background tasks")
             background_tasks.add_task(send_verification_email, email, verification_code)
         else:
+            logger.info("Sending verification email synchronously")
             await send_verification_email(email, verification_code)
             
         return {"message": "Verification email sent successfully"}
     except Exception as e:
-        logger.error(f"Failed to send verification email: {str(e)}")
+        logger.error(f"Failed to send verification email: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to send verification email"
-        ) 
+            detail=f"Failed to send verification email: {str(e)}"
+        )
+
+@router.post("/test-email", status_code=status.HTTP_200_OK)
+async def test_email_service(
+    data: Dict[str, str] = Body(...),
+    db: Session = Depends(get_db)
+):
+    """Test endpoint for email service debugging"""
+    try:
+        recipient = data.get("email", "mdp73@bath.ac.uk")
+        code = data.get("code", "123456")
+        
+        # Log environment and configuration
+        logger.info("========== EMAIL SERVICE DEBUG ==========")
+        logger.info(f"Testing email service sending to: {recipient}")
+        logger.info(f"Environment: AZURE_WEBSITE_NAME={os.getenv('AZURE_WEBSITE_NAME', 'Not set')}")
+        
+        # Log email configuration
+        logger.info(f"Email config from settings:")
+        logger.info(f"  SENDER_EMAIL: {EMAIL_CONFIG['sender_email']}")
+        logger.info(f"  FROM_NAME: {EMAIL_CONFIG['from_name']}")
+        logger.info(f"  API_KEY present: {'Yes' if EMAIL_CONFIG['api_key'] else 'No'}")
+        logger.info(f"  TEMPLATE_ID: {EMAIL_CONFIG['template_id']}")
+        
+        # Log raw environment variables for debugging
+        logger.info(f"Raw environment variables:")
+        logger.info(f"  SENDER_EMAIL: {os.getenv('SENDER_EMAIL')}")
+        logger.info(f"  SENDGRID_FROM_NAME: {os.getenv('SENDGRID_FROM_NAME')}")
+        logger.info(f"  SENDGRID_API_KEY length: {len(os.getenv('SENDGRID_API_KEY', '')) if os.getenv('SENDGRID_API_KEY') else 'Not set'}")
+        
+        # Log DB connection status
+        try:
+            user_count = db.query(User).count()
+            logger.info(f"Database connection: OK (User count: {user_count})")
+        except Exception as db_error:
+            logger.error(f"Database connection error: {str(db_error)}")
+        
+        # Try to send the email with detailed logging
+        logger.info("Attempting to send test verification email...")
+        await send_verification_email(recipient, code)
+        logger.info("Email sent successfully!")
+        
+        return {
+            "status": "success",
+            "message": "Test email sent successfully",
+            "config": {
+                "sender_email": EMAIL_CONFIG['sender_email'],
+                "from_name": EMAIL_CONFIG['from_name'],
+                "api_key_present": bool(EMAIL_CONFIG['api_key']),
+                "environment": "Production" if os.getenv('AZURE_WEBSITE_NAME') else "Development"
+            }
+        }
+    except Exception as e:
+        logger.error(f"Test email failed: {str(e)}", exc_info=True)
+        return {
+            "status": "error",
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "config": {
+                "sender_email": EMAIL_CONFIG['sender_email'] or "Not set",
+                "from_name": EMAIL_CONFIG['from_name'] or "Not set",
+                "api_key_present": bool(EMAIL_CONFIG['api_key']),
+                "environment": "Production" if os.getenv('AZURE_WEBSITE_NAME') else "Development"
+            }
+        } 
