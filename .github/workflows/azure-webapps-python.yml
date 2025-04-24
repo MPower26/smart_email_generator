@@ -25,9 +25,8 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_WEBAPP_NAME: smart-email-backend    # set this to your application's name
-  WORKING_DIRECTORY: 'new_backend'          # set this to the directory with your code
-  PYTHON_VERSION: '3.9'                     # set this to the Python version to use
+  AZURE_WEBAPP_NAME: smart-email-backend
+  PYTHON_VERSION: '3.9'
 
 jobs:
   build:
@@ -41,48 +40,30 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       
-      - name: Verify directory structure
-        run: |
-          pwd
-          ls -la
-          echo "Working directory: ${{ env.WORKING_DIRECTORY }}"
-          ls -la ${{ env.WORKING_DIRECTORY }}
-          if [ -f "${{ env.WORKING_DIRECTORY }}/requirements.txt" ]; then
-            echo "requirements.txt exists"
-            cat ${{ env.WORKING_DIRECTORY }}/requirements.txt
-          else
-            echo "requirements.txt does not exist"
-            exit 1
-          fi
-      
       - name: Install dependencies
         run: |
-          cd ${{ env.WORKING_DIRECTORY }}
-          pwd
-          ls -la
+          cd new_backend
           python -m pip install --upgrade pip
-          if [ -f "requirements.txt" ]; then
-            pip install -r requirements.txt
-          else
-            echo "requirements.txt not found in current directory"
-            exit 1
-          fi
-          ls -la  # This will help us verify the files are present
-
-      # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
+          pip install -r requirements.txt
+      
+      - name: Create deployment package
+        run: |
+          cd new_backend
+          mkdir -p deploy
+          cp -r app deploy/
+          cp -r alembic deploy/
+          cp requirements.txt deploy/
+          cp startup.sh deploy/
+          cp gunicorn.conf.py deploy/
+          cp __init__.py deploy/
+          cp db.env deploy/
+          ls -la deploy/
       
       - name: Upload artifact for deployment jobs
         uses: actions/upload-artifact@v3
         with:
           name: python-app
-          path: |
-            ${{ env.WORKING_DIRECTORY }}/app
-            ${{ env.WORKING_DIRECTORY }}/alembic
-            ${{ env.WORKING_DIRECTORY }}/requirements.txt
-            ${{ env.WORKING_DIRECTORY }}/startup.sh
-            ${{ env.WORKING_DIRECTORY }}/gunicorn.conf.py
-            ${{ env.WORKING_DIRECTORY }}/__init__.py
-            ${{ env.WORKING_DIRECTORY }}/db.env
+          path: new_backend/deploy
   
   deploy:
     runs-on: ubuntu-latest
@@ -98,9 +79,7 @@ jobs:
           name: python-app
           
       - name: Make startup script executable
-        run: |
-          cd ${{ env.WORKING_DIRECTORY }}
-          chmod +x startup.sh
+        run: chmod +x startup.sh
           
       - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp
