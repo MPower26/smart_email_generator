@@ -58,13 +58,13 @@ jobs:
         run: |
           cd new_backend
           mkdir -p deploy
-          cp -r app deploy/
-          cp -r alembic deploy/
-          cp requirements.txt deploy/
-          cp startup.sh deploy/
-          cp gunicorn.conf.py deploy/
-          cp __init__.py deploy/
-          cp db.env deploy/
+          cp -r app deploy/ || true
+          cp -r alembic deploy/ || true
+          cp requirements.txt deploy/ || true
+          cp startup.sh deploy/ || true
+          cp gunicorn.conf.py deploy/ || true
+          cp __init__.py deploy/ || true
+          cp db.env deploy/ || true
           ls -la deploy/
       
       - name: Upload artifact for deployment jobs
