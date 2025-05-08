@@ -31,7 +31,7 @@ jobs:
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: <smart-email-backend-retry>
+          app-name: smart-email-backend-retry
           slot-name: 'production'
           package: ./backend.zip
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE }}
