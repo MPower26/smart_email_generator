@@ -3,7 +3,7 @@ name: Deploy FastAPI Backend to Azure Web App
 on:
   push:
     branches:
-      - main  # or your deployment branch
+      - master  # Changed from main to master
 
 jobs:
   build-and-deploy:
