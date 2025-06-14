@@ -25,7 +25,7 @@ app.add_middleware(
         "http://localhost:3000",
         "https://jolly-bush-0bae83703.6.azurestaticapps.net"
     ],
-    allow_credentials=False,  # Changed to False since we're not using cookies
+    allow_credentials=True,  # Changed to False since we're not using cookies
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
     expose_headers=["*"],
