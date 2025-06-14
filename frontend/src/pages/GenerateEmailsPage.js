@@ -77,7 +77,7 @@ const GenerateEmailsPage = () => {
         const response = await fetch('https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net/api/emails/by-stage/outreach', {
           method: 'GET',
           headers: {
-            'Authorization': userEmail
+            'Authorization': `Bearer ${userEmail}`
           },
           credentials: 'include'
         });
@@ -98,7 +98,7 @@ const GenerateEmailsPage = () => {
         const response = await fetch('https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net/api/emails/by-stage/followup', {
           method: 'GET',
           headers: {
-            'Authorization': userEmail
+            'Authorization': `Bearer ${userEmail}`
           },
           credentials: 'include'
         });
@@ -119,7 +119,7 @@ const GenerateEmailsPage = () => {
         const response = await fetch('https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net/api/emails/by-stage/lastchance', {
           method: 'GET',
           headers: {
-            'Authorization': userEmail
+            'Authorization': `Bearer ${userEmail}`
           },
           credentials: 'include'
         });
