@@ -74,7 +74,7 @@ const GenerateEmailsPage = () => {
       
       // Simple approach - fetch outreach emails directly
       try {
-        const response = await fetch('http://localhost:8000/api/emails/by-stage/outreach', {
+        const response = await fetch('https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net/api/emails/by-stage/outreach', {
           method: 'GET',
           headers: {
             'Authorization': userEmail
@@ -95,7 +95,7 @@ const GenerateEmailsPage = () => {
       
       // Fetch follow-up emails
       try {
-        const response = await fetch('http://localhost:8000/api/emails/by-stage/followup', {
+        const response = await fetch('https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net/api/emails/by-stage/followup', {
           method: 'GET',
           headers: {
             'Authorization': userEmail
@@ -116,7 +116,7 @@ const GenerateEmailsPage = () => {
       
       // Fetch last chance emails
       try {
-        const response = await fetch('http://localhost:8000/api/emails/by-stage/lastchance', {
+        const response = await fetch('https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net/api/emails/by-stage/lastchance', {
           method: 'GET',
           headers: {
             'Authorization': userEmail
