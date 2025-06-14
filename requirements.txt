@@ -7,6 +7,7 @@ fastapi==0.68.0
 uvicorn==0.15.0
 gunicorn==20.1.0
 python-multipart==0.0.5  # for form data processing
+openai==1.55.3
 
 # Database
 pyodbc==4.0.32  # for SQL Server connection
