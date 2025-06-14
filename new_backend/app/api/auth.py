@@ -8,6 +8,7 @@ from ..models.models import User, VerificationCode
 from ..services.email_service import send_verification_email
 from ..schemas.auth import VerificationRequest, VerificationResponse
 from typing import Optional
+from sqlalchemy import text
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -75,7 +76,7 @@ async def request_verification_code(request: VerificationRequest, db: Session = 
         
         # Log database connection status
         try:
-            db.execute("SELECT 1")
+            db.execute(text("SELECT 1"))
             logger.info("Database connection test: SUCCESS")
         except Exception as db_error:
             logger.error(f"Database connection test: FAILED - {str(db_error)}")
