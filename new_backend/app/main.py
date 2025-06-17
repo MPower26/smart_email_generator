@@ -1,3 +1,9 @@
+from fastapi import FastAPI, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+import logging
+
+from app.api.endpoints import emails, friends
+from app.api import auth
 from app.db.database import engine
 from app.models.models import Base
 from app.routers import users
@@ -15,7 +21,10 @@ app = FastAPI(title="Smart Email Generator API")
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://jolly-bush-0bae83703.6.azurestaticapps.net"],
+    allow_origins=[
+        "http://localhost:3000",
+        "https://jolly-bush-0bae83703.6.azurestaticapps.net"
+    ],
     allow_credentials=True,  # Changed to True cause email won't show in outreach follow up and stuff without it
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -42,12 +51,4 @@ async def health_check():
 @app.post("/dev-login")
 async def dev_login(email: str):
     logger.info(f"Dev login for email: {email}")
-    return {"message": f"Dev login successful for {email}"}
-
-@app.get("/cors-test")
-async def cors_test(request: Request):
-    headers = dict(request.headers)
-    return {
-        "message": "CORS test successful!",
-        "request_headers": headers
-    } 
+    return {"message": f"Dev login successful for {email}"} 
