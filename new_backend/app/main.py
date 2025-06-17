@@ -21,10 +21,7 @@ app = FastAPI(title="Smart Email Generator API")
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "https://jolly-bush-0bae83703.6.azurestaticapps.net"
-    ],
+    allow_origins=["https://jolly-bush-0bae83703.6.azurestaticapps.net"],
     allow_credentials=True,  # Changed to True cause email won't show in outreach follow up and stuff without it
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
