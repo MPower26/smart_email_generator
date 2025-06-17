@@ -50,7 +50,7 @@ async def get_emails_by_stage(
     db: Session = Depends(get_db)
 ):
     """Get emails for the current user filtered by stage"""
-    logger.info(f"Getting emails for user {current_user.email} (ID: {current_user.id}) in stage {stage}")
+    logger.info(f"[EMAILS] Getting emails for user {current_user.email} (ID: {current_user.id}) in stage '{stage}'")
     logger.info(f"Current user details - ID: {current_user.id}, Email: {current_user.email}")
     
     # Get user's own emails
@@ -58,6 +58,7 @@ async def get_emails_by_stage(
         GeneratedEmail.user_id == current_user.id,
         GeneratedEmail.stage == stage
     ).all()
+    logger.info(f"[EMAILS] Found {len(emails)} emails for user {current_user.email} (ID: {current_user.id}) in stage '{stage}'")
     
     # Get friends who have sharing enabled
     friends_with_sharing = []
