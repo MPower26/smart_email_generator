@@ -313,22 +313,15 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
                 ) : (
                   <>
                     {userProfile?.gmail_access_token ? (
-                      <Button 
-                        variant="primary" 
+                      <Button
+                        variant="primary"
                         size="sm"
                         className="me-2"
-                        onClick={handleSendViaGmail}
+                        onClick={userProfile?.gmail_access_token ? handleSendViaGmail : handleConnectGmail}
                         disabled={isSending}
-                        title="Send via Gmail API"
+                        title={userProfile?.gmail_access_token ? "Send via Gmail API" : "Connect Gmail"}
                       >
-                        {isSending ? (
-                          <>
-                            <Spinner animation="border" size="sm" className="me-1" />
-                            Sending...
-                          </>
-                        ) : (
-                          'Send via Gmail'
-                        )}
+                        {isSending ? "Sending..." : "Send via Gmail"}
                       </Button>
                     ) : (
                       <Button 
