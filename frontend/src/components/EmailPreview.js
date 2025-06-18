@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { Card, Button, Badge, Collapse, Alert } from 'react-bootstrap';
-import { FaUserFriends } from 'react-icons/fa';
+import React, { useState, useEffect, useContext } from 'react';
+import { Card, Button, Badge, Collapse, Alert, Spinner } from 'react-bootstrap';
+import { UserContext } from '../contexts/UserContext';
 
 const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = false, isSentHighlight = false, isUnmarkedHighlight = false }) => {
+  const { userProfile } = useContext(UserContext);
   const [copied, setCopied] = useState(false);
-  const [showBody, setShowBody] = useState(false); // Always start collapsed
+  const [showBody, setShowBody] = useState(!isCollapsed);
   const [error, setError] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSending, setIsSending] = useState(false);
 
   // This effect will collapse emails when tab changes
   useEffect(() => {
@@ -22,13 +24,29 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
   };
 
   const copyToClipboard = (text) => {
-    try {
-      navigator.clipboard.writeText(text);
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => {
+        handleCopy();
+      }).catch(err => {
+        console.error('Failed to copy: ', err);
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        handleCopy();
+      });
+    } else {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
       handleCopy();
-    } catch (error) {
-      console.error('Error copying to clipboard:', error);
-      setError('Failed to copy to clipboard. Try again.');
-      setTimeout(() => setError(null), 3000);
     }
   };
 
@@ -38,59 +56,103 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
     setShowBody(!showBody);
   };
 
-  // Safe handler for marking as sent
-  const handleMarkSent = (e, id) => {
+  // Handler for marking email as sent
+  const handleMarkSent = async (e, id) => {
     e.stopPropagation();
-    try {
-      onSend(id);
-    } catch (error) {
-      console.error('Error marking email as sent:', error);
-      setError('Failed to mark email as sent. Try again.');
-      setTimeout(() => setError(null), 3000);
-    }
-  };
-  
-  // Handler for unmarking as sent
-  const handleUnmarkSent = (e, id) => {
-    e.stopPropagation();
-    setError(null); // Clear previous errors
-    try {
-      onUnmarkSent(id);
-    } catch (error) {
-      console.error('Error unmarking email:', error);
-      setError('Failed to unmark email.');
-      setTimeout(() => setError(null), 3000);
+    setError(null);
+    
+    if (typeof onSend === 'function') {
+      try {
+        await onSend(id);
+      } catch (error) {
+        console.error('Error marking as sent:', error);
+        setError(error.message || 'Failed to mark as sent.');
+        setTimeout(() => setError(null), 3000);
+      }
     }
   };
 
-  // Handler to open default email client AND mark as sent
-  const handleOpenMailClient = (e) => {
+  // Handler for unmarking email as sent
+  const handleUnmarkSent = async (e, id) => {
     e.stopPropagation();
-    setError(null); // Clear error first
+    setError(null);
+    
+    if (typeof onUnmarkSent === 'function') {
+      try {
+        await onUnmarkSent(id);
+      } catch (error) {
+        console.error('Error unmarking as sent:', error);
+        setError(error.message || 'Failed to unmark as sent.');
+        setTimeout(() => setError(null), 3000);
+      }
+    }
+  };
+
+  // Handler for sending via Gmail
+  const handleSendViaGmail = async (e) => {
+    e.stopPropagation();
+    setError(null);
+    
+    if (!userProfile?.gmail_access_token) {
+      setError('Gmail not connected. Please connect your Gmail account in Settings first.');
+      setTimeout(() => setError(null), 5000);
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      const response = await fetch(`/api/emails/send_via_gmail?email_id=${email.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userProfile.email}`
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Email sent via Gmail:', result);
+        
+        // Mark as sent in the app
+        if (typeof onSend === 'function') {
+          await onSend(email.id);
+        }
+        
+        setError(null);
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to send email via Gmail');
+      }
+    } catch (error) {
+      console.error('Error sending via Gmail:', error);
+      setError(error.message || 'Failed to send email via Gmail. Please try again.');
+      setTimeout(() => setError(null), 5000);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  // Handler for opening mail client (fallback)
+  const handleOpenMailClient = async (e) => {
+    e.stopPropagation();
+    setError(null);
     
     try {
-      // Mark as sent FIRST to ensure the API call is initiated
-      handleMarkSent(e, email.id);
-
-      // Now, try to open the mail client
-      const subject = encodeURIComponent(email.subject || '');
-      const body = encodeURIComponent(email.body || '');
-      const recipient = encodeURIComponent(email.to || '');
-      
-      if (!recipient) {
-        // We still might want to show an error, even if marked as sent
-        setError('No recipient email address found for mailto link.');
-        setTimeout(() => setError(null), 3000);
-        return; // Stop before trying mailto
+      // First mark as sent in the app
+      if (typeof onSend === 'function') {
+        await onSend(email.id);
       }
+      
+      // Then create mailto link
+      const recipient = email.recipient_email || email.to || '';
+      const subject = encodeURIComponent(email.subject || '');
+      const body = encodeURIComponent(email.body || email.content || '');
       
       const mailtoLink = `mailto:${recipient}?subject=${subject}&body=${body}`;
       
       if (mailtoLink.length > 10000) {
           setError('Email content too long for mailto link. Marked as sent, but client might not open.');
           setTimeout(() => setError(null), 5000);
-          // Decide if you still want to try opening
-          // window.location.href = mailtoLink;
           return; 
       }
 
@@ -98,10 +160,7 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
       window.location.href = mailtoLink;
       
     } catch (err) {
-      // Error could be from handleMarkSent OR mailto link creation
       console.error('Error in handleOpenMailClient:', err);
-      // If handleMarkSent failed, its internal error state might already be set
-      // Add a general fallback error if not already set by handleMarkSent
       if (!error) {
         setError('Operation failed (check console).');
         setTimeout(() => setError(null), 3000);
@@ -253,15 +312,35 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
                   </Button>
                 ) : (
                   <>
-                    <Button 
-                      variant="primary" 
-                      size="sm"
-                      className="me-2"
-                      onClick={handleOpenMailClient} 
-                      title="Open in default email client"
-                    >
-                      Send via Email Client
-                    </Button>
+                    {userProfile?.gmail_access_token ? (
+                      <Button 
+                        variant="primary" 
+                        size="sm"
+                        className="me-2"
+                        onClick={handleSendViaGmail}
+                        disabled={isSending}
+                        title="Send via Gmail API"
+                      >
+                        {isSending ? (
+                          <>
+                            <Spinner animation="border" size="sm" className="me-1" />
+                            Sending...
+                          </>
+                        ) : (
+                          'Send via Gmail'
+                        )}
+                      </Button>
+                    ) : (
+                      <Button 
+                        variant="outline-primary" 
+                        size="sm"
+                        className="me-2"
+                        onClick={handleOpenMailClient} 
+                        title="Open in default email client (Gmail not connected)"
+                      >
+                        Send via Email Client
+                      </Button>
+                    )}
                     <Button 
                       variant="success" 
                       size="sm"
