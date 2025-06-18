@@ -104,7 +104,7 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
 
     setIsSending(true);
     try {
-      const response = await fetch(`/api/emails/send_via_gmail?email_id=${email.id}`, {
+      const response = await fetch(`${BACKEND_URL}/api/emails/send_via_gmail?email_id=${email.id}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
