@@ -6,7 +6,7 @@ import { UserContext } from '../contexts/UserContext';
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net';
 
 const SettingsPage = () => {
-  const { userProfile, updateUserProfile, logout } = useContext(UserContext);
+  const { userProfile, updateUserProfile, fetchUserProfile, logout } = useContext(UserContext);
   const [profile, setProfile] = useState({
     full_name: '',
     email: '',
@@ -121,18 +121,11 @@ const SettingsPage = () => {
       // Listen for the OAuth callback
       const checkConnection = setInterval(async () => {
         try {
-          const userRes = await fetch(`${BACKEND_URL}/api/users/me`, {
-            headers: {
-              'Authorization': `Bearer ${userProfile.email}`
-            }
-          });
-          if (userRes.ok) {
-            const userData = await userRes.json();
-            if (userData.gmail_access_token) {
-              setGmailConnected(true);
-              clearInterval(checkConnection);
-              setGmailLoading(false);
-            }
+          await fetchUserProfile(); // Refresh user profile
+          if (userProfile?.gmail_access_token) {
+            setGmailConnected(true);
+            clearInterval(checkConnection);
+            setGmailLoading(false);
           }
         } catch (err) {
           console.error('Error checking Gmail connection:', err);
