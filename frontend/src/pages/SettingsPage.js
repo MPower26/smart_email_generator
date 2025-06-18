@@ -290,3 +290,50 @@ function ConnectGmail() {
 }
 
 export default SettingsPage; 
+
+function FollowupIntervals({ user }) {
+  const [followup, setFollowup] = useState(user?.followup_interval_days || 3);
+  const [lastchance, setLastchance] = useState(user?.lastchance_interval_days || 6);
+
+  const update = async () => {
+    await fetch('/api/settings/update_intervals', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ followup_days: followup, lastchance_days: lastchance })
+    });
+    alert("Intervals updated!");
+  };
+
+  return (
+    <Card className="mb-4">
+      <Card.Header>
+        <h4 className="mb-0">Délais de relance</h4>
+      </Card.Header>
+      <Card.Body>
+        <Form>
+          <Form.Group controlId="followupInterval">
+            <Form.Label>Délai avant relance (jours)</Form.Label>
+            <Form.Control
+              type="number"
+              value={followup}
+              min={1}
+              max={30}
+              onChange={e => setFollowup(Number(e.target.value))}
+            />
+          </Form.Group>
+          <Form.Group controlId="lastchanceInterval" className="mt-3">
+            <Form.Label>Délai avant dernier rappel (jours)</Form.Label>
+            <Form.Control
+              type="number"
+              value={lastchance}
+              min={1}
+              max={30}
+              onChange={e => setLastchance(Number(e.target.value))}
+            />
+          </Form.Group>
+          <Button className="mt-3" onClick={update}>Mettre à jour</Button>
+        </Form>
+      </Card.Body>
+    </Card>
+  );
+}
