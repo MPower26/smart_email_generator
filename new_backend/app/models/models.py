@@ -123,3 +123,8 @@ class GeneratedEmail(Base):
     # Relationships
     user = relationship("User", back_populates="generated_emails", foreign_keys=[user_id])
     template = relationship("EmailTemplate",  back_populates="generated_emails") 
+    
+    # EMail flow
+    followup_due_at = Column(DateTime, nullable=True)
+    lastchance_due_at = Column(DateTime, nullable=True)
+    status = Column(String, default="outreach_pending")  # outreach_sent, followup_due, lastchance_due, sent, etc.
