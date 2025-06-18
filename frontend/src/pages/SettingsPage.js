@@ -280,4 +280,13 @@ const SettingsPage = () => {
   );
 };
 
+function ConnectGmail() {
+  const handleConnect = async () => {
+    const res = await fetch('/api/gmail/auth/start');
+    const data = await res.json();
+    window.open(data.auth_url, "_blank", "width=500,height=600");
+  };
+  return <button onClick={handleConnect}>Connect Gmail</button>;
+}
+
 export default SettingsPage; 
