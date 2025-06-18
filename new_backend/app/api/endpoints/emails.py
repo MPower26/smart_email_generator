@@ -165,7 +165,8 @@ async def get_templates(
 async def generate_emails(
     file: UploadFile = File(...),
     template_id: Optional[str] = Form(None),
-    stage: str = Form("outreach"),  # Add stage parameter with default value
+    stage: str = Form("outreach"),
+    avoid_duplicates: Optional[bool] = Form(False),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -189,46 +190,20 @@ async def generate_emails(
             if not template:
                 raise HTTPException(status_code=404, detail="Template not found")
         
-        # Initialize email generator
+        # Get friends_with_sharing
+        friends_with_sharing = [f.id for f in current_user.friends if f.combine_contacts]
+        dedupe_with_friends = len(friends_with_sharing) > 0
+
         email_generator = EmailGenerator(db)
-        
-        # Generate emails for each contact
-        generated_emails = []
-        for contact in contacts:
-            # Skip contacts without email
-            if not contact.get('Email'):
-                continue
-                
-            # Format contact data for email generation
-            contact_data = {
-                "First Name": contact.get('First Name', ''),
-                "Last Name": contact.get('Last Name', ''),
-                "Email": contact.get('Email', ''),
-                "Title": contact.get('Title', ''),
-                "Company": contact.get('Company', ''),
-                "Industry": contact.get('Industry', ''),
-                "Keywords": contact.get('Keywords', ''),
-                "SEO Description": contact.get('SEO Description', ''),
-                "Website": contact.get('Website', ''),
-                "Company LinkedIn": contact.get('Company Linkedin Url', ''),
-                "Person LinkedIn": contact.get('Person Linkedin Url', ''),
-                "Location": f"{contact.get('City', '')}, {contact.get('State', '')}, {contact.get('Country', '')}",
-                "Company Size": contact.get('# Employees', ''),
-                "Revenue": contact.get('Annual Revenue', ''),
-                "Funding": contact.get('Total Funding', '')
-            }
-            
-            try:
-                email = email_generator.generate_personalized_email(
-                    contact_data,
-                    current_user,
-                    template,
-                    stage  # Pass the stage parameter
-                )
-                generated_emails.append(email)
-            except Exception as e:
-                logger.error(f"Error generating email for {contact.get('Email', '')}: {str(e)}")
-                continue
+        generated_emails = email_generator.process_csv_data(
+            contacts,
+            current_user,
+            template,
+            stage,
+            avoid_duplicates=avoid_duplicates,
+            dedupe_with_friends=dedupe_with_friends,
+            friends_ids=friends_with_sharing
+        )
         
         # Format the emails for response
         formatted_emails = []
