@@ -3,6 +3,8 @@ import { Container, Row, Col, Form, Button, Card, Alert, Spinner } from 'react-b
 import { emailService } from '../services/api';
 import { UserContext } from '../contexts/UserContext';
 
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net';
+
 const SettingsPage = () => {
   const { userProfile, updateUserProfile, logout } = useContext(UserContext);
   const [profile, setProfile] = useState({
@@ -112,14 +114,14 @@ const SettingsPage = () => {
   const handleConnectGmail = async () => {
     setGmailLoading(true);
     try {
-      const res = await fetch('https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net/api/gmail/auth/start');
+      const res = await fetch(`${BACKEND_URL}/api/gmail/auth/start`);
       const data = await res.json();
       window.open(data.auth_url, "_blank", "width=500,height=600");
       
       // Listen for the OAuth callback
       const checkConnection = setInterval(async () => {
         try {
-          const userRes = await fetch('/api/user/profile', {
+          const userRes = await fetch(`${BACKEND_URL}/api/user/profile`, {
             headers: {
               'Authorization': `Bearer ${userProfile.email}`
             }
@@ -382,7 +384,7 @@ function FollowupIntervals({ user }) {
   const [lastchance, setLastchance] = useState(user?.lastchance_interval_days || 6);
 
   const update = async () => {
-    await fetch('/api/settings/update_intervals', {
+    await fetch(`${BACKEND_URL}/api/settings/update_intervals`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ followup_days: followup, lastchance_days: lastchance })
