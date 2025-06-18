@@ -221,25 +221,38 @@ Best regards,
         except Exception as e:
             raise Exception(f"Failed to generate email: {str(e)}")
     
-    def process_csv_data(self, csv_data: List[Dict[str, Any]], user: User, template: Optional[EmailTemplate] = None, stage: str = "outreach") -> List[GeneratedEmail]:
-        """Process CSV data and generate emails for each contact"""
+    def process_csv_data(
+        self,
+        csv_data: List[Dict[str, Any]],
+        user: User,
+        template: Optional[EmailTemplate] = None,
+        stage: str = "outreach",
+        avoid_duplicates: bool = False,
+        dedupe_with_friends: bool = False,
+        friends_ids: Optional[List[int]] = None
+    ) -> List[GeneratedEmail]:
         generated_emails = []
-        
+        already_emailed = set()
+        # Build set of already emailed addresses for this user (and optionally friends)
+        if avoid_duplicates:
+            query = self.db.query(GeneratedEmail.recipient_email).filter(
+                (GeneratedEmail.user_id == user.id) | (
+                    dedupe_with_friends & GeneratedEmail.user_id.in_(friends_ids or []))
+            )
+            emails = {r[0].lower() for r in query}
+            already_emailed.update(emails)
+
         for contact in csv_data:
+            email_addr = contact.get("Email", "").lower()
+            if not email_addr:
+                continue
+            if avoid_duplicates and email_addr in already_emailed:
+                continue
             try:
-                # Validate required fields
-                if not contact.get("Email"):
-                    print(f"Skipping contact: Missing email address")
-                    continue
-                
-                if not contact.get("First Name") or not contact.get("Last Name"):
-                    print(f"Skipping contact {contact.get('Email')}: Missing name information")
-                    continue
-                
                 email = self.generate_personalized_email(contact, user, template, stage)
                 generated_emails.append(email)
+                if avoid_duplicates:
+                    already_emailed.add(email_addr)
             except Exception as e:
-                # Log the error but continue with other contacts
-                print(f"Error generating email for {contact.get('Email', '')}: {str(e)}")
-        
+                print(f"Error generating email for {email_addr}: {str(e)}")
         return generated_emails 
