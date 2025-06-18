@@ -278,7 +278,7 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
             <strong className="text-primary">To: </strong> 
             <span className="fw-semibold">{email.to || 'No recipient'}</span>
             {email.status && (
-              <Badge bg={email.status === 'sent by friend' ? 'info' : email.status === 'sent' ? 'success' : 'secondary'} className="ms-2">
+              <Badge bg={email.status === 'sent by friend' ? 'info' : email.status === 'outreach_sent' ? 'success' : 'secondary'} className="ms-2">
                 {email.status}
               </Badge>
             )}
