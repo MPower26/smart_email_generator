@@ -112,7 +112,7 @@ const SettingsPage = () => {
   const handleConnectGmail = async () => {
     setGmailLoading(true);
     try {
-      const res = await fetch('/api/gmail/auth/start');
+      const res = await fetch('https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net/api/gmail/auth/start');
       const data = await res.json();
       window.open(data.auth_url, "_blank", "width=500,height=600");
       
