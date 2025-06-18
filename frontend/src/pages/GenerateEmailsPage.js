@@ -73,7 +73,9 @@ const GenerateEmailsPage = () => {
         return;
       }
       
-      // Fetch outreach emails and filter out outreach_sent (they go to Follow-Up)
+      let outreachSentEmails = []; // Store outreach_sent emails to add to Follow-Up
+      
+      // Fetch outreach emails and filter out outreach_sent (they belong in Follow-Up)
       try {
         const response = await fetch('https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net/api/emails/by-stage/outreach', {
           method: 'GET',
@@ -89,6 +91,9 @@ const GenerateEmailsPage = () => {
           // Filter out outreach_sent emails - they belong in Follow-Up
           const filteredOutreachEmails = data.filter(email => email.status !== 'outreach_sent');
           setOutreachEmails(filteredOutreachEmails);
+          
+          // Store outreach_sent emails to add to Follow-Up
+          outreachSentEmails = data.filter(email => email.status === 'outreach_sent' && email.followup_due_at);
         } else {
           console.error('Failed to fetch outreach emails:', response.status);
         }
@@ -96,7 +101,7 @@ const GenerateEmailsPage = () => {
         console.error('Error fetching outreach emails:', err);
       }
       
-      // Fetch follow-up emails and add outreach_sent emails with followup_due_at
+      // Fetch follow-up emails and combine with outreach_sent emails
       try {
         const response = await fetch('https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net/api/emails/by-stage/followup', {
           method: 'GET',
@@ -109,7 +114,11 @@ const GenerateEmailsPage = () => {
         if (response.ok) {
           const data = await response.json();
           console.log('Follow-up data:', data);
-          setFollowupEmails(data);
+          console.log('Outreach_sent emails to add:', outreachSentEmails);
+          
+          // Combine followup emails with outreach_sent emails that have followup_due_at
+          const combinedFollowupEmails = [...data, ...outreachSentEmails];
+          setFollowupEmails(combinedFollowupEmails);
         } else {
           console.error('Failed to fetch follow-up emails:', response.status);
         }
