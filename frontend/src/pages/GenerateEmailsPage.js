@@ -286,7 +286,7 @@ const GenerateEmailsPage = () => {
   const handleMarkAsSent = async (emailId) => {
     setError(null); // Clear previous errors
     try {
-      await emailService.updateEmailStatus(emailId, { status: 'sent' });
+      await emailService.updateEmailStatus(emailId, { status: 'outreach_sent' });
       setLastAction({ id: emailId, type: 'sent' }); // <-- Set action type to 'sent'
       loadEmailsByStage(); // Reload to reflect status change
     } catch (err) {
@@ -475,7 +475,7 @@ const GenerateEmailsPage = () => {
                     {[...outreachEmails]
                       .sort((a, b) => {
                         // First sort by status
-                        const statusOrder = { 'sent': 0, 'draft': 1, 'sent by friend': 2 };
+                        const statusOrder = { 'outreach_sent': 0, 'draft': 1, 'sent by friend': 2 };
                         const statusA = statusOrder[a.status] || 3;
                         const statusB = statusOrder[b.status] || 3;
                         return statusA - statusB;
@@ -529,7 +529,7 @@ const GenerateEmailsPage = () => {
                     {[...followupEmails]
                       .sort((a, b) => {
                         // First sort by status
-                        const statusOrder = { 'sent': 0, 'draft': 1, 'sent by friend': 2 };
+                        const statusOrder = { 'outreach_sent': 0, 'draft': 1, 'sent by friend': 2 };
                         const statusA = statusOrder[a.status] || 3;
                         const statusB = statusOrder[b.status] || 3;
                         return statusA - statusB;
@@ -583,7 +583,7 @@ const GenerateEmailsPage = () => {
                     {[...lastChanceEmails]
                       .sort((a, b) => {
                         // First sort by status
-                        const statusOrder = { 'sent': 0, 'draft': 1, 'sent by friend': 2 };
+                        const statusOrder = { 'outreach_sent': 0, 'draft': 1, 'sent by friend': 2 };
                         const statusA = statusOrder[a.status] || 3;
                         const statusB = statusOrder[b.status] || 3;
                         return statusA - statusB;
