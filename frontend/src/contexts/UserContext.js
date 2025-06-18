@@ -192,6 +192,7 @@ export const UserProvider = ({ children }) => {
       value={{ 
         userProfile, 
         updateUserProfile, 
+        fetchUserProfile,
         logout,
         loading,
         authenticated,
