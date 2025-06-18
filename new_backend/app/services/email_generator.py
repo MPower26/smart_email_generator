@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 from openai import AzureOpenAI
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
+from sqlalchemy import or_
 
 from app.models.models import GeneratedEmail, User, EmailTemplate
 
@@ -235,10 +236,10 @@ Best regards,
         already_emailed = set()
         # Build set of already emailed addresses for this user (and optionally friends)
         if avoid_duplicates:
-            query = self.db.query(GeneratedEmail.recipient_email).filter(
-                (GeneratedEmail.user_id == user.id) | (
-                    dedupe_with_friends & GeneratedEmail.user_id.in_(friends_ids or []))
-            )
+            conditions = [GeneratedEmail.user_id == user.id]
+            if dedupe_with_friends and friends_ids:
+                conditions.append(GeneratedEmail.user_id.in_(friends_ids))
+            query = self.db.query(GeneratedEmail.recipient_email).filter(or_(*conditions))
             emails = {r[0].lower() for r in query}
             already_emailed.update(emails)
 
