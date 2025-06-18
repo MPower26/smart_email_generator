@@ -278,8 +278,27 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
             <strong className="text-primary">To: </strong> 
             <span className="fw-semibold">{email.to || 'No recipient'}</span>
             {email.status && (
-              <Badge bg={email.status === 'sent by friend' ? 'info' : email.status === 'outreach_sent' ? 'success' : 'secondary'} className="ms-2">
+              <Badge bg={email.status === 'sent by friend' ? 'info' : email.status === 'outreach_sent' ? 'success' : email.status === 'followup_due' ? 'warning' : 'secondary'} className="ms-2">
                 {email.status}
+              </Badge>
+            )}
+            {email.status === 'followup_due' && email.followup_due_at && (
+              <Badge bg="warning" text="dark" className="ms-2">
+                <i className="bi bi-clock me-1"></i>
+                {(() => {
+                  const dueDate = new Date(email.followup_due_at);
+                  const now = new Date();
+                  const diffTime = dueDate - now;
+                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                  
+                  if (diffDays <= 0) {
+                    return 'Due now';
+                  } else if (diffDays === 1) {
+                    return 'Due tomorrow';
+                  } else {
+                    return `Due in ${diffDays} days`;
+                  }
+                })()}
               </Badge>
             )}
             {userProfile?.gmail_access_token && (
