@@ -282,7 +282,7 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
                 {email.status}
               </Badge>
             )}
-            {email.status === 'followup_due' && email.followup_due_at && (
+            {email.followup_due_at && (
               <Badge bg="warning" text="dark" className="ms-2">
                 <i className="bi bi-clock me-1"></i>
                 {(() => {
