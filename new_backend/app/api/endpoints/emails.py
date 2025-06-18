@@ -15,6 +15,7 @@ from app.api.auth import get_current_user
 from app.services.email_generator import EmailGenerator
 from app.services.email_service import send_verification_email
 from app.config.settings import EMAIL_CONFIG
+from app.services.gmail_service import send_gmail_email
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -356,4 +357,17 @@ async def test_email_service(
                 "api_key_present": bool(EMAIL_CONFIG['api_key']),
                 "environment": "Production" if os.getenv('AZURE_WEBSITE_NAME') else "Development"
             }
-        } 
+        }
+
+@router.post("/send_via_gmail")
+def send_via_gmail(email_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    generated_email = db.query(GeneratedEmail).filter_by(id=email_id, user_id=user.id).first()
+    if not generated_email:
+        raise HTTPException(status_code=404, detail="Email not found")
+    try:
+        send_gmail_email(user, generated_email.recipient_email, generated_email.subject, generated_email.content)
+        generated_email.status = "sent"
+        db.commit()
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e)) 
