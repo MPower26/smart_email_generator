@@ -289,7 +289,6 @@ function ConnectGmail() {
   return <button onClick={handleConnect}>Connect Gmail</button>;
 }
 
-export default SettingsPage; 
 
 function FollowupIntervals({ user }) {
   const [followup, setFollowup] = useState(user?.followup_interval_days || 3);
@@ -337,3 +336,4 @@ function FollowupIntervals({ user }) {
     </Card>
   );
 }
+export default SettingsPage; 
