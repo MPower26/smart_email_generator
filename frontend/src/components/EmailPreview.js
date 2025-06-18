@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Card, Button, Badge, Collapse, Alert, Spinner } from 'react-bootstrap';
 import { UserContext } from '../contexts/UserContext';
 
-const BACKEND_URL = process.env.GOOGLE_OAUTH_REDIRECT_URI || 'https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net/api/gmail/auth/callback';
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net';
 
 const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = false, isSentHighlight = false, isUnmarkedHighlight = false }) => {
   const { userProfile, fetchUserProfile } = useContext(UserContext);
