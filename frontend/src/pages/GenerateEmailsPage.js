@@ -15,7 +15,6 @@ const GenerateEmailsPage = () => {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('generation');
   const [emailStage, setEmailStage] = useState('outreach');
-  const [preventDuplicates, setPreventDuplicates] = useState(true);
   
   // Stage-specific email arrays
   const [outreachEmails, setOutreachEmails] = useState([]);
@@ -219,7 +218,6 @@ const GenerateEmailsPage = () => {
     formData.append('file', file);
     formData.append('use_ai', generationMethod === 'ai');
     formData.append('stage', emailStage);
-    formData.append('prevent_duplicates', preventDuplicates);
     
     // Add user profile information if available
     if (userProfile) {
@@ -242,10 +240,6 @@ const GenerateEmailsPage = () => {
         
         // Switch to appropriate tab based on the stage of generated emails
         setActiveTab(emailStage);
-        // Show skipped emails if any
-        if (response.data.skipped && response.data.skipped.length > 0) {
-          setError(`Skipped ${response.data.skipped.length} duplicate emails: ${response.data.skipped.join(', ')}`);
-        }
       } else {
         throw new Error('Invalid response format from server');
       }
@@ -425,15 +419,6 @@ const GenerateEmailsPage = () => {
                     </Form.Select>
                   </Form.Group>
                 )}
-
-                <Form.Group className="mb-3">
-                  <Form.Check
-                    type="checkbox"
-                    label="Prevent duplicate outreach (recommended)"
-                    checked={preventDuplicates}
-                    onChange={e => setPreventDuplicates(e.target.checked)}
-                  />
-                </Form.Group>
 
                 {error && <Alert variant="danger">{error}</Alert>}
 
