@@ -48,6 +48,9 @@ class User(Base):
     gmail_access_token = Column(String, nullable=True)
     gmail_refresh_token = Column(String, nullable=True)
     gmail_token_expiry = Column(DateTime, nullable=True)
+    # Notifications
+    followup_interval_days = Column(Integer, default=3)
+    lastchance_interval_days = Column(Integer, default=6)
     
     # Friend relationships
     friends = relationship(
