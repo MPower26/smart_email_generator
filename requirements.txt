@@ -22,3 +22,11 @@ pydantic==1.8.2  # for data validation
 pytest==6.2.5
 pytest-asyncio==0.15.1
 httpx==0.18.2  # for async HTTP requests in tests 
+
+# For scheduling follow-up and last-chance jobs
+apscheduler==3.10.4
+
+# For Gmail OAuth & sending
+google-auth==2.29.0
+google-auth-oauthlib==1.2.0
+google-api-python-client==2.125.0
