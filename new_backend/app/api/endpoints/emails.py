@@ -1,7 +1,7 @@
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Body, UploadFile, File, Form, Response
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 import json
 import csv
@@ -115,7 +115,7 @@ async def update_email_status(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Update the status of an email (e.g., 'sent', 'draft')"""
+    """Update the status of an email (e.g., 'draft', 'outreach_sent', 'followup_due', 'lastchance_due')"""
     email = db.query(GeneratedEmail).filter(
         GeneratedEmail.id == email_id,
         GeneratedEmail.user_id == current_user.id
@@ -124,16 +124,29 @@ async def update_email_status(
         raise HTTPException(status_code=404, detail="Email not found")
     
     new_status = data.get("status")
-    if new_status not in ['draft', 'sent', 'sent by friend']: # Allow draft, sent, or sent by friend
-         raise HTTPException(status_code=400, detail="Invalid status value. Must be 'draft', 'sent', or 'sent by friend'.")
+    valid_statuses = ['draft', 'outreach_sent', 'followup_due', 'lastchance_due', 'sent by friend', 'completed']
+    if new_status not in valid_statuses:
+         raise HTTPException(status_code=400, detail=f"Invalid status value. Must be one of: {', '.join(valid_statuses)}")
          
     email.status = new_status
     
-    # Set sent_at timestamp only when marking as sent or sent by friend
-    if email.status in ["sent", "sent by friend"] and not email.sent_at:
+    # Set sent_at timestamp when marking as sent
+    if email.status in ["outreach_sent", "sent by friend"] and not email.sent_at:
         email.sent_at = datetime.utcnow()
+        
+        # Set followup timestamps based on user's interval settings
+        if email.status == "outreach_sent":
+            now = datetime.utcnow()
+            followup_days = current_user.followup_interval_days or 3
+            lastchance_days = current_user.lastchance_interval_days or 6
+            
+            email.followup_due_at = now + timedelta(days=followup_days)
+            email.lastchance_due_at = now + timedelta(days=lastchance_days)
+            
     elif email.status == "draft": # Clear sent_at if reverting to draft
         email.sent_at = None
+        email.followup_due_at = None
+        email.lastchance_due_at = None
         
     db.commit()
     db.refresh(email)
@@ -366,7 +379,19 @@ def send_via_gmail(email_id: int, db: Session = Depends(get_db), user: User = De
         raise HTTPException(status_code=404, detail="Email not found")
     try:
         send_gmail_email(user, generated_email.recipient_email, generated_email.subject, generated_email.content)
-        generated_email.status = "sent"
+        
+        # Update status and set followup timestamps
+        generated_email.status = "outreach_sent"
+        generated_email.sent_at = datetime.utcnow()
+        
+        # Set followup timestamps based on user's interval settings
+        now = datetime.utcnow()
+        followup_days = user.followup_interval_days or 3
+        lastchance_days = user.lastchance_interval_days or 6
+        
+        generated_email.followup_due_at = now + timedelta(days=followup_days)
+        generated_email.lastchance_due_at = now + timedelta(days=lastchance_days)
+        
         db.commit()
         return {"success": True}
     except Exception as e:
