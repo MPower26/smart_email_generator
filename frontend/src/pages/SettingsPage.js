@@ -114,7 +114,7 @@ const SettingsPage = () => {
   const handleConnectGmail = async () => {
     setGmailLoading(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/gmail/auth/start`);
+      const res = await fetch(`${BACKEND_URL}/api/gmail/auth/start?email=${encodeURIComponent(userProfile.email)}`);
       const data = await res.json();
       window.open(data.auth_url, "_blank", "width=500,height=600");
       
