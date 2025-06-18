@@ -44,6 +44,10 @@ class User(Base):
     templates = relationship("EmailTemplate", back_populates="owner")
     generated_emails = relationship("GeneratedEmail", back_populates="user", foreign_keys="GeneratedEmail.user_id")
     verification_codes = relationship("VerificationCode", back_populates="user")
+    #gmail connection
+    gmail_access_token = Column(String, nullable=True)
+    gmail_refresh_token = Column(String, nullable=True)
+    gmail_token_expiry = Column(DateTime, nullable=True)
     
     # Friend relationships
     friends = relationship(
