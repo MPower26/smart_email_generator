@@ -1,12 +1,14 @@
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 import logging
+from sqlalchemy.orm import Session
 
-from app.api.endpoints import emails, friends, auth_gmail
+from app.api.endpoints import emails, friends, auth_gmail, user_settings
 from app.api import auth
-from app.db.database import engine
+from app.db.database import engine, get_db
 from app.models.models import Base
 from app.routers import users
+from app.services.followup_tasks import check_and_notify_followups
 
 # Configure logging
 logging.basicConfig(
@@ -35,6 +37,7 @@ app.include_router(emails.router, prefix="/api/emails", tags=["Emails"])
 app.include_router(friends.router, prefix="/api/friends", tags=["Friends"])
 app.include_router(users.router, prefix="/api/users", tags=["Users"])
 app.include_router(auth_gmail.router, prefix="/api", tags=["Gmail Auth"])
+app.include_router(user_settings.router, prefix="/api", tags=["User Settings"])
 
 @app.get("/")
 async def root():
@@ -44,6 +47,18 @@ async def root():
 async def health_check():
     """Health check endpoint for monitoring the API status"""
     return {"status": "healthy"}
+
+@app.post("/scheduled/followup-check")
+async def run_followup_check(db: Session = Depends(get_db)):
+    """Scheduled endpoint to check and process followup emails"""
+    try:
+        logger.info("Starting scheduled followup check")
+        check_and_notify_followups(db)
+        logger.info("Scheduled followup check completed successfully")
+        return {"status": "success", "message": "Followup check completed"}
+    except Exception as e:
+        logger.error(f"Error in scheduled followup check: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Followup check failed: {str(e)}")
 
 # Dev-only login endpoint (for testing)
 @app.post("/dev-login")
@@ -58,4 +73,3 @@ async def cors_test(request: Request):
         "message": "CORS test successful!",
         "request_headers": headers
     } 
-
