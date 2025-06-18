@@ -73,7 +73,7 @@ const GenerateEmailsPage = () => {
         return;
       }
       
-      // Simple approach - fetch outreach emails directly
+      // Fetch outreach emails and filter out outreach_sent (they go to Follow-Up)
       try {
         const response = await fetch('https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net/api/emails/by-stage/outreach', {
           method: 'GET',
@@ -86,7 +86,9 @@ const GenerateEmailsPage = () => {
         if (response.ok) {
           const data = await response.json();
           console.log('Outreach data:', data);
-          setOutreachEmails(data);
+          // Filter out outreach_sent emails - they belong in Follow-Up
+          const filteredOutreachEmails = data.filter(email => email.status !== 'outreach_sent');
+          setOutreachEmails(filteredOutreachEmails);
         } else {
           console.error('Failed to fetch outreach emails:', response.status);
         }
@@ -94,7 +96,7 @@ const GenerateEmailsPage = () => {
         console.error('Error fetching outreach emails:', err);
       }
       
-      // Fetch follow-up emails
+      // Fetch follow-up emails and add outreach_sent emails with followup_due_at
       try {
         const response = await fetch('https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net/api/emails/by-stage/followup', {
           method: 'GET',
