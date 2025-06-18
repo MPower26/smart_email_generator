@@ -37,7 +37,6 @@ class User(Base):
     contact_info = Column(String(255))
     is_active = Column(Boolean, default=True)
     combine_contacts = Column(Boolean, default=False)
-    prevent_duplicates = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -119,4 +118,4 @@ class GeneratedEmail(Base):
 
     # Relationships
     user = relationship("User", back_populates="generated_emails", foreign_keys=[user_id])
-    template = relationship("EmailTemplate", back_populates="generated_emails") 
+    template = relationship("EmailTemplate",  back_populates="generated_emails") 
