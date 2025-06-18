@@ -121,7 +121,7 @@ const SettingsPage = () => {
       // Listen for the OAuth callback
       const checkConnection = setInterval(async () => {
         try {
-          const userRes = await fetch(`${BACKEND_URL}/api/user/profile`, {
+          const userRes = await fetch(`${BACKEND_URL}/api/users/me`, {
             headers: {
               'Authorization': `Bearer ${userProfile.email}`
             }
