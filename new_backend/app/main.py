@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 
-from app.api.endpoints import emails, friends
+from app.api.endpoints import emails, friends, auth_gmail
 from app.api import auth
 from app.db.database import engine
 from app.models.models import Base
@@ -34,6 +34,7 @@ app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(emails.router, prefix="/api/emails", tags=["Emails"])
 app.include_router(friends.router, prefix="/api/friends", tags=["Friends"])
 app.include_router(users.router, prefix="/api/users", tags=["Users"])
+app.include_router(auth_gmail.router, prefix="/api", tags=["Gmail Auth"])
 
 @app.get("/")
 async def root():
@@ -57,3 +58,4 @@ async def cors_test(request: Request):
         "message": "CORS test successful!",
         "request_headers": headers
     } 
+
