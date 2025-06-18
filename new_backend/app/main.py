@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 
@@ -48,4 +48,12 @@ async def health_check():
 @app.post("/dev-login")
 async def dev_login(email: str):
     logger.info(f"Dev login for email: {email}")
-    return {"message": f"Dev login successful for {email}"} 
+    return {"message": f"Dev login successful for {email}"}
+
+@app.get("/cors-test")
+async def cors_test(request: Request):
+    headers = dict(request.headers)
+    return {
+        "message": "CORS test successful!",
+        "request_headers": headers
+    } 
