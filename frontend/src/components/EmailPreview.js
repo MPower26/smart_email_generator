@@ -2,10 +2,10 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Card, Button, Badge, Collapse, Alert, Spinner } from 'react-bootstrap';
 import { UserContext } from '../contexts/UserContext';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net';
+const BACKEND_URL = process.env.GOOGLE_OAUTH_REDIRECT_URI || 'https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net/api/gmail/auth/callback';
 
 const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = false, isSentHighlight = false, isUnmarkedHighlight = false }) => {
-  const { userProfile } = useContext(UserContext);
+  const { userProfile, fetchUserProfile } = useContext(UserContext);
   const [copied, setCopied] = useState(false);
   const [showBody, setShowBody] = useState(!isCollapsed);
   const [error, setError] = useState(null);
@@ -212,10 +212,30 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
       const res = await fetch(`${BACKEND_URL}/api/gmail/auth/start?email=${encodeURIComponent(userProfile.email)}`);
       const data = await res.json();
       window.open(data.auth_url, "_blank", "width=500,height=600");
-      setError('Please complete Gmail authentication in the new window, then refresh this page.');
+      
+      // Start polling for Gmail connection status
+      const checkConnection = setInterval(async () => {
+        try {
+          await fetchUserProfile(); // Refresh user profile
+          if (userProfile?.gmail_access_token) {
+            clearInterval(checkConnection);
+            setIsConnecting(false);
+            setError(null);
+          }
+        } catch (err) {
+          console.error('Error checking Gmail connection:', err);
+        }
+      }, 2000);
+      
+      // Stop checking after 5 minutes
+      setTimeout(() => {
+        clearInterval(checkConnection);
+        setIsConnecting(false);
+      }, 300000);
+      
+      setError('Please complete Gmail authentication in the new window. The page will update automatically when connected.');
     } catch (error) {
       setError('Failed to start Gmail authentication.');
-    } finally {
       setIsConnecting(false);
     }
   };
@@ -262,6 +282,12 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
                 {email.status}
               </Badge>
             )}
+            {userProfile?.gmail_access_token && (
+              <Badge bg="success" className="ms-2">
+                <i className="bi bi-envelope-check me-1"></i>
+                Gmail Ready
+              </Badge>
+            )}
           </div>
           <div className="ms-3 text-muted small">
             <Badge bg="light" text="dark" pill>
@@ -287,6 +313,13 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
                 {email.body}
               </pre>
             </div>
+            
+            {userProfile?.gmail_access_token && (
+              <Alert variant="info" className="py-2 mb-3">
+                <i className="bi bi-info-circle me-2"></i>
+                <small>Gmail is connected! Click "Send via Gmail" to send this email directly from your Gmail account.</small>
+              </Alert>
+            )}
             
             <div className="d-flex justify-content-between align-items-center mt-3">
               <div>
@@ -320,33 +353,49 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
                   {copied ? 'Copied!' : 'Copy Body'}
                 </Button>
 
-                {/* Always show Send via Gmail button */}
-                <Button 
-                  variant="primary" 
-                  size="sm"
-                  className="me-2"
-                  onClick={userProfile?.gmail_access_token ? handleSendViaGmail : handleConnectGmail}
-                  disabled={isSending || isConnecting}
-                  title={userProfile?.gmail_access_token ? "Send via Gmail API" : "Connect Gmail"}
-                >
-                  {isSending ? (
-                    <>
-                      <Spinner animation="border" size="sm" className="me-1" />
-                      Sending...
-                    </>
-                  ) : isConnecting ? (
-                    <>
-                      <Spinner animation="border" size="sm" className="me-1" />
-                      Connecting...
-                    </>
-                  ) : (
-                    'Send via Gmail'
-                  )}
-                </Button>
+                {/* Primary action: Gmail if connected, Connect Gmail if not */}
+                {userProfile?.gmail_access_token ? (
+                  <Button 
+                    variant="primary" 
+                    size="sm"
+                    className="me-2"
+                    onClick={handleSendViaGmail}
+                    disabled={isSending}
+                    title="Send via Gmail API"
+                  >
+                    {isSending ? (
+                      <>
+                        <Spinner animation="border" size="sm" className="me-1" />
+                        Sending...
+                      </>
+                    ) : (
+                      'Send via Gmail'
+                    )}
+                  </Button>
+                ) : (
+                  <Button 
+                    variant="primary" 
+                    size="sm"
+                    className="me-2"
+                    onClick={handleConnectGmail}
+                    disabled={isConnecting}
+                    title="Connect Gmail to send emails"
+                  >
+                    {isConnecting ? (
+                      <>
+                        <Spinner animation="border" size="sm" className="me-1" />
+                        Connecting...
+                      </>
+                    ) : (
+                      'Connect Gmail'
+                    )}
+                  </Button>
+                )}
 
+                {/* Secondary action: Mark as Sent/Unmark */}
                 {email.status === 'outreach_sent' ? (
                   <Button 
-                    variant="warning" 
+                    variant="outline-warning" 
                     size="sm"
                     onClick={(e) => handleUnmarkSent(e, email.id)}
                     title="Mark as Draft"
@@ -355,10 +404,10 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
                   </Button>
                 ) : (
                   <Button 
-                    variant="success" 
+                    variant="outline-success" 
                     size="sm"
                     onClick={(e) => handleMarkSent(e, email.id)}
-                    title="Mark as Sent in App"
+                    title="Mark as Sent in App (manual tracking)"
                   >
                     Mark as Sent
                   </Button>
