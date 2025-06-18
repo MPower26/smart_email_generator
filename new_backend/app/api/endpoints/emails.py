@@ -165,21 +165,18 @@ async def get_templates(
 async def generate_emails(
     file: UploadFile = File(...),
     template_id: Optional[str] = Form(None),
-    stage: str = Form("outreach"),  # Add stage parameter with default value
+    stage: str = Form("outreach"),
+    prevent_duplicates: Optional[bool] = Form(True),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Generate emails based on Apollo contacts export"""
     logger.info(f"Generate request for user {current_user.email}")
-    
     try:
-        # Read and parse the CSV file
         contents = await file.read()
         csv_file = io.StringIO(contents.decode('utf-8'))
         reader = csv.DictReader(csv_file)
         contacts = list(reader)
-        
-        # Get template if provided
         template = None
         if template_id:
             template = db.query(EmailTemplate).filter(
@@ -188,18 +185,26 @@ async def generate_emails(
             ).first()
             if not template:
                 raise HTTPException(status_code=404, detail="Template not found")
-        
-        # Initialize email generator
         email_generator = EmailGenerator(db)
-        
-        # Generate emails for each contact
+        # --- Duplicate prevention logic ---
+        already_contacted = set(
+            e.recipient_email.lower() for e in db.query(GeneratedEmail).filter(GeneratedEmail.user_id == current_user.id).all()
+        )
+        # If sharing is enabled, add friends' recipients
+        if current_user.combine_contacts:
+            for friend in current_user.friends:
+                if friend.combine_contacts:
+                    friend_emails = db.query(GeneratedEmail).filter(GeneratedEmail.user_id == friend.id).all()
+                    already_contacted.update(e.recipient_email.lower() for e in friend_emails)
         generated_emails = []
+        skipped_emails = []
         for contact in contacts:
-            # Skip contacts without email
-            if not contact.get('Email'):
+            email_addr = contact.get('Email', '').lower()
+            if not email_addr:
                 continue
-                
-            # Format contact data for email generation
+            if prevent_duplicates and email_addr in already_contacted:
+                skipped_emails.append(email_addr)
+                continue
             contact_data = {
                 "First Name": contact.get('First Name', ''),
                 "Last Name": contact.get('Last Name', ''),
@@ -217,38 +222,34 @@ async def generate_emails(
                 "Revenue": contact.get('Annual Revenue', ''),
                 "Funding": contact.get('Total Funding', '')
             }
-            
             try:
                 email = email_generator.generate_personalized_email(
                     contact_data,
                     current_user,
                     template,
-                    stage  # Pass the stage parameter
+                    stage
                 )
                 generated_emails.append(email)
+                already_contacted.add(email_addr)
             except Exception as e:
-                logger.error(f"Error generating email for {contact.get('Email', '')}: {str(e)}")
+                logger.error(f"Error generating email for {email_addr}: {str(e)}")
                 continue
-        
-        # Format the emails for response
         formatted_emails = []
         for email in generated_emails:
             content_lines = email.content.split('\n')
             subject = content_lines[0].strip()
             content = '\n'.join(content_lines[1:]).strip()
-            
             formatted_emails.append({
                 "to": email.recipient_email,
                 "content": content,
                 "subject": subject
             })
-        
         return {
             "message": "Emails generated successfully",
             "emails": formatted_emails,
-            "count": len(generated_emails)
+            "count": len(generated_emails),
+            "skipped": skipped_emails
         }
-        
     except Exception as e:
         logger.error(f"Error generating emails: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
