@@ -17,6 +17,8 @@ const SettingsPage = () => {
   const [clearingCache, setClearingCache] = useState(false);
   const [cacheError, setCacheError] = useState('');
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [gmailConnected, setGmailConnected] = useState(false);
+  const [gmailLoading, setGmailLoading] = useState(false);
 
   // Charger le profil utilisateur au démarrage
   useEffect(() => {
@@ -28,6 +30,8 @@ const SettingsPage = () => {
         company_name: userProfile.company_name || '',
         company_description: userProfile.company_description || ''
       });
+      // Check if Gmail is connected
+      setGmailConnected(!!userProfile.gmail_access_token);
     }
     fetchCacheInfo();
   }, [userProfile]);
@@ -101,6 +105,47 @@ const SettingsPage = () => {
       console.error('Error updating profile:', error);
       setCacheError('Failed to update profile. Please try again.');
       setTimeout(() => setCacheError(''), 3000);
+    }
+  };
+
+  // Gmail connection handler
+  const handleConnectGmail = async () => {
+    setGmailLoading(true);
+    try {
+      const res = await fetch('/api/gmail/auth/start');
+      const data = await res.json();
+      window.open(data.auth_url, "_blank", "width=500,height=600");
+      
+      // Listen for the OAuth callback
+      const checkConnection = setInterval(async () => {
+        try {
+          const userRes = await fetch('/api/user/profile', {
+            headers: {
+              'Authorization': `Bearer ${userProfile.email}`
+            }
+          });
+          if (userRes.ok) {
+            const userData = await userRes.json();
+            if (userData.gmail_access_token) {
+              setGmailConnected(true);
+              clearInterval(checkConnection);
+              setGmailLoading(false);
+            }
+          }
+        } catch (err) {
+          console.error('Error checking Gmail connection:', err);
+        }
+      }, 2000);
+      
+      // Stop checking after 5 minutes
+      setTimeout(() => {
+        clearInterval(checkConnection);
+        setGmailLoading(false);
+      }, 300000);
+      
+    } catch (error) {
+      console.error('Error starting Gmail auth:', error);
+      setGmailLoading(false);
     }
   };
 
@@ -203,6 +248,58 @@ const SettingsPage = () => {
         </Col>
       </Row>
 
+      {/* Gmail Integration Section */}
+      <Row className="mb-5">
+        <Col md={8}>
+          <Card>
+            <Card.Header>
+              <h4 className="mb-0">Intégration Gmail</h4>
+            </Card.Header>
+            <Card.Body>
+              <p className="text-muted mb-4">
+                Connectez votre compte Gmail pour envoyer des emails directement depuis l'application.
+              </p>
+              
+              <div className="d-flex align-items-center mb-3">
+                <div className="me-3">
+                  {gmailConnected ? (
+                    <Alert variant="success" className="mb-0 py-2">
+                      <i className="bi bi-check-circle-fill me-2"></i>
+                      Gmail connecté
+                    </Alert>
+                  ) : (
+                    <Alert variant="warning" className="mb-0 py-2">
+                      <i className="bi bi-exclamation-triangle-fill me-2"></i>
+                      Gmail non connecté
+                    </Alert>
+                  )}
+                </div>
+                
+                <Button 
+                  variant={gmailConnected ? "outline-secondary" : "primary"}
+                  onClick={handleConnectGmail}
+                  disabled={gmailLoading}
+                >
+                  {gmailLoading ? (
+                    <>
+                      <Spinner animation="border" size="sm" className="me-2" />
+                      Connexion...
+                    </>
+                  ) : gmailConnected ? (
+                    "Reconnecter Gmail"
+                  ) : (
+                    "Connecter Gmail"
+                  )}
+                </Button>
+              </div>
+
+              {/* Followup Intervals */}
+              <FollowupIntervals user={userProfile} />
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+
       <Row>
         <Col md={6}>
           <Card className="mb-4">
@@ -279,16 +376,6 @@ const SettingsPage = () => {
     </Container>
   );
 };
-
-function ConnectGmail() {
-  const handleConnect = async () => {
-    const res = await fetch('/api/gmail/auth/start');
-    const data = await res.json();
-    window.open(data.auth_url, "_blank", "width=500,height=600");
-  };
-  return <button onClick={handleConnect}>Connect Gmail</button>;
-}
-
 
 function FollowupIntervals({ user }) {
   const [followup, setFollowup] = useState(user?.followup_interval_days || 3);
