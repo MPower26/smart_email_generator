@@ -143,6 +143,9 @@ async def update_email_status(
             email.followup_due_at = now + timedelta(days=followup_days)
             email.lastchance_due_at = now + timedelta(days=lastchance_days)
             
+            # Automatically move to followup_due status
+            email.status = "followup_due"
+            
     elif email.status == "draft": # Clear sent_at if reverting to draft
         email.sent_at = None
         email.followup_due_at = None
@@ -380,8 +383,8 @@ def send_via_gmail(email_id: int, db: Session = Depends(get_db), user: User = De
     try:
         send_gmail_email(user, generated_email.recipient_email, generated_email.subject, generated_email.content)
         
-        # Update status and set followup timestamps
-        generated_email.status = "outreach_sent"
+        # Update status and set followup timestamps - DIRECTLY to followup_due
+        generated_email.status = "followup_due"  # Changed from "outreach_sent" to "followup_due"
         generated_email.sent_at = datetime.utcnow()
         
         # Set followup timestamps based on user's interval settings
@@ -389,10 +392,11 @@ def send_via_gmail(email_id: int, db: Session = Depends(get_db), user: User = De
         followup_days = user.followup_interval_days or 3
         lastchance_days = user.lastchance_interval_days or 6
         
+        # Set followup_due_at to now + 3 days (countdown starts immediately)
         generated_email.followup_due_at = now + timedelta(days=followup_days)
         generated_email.lastchance_due_at = now + timedelta(days=lastchance_days)
         
         db.commit()
-        return {"success": True}
+        return {"success": True, "message": "Email sent and moved to follow-up queue"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e)) 
