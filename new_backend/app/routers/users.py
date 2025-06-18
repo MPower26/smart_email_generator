@@ -19,7 +19,10 @@ async def get_current_user_profile(
         "full_name": current_user.full_name,
         "position": current_user.position,
         "company_name": current_user.company_name,
-        "company_description": current_user.company_description
+        "company_description": current_user.company_description,
+        "gmail_access_token": current_user.gmail_access_token,
+        "gmail_refresh_token": current_user.gmail_refresh_token,
+        "gmail_token_expiry": str(current_user.gmail_token_expiry) if current_user.gmail_token_expiry else None
     }
 
 @router.put("/settings")
