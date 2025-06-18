@@ -9,6 +9,7 @@ import SettingsPage from './pages/SettingsPage';
 import FriendsButton from './components/FriendsButton';
 import AuthScreen from './components/AuthScreen';
 import { UserProvider, useUser } from './contexts/UserContext';
+import GmailSuccess from './pages/GmailSuccess';
 import './App.css';
 
 // Composant de routes protégées
@@ -48,7 +49,10 @@ function App() {
     <UserProvider>
       <Router>
         <div className="App d-flex flex-column min-vh-100">
-          <ProtectedRoutes />
+          <Routes>
+            <Route path="/gmail/success" element={<GmailSuccess />} />
+            <Route path="/*" element={<ProtectedRoutes />} />
+          </Routes>
         </div>
       </Router>
     </UserProvider>
