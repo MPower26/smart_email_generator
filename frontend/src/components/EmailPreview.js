@@ -301,7 +301,7 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
                   {copied ? 'Copied!' : 'Copy Body'}
                 </Button>
 
-                {email.status === 'sent' ? (
+                {email.status === 'outreach_sent' ? (
                   <Button 
                     variant="warning" 
                     size="sm"
