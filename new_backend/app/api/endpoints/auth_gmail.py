@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request, Depends, HTTPException
 from urllib.parse import urlencode
 import os
 import requests
+from datetime import datetime, timedelta
 from app.models.models import User, get_db
 from sqlalchemy.orm import Session
 
@@ -38,9 +39,14 @@ def gmail_auth_callback(code: str, db: Session = Depends(get_db), user: User = D
     if resp.status_code != 200:
         raise HTTPException(status_code=400, detail="OAuth failed")
     tokens = resp.json()
+    
+    # Calculate actual expiry timestamp
+    expires_in = tokens.get("expires_in", 3600)  # Default to 1 hour if not provided
+    expiry_timestamp = datetime.utcnow() + timedelta(seconds=expires_in)
+    
     # Save tokens in user model
     user.gmail_access_token = tokens["access_token"]
     user.gmail_refresh_token = tokens.get("refresh_token")
-    user.gmail_token_expiry = tokens.get("expires_in")
+    user.gmail_token_expiry = expiry_timestamp
     db.commit()
     return {"success": True}
