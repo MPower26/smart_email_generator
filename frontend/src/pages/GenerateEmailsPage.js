@@ -22,6 +22,7 @@ const GenerateEmailsPage = () => {
   const [lastChanceEmails, setLastChanceEmails] = useState([]);
   const [loadingEmails, setLoadingEmails] = useState(false);
   const [lastAction, setLastAction] = useState({ id: null, type: null }); // { id: emailId, type: 'sent' | 'unmarked' }
+  const [avoidDuplicates, setAvoidDuplicates] = useState(true);
 
   // Track which tab's emails should be collapsed
   const isTabCollapsed = (tabName) => {
@@ -218,6 +219,7 @@ const GenerateEmailsPage = () => {
     formData.append('file', file);
     formData.append('use_ai', generationMethod === 'ai');
     formData.append('stage', emailStage);
+    formData.append('avoid_duplicates', avoidDuplicates);
     
     // Add user profile information if available
     if (userProfile) {
@@ -419,6 +421,14 @@ const GenerateEmailsPage = () => {
                     </Form.Select>
                   </Form.Group>
                 )}
+
+                <Form.Check
+                  type="checkbox"
+                  label="Avoid duplicates"
+                  checked={avoidDuplicates}
+                  onChange={e => setAvoidDuplicates(e.target.checked)}
+                  className="mb-3"
+                />
 
                 {error && <Alert variant="danger">{error}</Alert>}
 
