@@ -97,7 +97,9 @@ async def get_emails_by_stage(
             "body": email.content,
             "status": email.status,
             "stage": email.stage,
-            "shared_by": shared_by
+            "shared_by": shared_by,
+            "followup_due_at": email.followup_due_at.isoformat() if email.followup_due_at else None,
+            "lastchance_due_at": email.lastchance_due_at.isoformat() if email.lastchance_due_at else None
         }
         result.append(email_dict)
     
