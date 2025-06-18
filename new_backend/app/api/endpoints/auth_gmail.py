@@ -3,7 +3,8 @@ from urllib.parse import urlencode
 import os
 import requests
 from datetime import datetime, timedelta
-from app.models.models import User, get_db
+from app.models.models import User
+from app.db.database import get_db
 from sqlalchemy.orm import Session
 
 router = APIRouter()
@@ -50,3 +51,4 @@ def gmail_auth_callback(code: str, db: Session = Depends(get_db), user: User = D
     user.gmail_token_expiry = expiry_timestamp
     db.commit()
     return {"success": True}
+
