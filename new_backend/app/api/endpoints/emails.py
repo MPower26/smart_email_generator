@@ -8,6 +8,7 @@ import csv
 import io
 import os
 from fastapi import status
+from sqlalchemy import or_, and_
 
 from app.db.database import get_db
 from app.models.models import GeneratedEmail, User, EmailTemplate
@@ -54,11 +55,28 @@ async def get_emails_by_stage(
     logger.info(f"[EMAILS] Getting emails for user {current_user.email} (ID: {current_user.id}) in stage '{stage}'")
     logger.info(f"Current user details - ID: {current_user.id}, Email: {current_user.email}")
     
-    # Get user's own emails
-    emails = db.query(GeneratedEmail).filter(
-        GeneratedEmail.user_id == current_user.id,
-        GeneratedEmail.stage == stage
-    ).all()
+    # Get user's own emails with special logic for followup stage
+    if stage == "followup":
+        # For followup stage, include emails that are either:
+        # 1. status = 'followup_due' 
+        # 2. status = 'outreach_sent' AND have followup_due_at set
+        emails = db.query(GeneratedEmail).filter(
+            GeneratedEmail.user_id == current_user.id,
+            or_(
+                GeneratedEmail.status == "followup_due",
+                and_(
+                    GeneratedEmail.status == "outreach_sent",
+                    GeneratedEmail.followup_due_at.isnot(None)
+                )
+            )
+        ).all()
+    else:
+        # For other stages, use the original logic
+        emails = db.query(GeneratedEmail).filter(
+            GeneratedEmail.user_id == current_user.id,
+            GeneratedEmail.stage == stage
+        ).all()
+    
     logger.info(f"[EMAILS] Found {len(emails)} emails for user {current_user.email} (ID: {current_user.id}) in stage '{stage}'")
     
     # Get friends who have sharing enabled
