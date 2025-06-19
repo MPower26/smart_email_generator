@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
+from starlette.middleware.proxy_headers import ProxyHeadersMiddleware
 import logging
 from sqlalchemy.orm import Session
 
@@ -21,7 +22,10 @@ logger = logging.getLogger(__name__)
 # Create FastAPI app
 app = FastAPI(title="Smart Email Generator API")
 
-# Configure CORS FIRST
+# Add ProxyHeadersMiddleware FIRST (before CORS and other middleware)
+app.add_middleware(ProxyHeadersMiddleware)
+
+# Configure CORS SECOND
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://jolly-bush-0bae83703.6.azurestaticapps.net"],
