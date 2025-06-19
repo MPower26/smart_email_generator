@@ -1,9 +1,8 @@
 import axios from 'axios';
 
-// Récupère la variable d'env (définie en build) ou fallback HTTPS hard-codé
-let API_BASE_URL =
-  process.env.REACT_APP_API_URL
-  || 'https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net';
+
+let API_BASE_URL = 'https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net';
+
 
 // Force HTTPS - convert HTTP to HTTPS if needed
 API_BASE_URL = API_BASE_URL.replace(/^http:\/\//i, 'https://');
