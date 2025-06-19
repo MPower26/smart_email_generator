@@ -1,24 +1,49 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Container, Card, Form, Button, Alert, Modal, Tabs, Tab, Accordion, Badge } from 'react-bootstrap';
 
+// Example templates for demonstration
+const EXAMPLE_TEMPLATES = {
+  outreach: [
+    {
+      id: 1,
+      name: 'Intro Outreach',
+      content: 'Subject: Introduction\n\nDear [Recipient Name],\n\nI wanted to reach out regarding [Company Name] and our services.\n\nBest,\n[Your Name]',
+      category: 'outreach',
+      is_default: true,
+      created_at: new Date().toISOString(),
+    },
+  ],
+  followup: [
+    {
+      id: 2,
+      name: 'Follow Up',
+      content: 'Subject: Following Up\n\nHi [Recipient Name],\nJust checking in regarding my previous email.\n\nBest,\n[Your Name]',
+      category: 'followup',
+      is_default: true,
+      created_at: new Date().toISOString(),
+    },
+  ],
+  lastchance: [],
+};
+
+const LOCAL_STORAGE_KEY = "localEmailTemplates_v2";
+
 const TemplatesPage = () => {
-  // Use local state only, no backend/API yet
-  const [templatesByCategory, setTemplatesByCategory] = useState({
-    outreach: [],
-    followup: [],
-    lastchance: []
+  // Try to load from localStorage, else use EXAMPLE_TEMPLATES
+  const [templatesByCategory, setTemplatesByCategory] = useState(() => {
+    const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : EXAMPLE_TEMPLATES;
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  
   const [showModal, setShowModal] = useState(false);
   const [currentTemplate, setCurrentTemplate] = useState({
     id: null,
     name: '',
     content: '',
     category: 'outreach',
-    is_default: false
+    is_default: false,
   });
   const [isEditing, setIsEditing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('outreach');
@@ -30,8 +55,13 @@ const TemplatesPage = () => {
     'Company Name': 'Acme Corporation',
     'Your Name': 'Jane Doe',
     'Your Position': 'Sales Manager',
-    'Your Company': 'Tech Solutions Inc.'
+    'Your Company': 'Tech Solutions Inc.',
   };
+
+  // Sync to localStorage
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(templatesByCategory));
+  }, [templatesByCategory]);
 
   // Modal open: new template
   const handleNewTemplate = (category) => {
@@ -41,7 +71,7 @@ const TemplatesPage = () => {
       name: '',
       content: '',
       category: category,
-      is_default: false
+      is_default: false,
     });
     setIsEditing(false);
     setShowModal(true);
@@ -62,7 +92,7 @@ const TemplatesPage = () => {
     const { name, value, type, checked } = e.target;
     setCurrentTemplate({
       ...currentTemplate,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === 'checkbox' ? checked : value,
     });
   };
 
@@ -73,17 +103,19 @@ const TemplatesPage = () => {
     setError('');
     try {
       setTimeout(() => {
-        setTemplatesByCategory(prev => {
+        setTemplatesByCategory((prev) => {
           const cat = currentTemplate.category;
           let newCatArr = [...prev[cat]];
           if (isEditing) {
-            newCatArr = newCatArr.map(t => t.id === currentTemplate.id ? { ...currentTemplate } : t);
+            newCatArr = newCatArr.map((t) =>
+              t.id === currentTemplate.id ? { ...currentTemplate } : t
+            );
             setSuccess('Template updated locally!');
           } else {
             const newTemplate = {
               ...currentTemplate,
               id: Date.now(),
-              created_at: new Date().toISOString()
+              created_at: new Date().toISOString(),
             };
             newCatArr.push(newTemplate);
             setSuccess('New template created locally!');
@@ -92,7 +124,7 @@ const TemplatesPage = () => {
         });
         setShowModal(false);
         setLoading(false);
-      }, 500);
+      }, 400);
     } catch {
       setError('Failed to save template locally.');
       setLoading(false);
@@ -102,21 +134,21 @@ const TemplatesPage = () => {
   // Delete: local only
   const handleDeleteTemplate = (id, category) => {
     if (!window.confirm('Are you sure you want to delete this template?')) return;
-    setTemplatesByCategory(prev => ({
+    setTemplatesByCategory((prev) => ({
       ...prev,
-      [category]: prev[category].filter(t => t.id !== id)
+      [category]: prev[category].filter((t) => t.id !== id),
     }));
     setSuccess('Template deleted locally!');
   };
 
-  // Set as default: local only
+  // Set as default: local only (one per category)
   const handleSetDefault = (templateId, category) => {
-    setTemplatesByCategory(prev => ({
+    setTemplatesByCategory((prev) => ({
       ...prev,
-      [category]: prev[category].map(t => ({
+      [category]: prev[category].map((t) => ({
         ...t,
-        is_default: t.id === templateId
-      }))
+        is_default: t.id === templateId,
+      })),
     }));
     setSuccess('Default template set locally!');
   };
@@ -135,18 +167,26 @@ const TemplatesPage = () => {
   // Labels
   const getCategoryDisplayName = (category) => {
     switch (category) {
-      case 'outreach': return 'Initial Outreach';
-      case 'followup': return 'Follow Up';
-      case 'lastchance': return 'Last Chance';
-      default: return category;
+      case 'outreach':
+        return 'Initial Outreach';
+      case 'followup':
+        return 'Follow Up';
+      case 'lastchance':
+        return 'Last Chance';
+      default:
+        return category;
     }
   };
   const getCategoryDescription = (category) => {
     switch (category) {
-      case 'outreach': return 'Templates for initial contact emails';
-      case 'followup': return 'Templates for follow-up emails after no response';
-      case 'lastchance': return 'Templates for final follow-up attempts';
-      default: return '';
+      case 'outreach':
+        return 'Templates for initial contact emails';
+      case 'followup':
+        return 'Templates for follow-up emails after no response';
+      case 'lastchance':
+        return 'Templates for final follow-up attempts';
+      default:
+        return '';
     }
   };
 
@@ -158,9 +198,7 @@ const TemplatesPage = () => {
           <div className="flex-grow-1">
             <div className="d-flex align-items-center mb-2">
               <h6 className="mb-0 me-2">{template.name}</h6>
-              {template.is_default && (
-                <Badge bg="success">Default</Badge>
-              )}
+              {template.is_default && <Badge bg="success">Default</Badge>}
             </div>
             <p className="text-muted small mb-2">
               {template.content.substring(0, 150)}...
@@ -171,8 +209,8 @@ const TemplatesPage = () => {
           </div>
           <div className="d-flex flex-column gap-1">
             {!template.is_default && (
-              <Button 
-                variant="outline-success" 
+              <Button
+                variant="outline-success"
                 size="sm"
                 onClick={() => handleSetDefault(template.id, category)}
                 disabled={loading}
@@ -180,15 +218,15 @@ const TemplatesPage = () => {
                 Set Default
               </Button>
             )}
-            <Button 
-              variant="outline-primary" 
+            <Button
+              variant="outline-primary"
               size="sm"
               onClick={() => handleEditTemplate(template)}
             >
               Edit
             </Button>
-            <Button 
-              variant="outline-danger" 
+            <Button
+              variant="outline-danger"
               size="sm"
               onClick={() => handleDeleteTemplate(template.id, category)}
             >
@@ -203,10 +241,14 @@ const TemplatesPage = () => {
   return (
     <Container>
       <h1 className="mb-4">Email Templates</h1>
-      
+
       {error && <Alert variant="danger">{error}</Alert>}
-      {success && <Alert variant="success" onClose={() => setSuccess('')} dismissible>{success}</Alert>}
-      
+      {success && (
+        <Alert variant="success" onClose={() => setSuccess('')} dismissible>
+          {success}
+        </Alert>
+      )}
+
       {loading && (
         <div className="text-center mb-4">
           <div className="spinner-border text-primary" role="status">
@@ -214,7 +256,7 @@ const TemplatesPage = () => {
           </div>
         </div>
       )}
-      
+
       <Accordion defaultActiveKey="outreach">
         {['outreach', 'followup', 'lastchance'].map((category) => (
           <Accordion.Item key={category} eventKey={category}>
@@ -228,7 +270,7 @@ const TemplatesPage = () => {
                   <Button
                     variant="outline-primary"
                     size="sm"
-                    onClick={e => {
+                    onClick={(e) => {
                       e.stopPropagation();
                       handleNewTemplate(category);
                     }}
@@ -241,10 +283,12 @@ const TemplatesPage = () => {
             </Accordion.Header>
             <Accordion.Body>
               <p className="text-muted mb-3">{getCategoryDescription(category)}</p>
-              
+
               {templatesByCategory[category]?.length > 0 ? (
                 <div>
-                  {templatesByCategory[category].map(template => renderTemplateCard(template, category))}
+                  {templatesByCategory[category].map((template) =>
+                    renderTemplateCard(template, category)
+                  )}
                 </div>
               ) : (
                 <Alert variant="info">
@@ -255,10 +299,10 @@ const TemplatesPage = () => {
           </Accordion.Item>
         ))}
       </Accordion>
-      
+
       {/* Modal pour créer/éditer un template */}
-      <Modal 
-        show={showModal} 
+      <Modal
+        show={showModal}
         onHide={() => setShowModal(false)}
         size="lg"
         backdrop="static"
@@ -271,7 +315,7 @@ const TemplatesPage = () => {
         <Modal.Body>
           <Tabs
             activeKey={activeTab}
-            onSelect={k => setActiveTab(k)}
+            onSelect={(k) => setActiveTab(k)}
             className="mb-3"
           >
             <Tab eventKey="editor" title="Editor">
@@ -286,7 +330,7 @@ const TemplatesPage = () => {
                     required
                   />
                 </Form.Group>
-                
+
                 <Form.Group className="mb-3">
                   <Form.Label>Category</Form.Label>
                   <Form.Select
@@ -300,7 +344,7 @@ const TemplatesPage = () => {
                     <option value="lastchance">Last Chance</option>
                   </Form.Select>
                 </Form.Group>
-                
+
                 <Form.Group className="mb-3">
                   <Form.Label>Email Content</Form.Label>
                   <Form.Control
@@ -325,7 +369,7 @@ Best regards,
                     Available placeholders: [Recipient Name], [Company Name], [Your Name], [Your Position], [Your Company]
                   </Form.Text>
                 </Form.Group>
-                
+
                 <Form.Group className="mb-3">
                   <Form.Check
                     type="checkbox"
@@ -337,7 +381,7 @@ Best regards,
                 </Form.Group>
               </Form>
             </Tab>
-            
+
             <Tab eventKey="preview" title="Preview">
               <Card className="bg-light">
                 <Card.Body>
@@ -353,8 +397,8 @@ Best regards,
           <Button variant="secondary" onClick={() => setShowModal(false)}>
             Cancel
           </Button>
-          <Button 
-            variant="primary" 
+          <Button
+            variant="primary"
             onClick={handleSaveTemplate}
             disabled={loading}
           >
