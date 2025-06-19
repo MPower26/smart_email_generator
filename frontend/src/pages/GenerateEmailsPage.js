@@ -2,7 +2,8 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Container, Row, Col, Card, Form, Button, Alert, Tabs, Tab, Badge } from 'react-bootstrap';
 import FileUpload from '../components/FileUpload';
 import EmailPreview from '../components/EmailPreview';
-import { emailService, templateService } from '../services/api';
+import { emailService } from '../services/email.service';
+import { templateService } from '../services/template.service';
 import { UserContext } from '../contexts/UserContext';
 
 const GenerateEmailsPage = () => {
