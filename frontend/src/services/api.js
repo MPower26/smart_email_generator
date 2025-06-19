@@ -1,7 +1,15 @@
 import axios from 'axios';
 
 // Use the configured URL in .env or default URL
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net';
+let API_BASE_URL = process.env.REACT_APP_API_URL || 'https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net';
+
+// Force HTTPS - convert HTTP to HTTPS if needed
+if (API_BASE_URL.startsWith('http://')) {
+    API_BASE_URL = API_BASE_URL.replace('http://', 'https://');
+    console.log('Converted HTTP to HTTPS:', API_BASE_URL);
+}
+
+console.log('Using API URL:', API_BASE_URL);
 
 // Create axios instance with base configuration
 const api = axios.create({
@@ -21,11 +29,16 @@ api.interceptors.request.use(
       // Set Authorization header with email
       config.headers.Authorization = `Bearer ${email}`;
     }
+    
+    // Log the full URL being used
+    const fullUrl = `${config.baseURL}${config.url}`;
+    console.log('Making request to:', fullUrl);
     console.log('Request config:', {
       url: config.url,
       method: config.method,
       headers: config.headers,
-      baseURL: config.baseURL
+      baseURL: config.baseURL,
+      fullUrl: fullUrl
     });
     return config;
   },
