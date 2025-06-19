@@ -94,6 +94,7 @@ class EmailTemplate(Base):
     name = Column(String(255), index=True)
     content = Column(String)
     is_default = Column(Boolean, default=False)
+    category = Column(String(20), default="outreach")  # outreach, followup, lastchance
     user_id = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
