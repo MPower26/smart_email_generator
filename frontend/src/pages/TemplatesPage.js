@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Card, Form, Button, Alert, Modal, Tabs, Tab, Accordion, Badge } from 'react-bootstrap';
-import { templateService } from '../services/api';
+import { templateService } from '../services/template.service';
 
 const TemplatesPage = () => {
   const [templatesByCategory, setTemplatesByCategory] = useState({
