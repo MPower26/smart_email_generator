@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 import logging
 from sqlalchemy.orm import Session
 
@@ -19,6 +20,18 @@ logger = logging.getLogger(__name__)
 
 # Create FastAPI app
 app = FastAPI(title="Smart Email Generator API")
+
+# Add HTTPS redirection middleware
+@app.middleware("http")
+async def https_redirect(request: Request, call_next):
+    if request.headers.get("x-forwarded-proto") == "http":
+        # Redirect HTTP to HTTPS
+        url = str(request.url)
+        url = url.replace("http://", "https://", 1)
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url=url, status_code=301)
+    response = await call_next(request)
+    return response
 
 # Configure CORS
 app.add_middleware(
@@ -74,3 +87,4 @@ async def cors_test(request: Request):
         "message": "CORS test successful!",
         "request_headers": headers
     } 
+
