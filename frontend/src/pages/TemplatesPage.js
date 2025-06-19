@@ -1,33 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Card, Form, Button, Alert, Table, Modal, Tabs, Tab } from 'react-bootstrap';
-import axios from 'axios';
+import { Container, Card, Form, Button, Alert, Modal, Tabs, Tab, Accordion, Badge } from 'react-bootstrap';
+import { templateService } from '../services/api';
 
 const TemplatesPage = () => {
-  const [templates, setTemplates] = useState([]);
+  const [templatesByCategory, setTemplatesByCategory] = useState({
+    outreach: [],
+    followup: [],
+    lastchance: []
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   
-  // Pour le formulaire d'édition/création
+  // Modal state
   const [showModal, setShowModal] = useState(false);
   const [currentTemplate, setCurrentTemplate] = useState({
     id: null,
     name: '',
-    subject: '',
-    body: '',
+    content: '',
+    category: 'outreach',
     is_default: false
   });
   const [isEditing, setIsEditing] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('outreach');
   
   // Variables pour l'aperçu des placeholders
   const [activeTab, setActiveTab] = useState('editor');
   const placeholderData = {
-    first_name: 'John',
-    last_name: 'Smith',
-    company: 'Acme Corporation',
-    position: 'CTO',
-    industry: 'Technology',
-    technologies: 'AI, Cloud Computing'
+    'Recipient Name': 'John Smith',
+    'Company Name': 'Acme Corporation',
+    'Your Name': 'Jane Doe',
+    'Your Position': 'Sales Manager',
+    'Your Company': 'Tech Solutions Inc.'
   };
 
   // Charger les templates au chargement de la page
@@ -41,8 +45,8 @@ const TemplatesPage = () => {
     setError('');
     
     try {
-      const response = await axios.get('/api/templates');
-      setTemplates(response.data);
+      const response = await templateService.getTemplatesByCategory();
+      setTemplatesByCategory(response.data);
     } catch (err) {
       setError('Failed to load templates. Please try again later.');
       console.error('Error loading templates:', err);
@@ -52,12 +56,13 @@ const TemplatesPage = () => {
   };
 
   // Ouvrir le modal de création de template
-  const handleNewTemplate = () => {
+  const handleNewTemplate = (category) => {
+    setSelectedCategory(category);
     setCurrentTemplate({
       id: null,
       name: '',
-      subject: '',
-      body: '',
+      content: '',
+      category: category,
       is_default: false
     });
     setIsEditing(false);
@@ -70,10 +75,11 @@ const TemplatesPage = () => {
     setCurrentTemplate({
       id: template.id,
       name: template.name,
-      subject: template.subject,
-      body: template.body,
+      content: template.content,
+      category: template.category,
       is_default: template.is_default
     });
+    setSelectedCategory(template.category);
     setIsEditing(true);
     setShowModal(true);
     setActiveTab('editor');
@@ -99,11 +105,11 @@ const TemplatesPage = () => {
       
       if (isEditing) {
         // Mettre à jour un template existant
-        response = await axios.put(`/api/templates/${currentTemplate.id}`, currentTemplate);
+        response = await templateService.updateTemplate(currentTemplate.id, currentTemplate);
         setSuccess('Template updated successfully!');
       } else {
         // Créer un nouveau template
-        response = await axios.post('/api/templates', currentTemplate);
+        response = await templateService.createTemplate(currentTemplate);
         setSuccess('New template created successfully!');
       }
       
@@ -111,7 +117,7 @@ const TemplatesPage = () => {
       await loadTemplates();
       setShowModal(false);
     } catch (err) {
-      setError('Failed to save template. Please try again.');
+      setError(err.response?.data?.detail || 'Failed to save template. Please try again.');
       console.error('Error saving template:', err);
     } finally {
       setLoading(false);
@@ -126,13 +132,30 @@ const TemplatesPage = () => {
     setError('');
     
     try {
-      await axios.delete(`/api/templates/${id}`);
+      await templateService.deleteTemplate(id);
       setSuccess('Template deleted successfully!');
       // Recharger la liste des templates
       await loadTemplates();
     } catch (err) {
       setError('Failed to delete template. Please try again.');
       console.error('Error deleting template:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Set template as default
+  const handleSetDefault = async (templateId) => {
+    setLoading(true);
+    setError('');
+    
+    try {
+      await templateService.setDefaultTemplate(templateId);
+      setSuccess('Default template updated successfully!');
+      await loadTemplates();
+    } catch (err) {
+      setError('Failed to set default template. Please try again.');
+      console.error('Error setting default template:', err);
     } finally {
       setLoading(false);
     }
@@ -153,6 +176,76 @@ const TemplatesPage = () => {
     return preview;
   };
 
+  // Get category display name
+  const getCategoryDisplayName = (category) => {
+    switch (category) {
+      case 'outreach': return 'Initial Outreach';
+      case 'followup': return 'Follow Up';
+      case 'lastchance': return 'Last Chance';
+      default: return category;
+    }
+  };
+
+  // Get category description
+  const getCategoryDescription = (category) => {
+    switch (category) {
+      case 'outreach': return 'Templates for initial contact emails';
+      case 'followup': return 'Templates for follow-up emails after no response';
+      case 'lastchance': return 'Templates for final follow-up attempts';
+      default: return '';
+    }
+  };
+
+  // Render template card
+  const renderTemplateCard = (template) => (
+    <Card key={template.id} className="mb-3">
+      <Card.Body>
+        <div className="d-flex justify-content-between align-items-start">
+          <div className="flex-grow-1">
+            <div className="d-flex align-items-center mb-2">
+              <h6 className="mb-0 me-2">{template.name}</h6>
+              {template.is_default && (
+                <Badge bg="success">Default</Badge>
+              )}
+            </div>
+            <p className="text-muted small mb-2">
+              {template.content.substring(0, 150)}...
+            </p>
+            <small className="text-muted">
+              Created: {new Date(template.created_at).toLocaleDateString()}
+            </small>
+          </div>
+          <div className="d-flex flex-column gap-1">
+            {!template.is_default && (
+              <Button 
+                variant="outline-success" 
+                size="sm"
+                onClick={() => handleSetDefault(template.id)}
+                disabled={loading}
+              >
+                Set Default
+              </Button>
+            )}
+            <Button 
+              variant="outline-primary" 
+              size="sm"
+              onClick={() => handleEditTemplate(template)}
+            >
+              Edit
+            </Button>
+            <Button 
+              variant="outline-danger" 
+              size="sm"
+              onClick={() => handleDeleteTemplate(template.id)}
+            >
+              Delete
+            </Button>
+          </div>
+        </div>
+      </Card.Body>
+    </Card>
+  );
+
   return (
     <Container>
       <h1 className="mb-4">Email Templates</h1>
@@ -160,68 +253,54 @@ const TemplatesPage = () => {
       {error && <Alert variant="danger">{error}</Alert>}
       {success && <Alert variant="success" onClose={() => setSuccess('')} dismissible>{success}</Alert>}
       
-      <div className="d-flex justify-content-end mb-4">
-        <Button variant="primary" onClick={handleNewTemplate}>
-          Create New Template
-        </Button>
-      </div>
+      {loading && (
+        <div className="text-center mb-4">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      )}
       
-      <Card>
-        <Card.Body>
-          {loading ? (
-            <div className="text-center">
-              <div className="spinner-border text-primary" role="status">
-                <span className="visually-hidden">Loading...</span>
+      <Accordion defaultActiveKey="outreach">
+        {['outreach', 'followup', 'lastchance'].map((category) => (
+          <Accordion.Item key={category} eventKey={category}>
+            <Accordion.Header>
+              <div className="d-flex justify-content-between align-items-center w-100 me-3">
+                <span>{getCategoryDisplayName(category)}</span>
+                <div className="d-flex align-items-center">
+                  <Badge bg="secondary" className="me-2">
+                    {templatesByCategory[category]?.length || 0}/3
+                  </Badge>
+                  <Button
+                    variant="outline-primary"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleNewTemplate(category);
+                    }}
+                    disabled={(templatesByCategory[category]?.length || 0) >= 3}
+                  >
+                    Add Template
+                  </Button>
+                </div>
               </div>
-            </div>
-          ) : templates.length > 0 ? (
-            <Table responsive striped>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Subject</th>
-                  <th style={{ width: '40%' }}>Preview</th>
-                  <th>Default</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {templates.map(template => (
-                  <tr key={template.id}>
-                    <td>{template.name}</td>
-                    <td>{template.subject}</td>
-                    <td className="text-truncate" style={{ maxWidth: '300px' }}>
-                      {template.body.substring(0, 100)}...
-                    </td>
-                    <td>{template.is_default ? '✓' : ''}</td>
-                    <td>
-                      <Button 
-                        variant="outline-primary" 
-                        size="sm" 
-                        className="me-2"
-                        onClick={() => handleEditTemplate(template)}
-                      >
-                        Edit
-                      </Button>
-                      <Button 
-                        variant="outline-danger" 
-                        size="sm"
-                        onClick={() => handleDeleteTemplate(template.id)}
-                      >
-                        Delete
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          ) : (
-            <Alert variant="info">
-              No templates found. Create your first template to get started.
-            </Alert>
-          )}
-        </Card.Body>
-      </Card>
+            </Accordion.Header>
+            <Accordion.Body>
+              <p className="text-muted mb-3">{getCategoryDescription(category)}</p>
+              
+              {templatesByCategory[category]?.length > 0 ? (
+                <div>
+                  {templatesByCategory[category].map(template => renderTemplateCard(template))}
+                </div>
+              ) : (
+                <Alert variant="info">
+                  No templates in this category. Create your first {getCategoryDisplayName(category).toLowerCase()} template to get started.
+                </Alert>
+              )}
+            </Accordion.Body>
+          </Accordion.Item>
+        ))}
+      </Accordion>
       
       {/* Modal pour créer/éditer un template */}
       <Modal 
@@ -231,7 +310,9 @@ const TemplatesPage = () => {
         backdrop="static"
       >
         <Modal.Header closeButton>
-          <Modal.Title>{isEditing ? 'Edit Template' : 'Create Template'}</Modal.Title>
+          <Modal.Title>
+            {isEditing ? 'Edit Template' : 'Create Template'} - {getCategoryDisplayName(selectedCategory)}
+          </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Tabs
@@ -253,38 +334,48 @@ const TemplatesPage = () => {
                 </Form.Group>
                 
                 <Form.Group className="mb-3">
-                  <Form.Label>Subject Line</Form.Label>
-                  <Form.Control
-                    type="text"
-                    name="subject"
-                    value={currentTemplate.subject}
+                  <Form.Label>Category</Form.Label>
+                  <Form.Select
+                    name="category"
+                    value={currentTemplate.category}
                     onChange={handleInputChange}
-                    required
-                  />
-                  <Form.Text className="text-muted">
-                    You can use placeholders like [first_name], [company], etc.
-                  </Form.Text>
+                    disabled={isEditing} // Don't allow changing category when editing
+                  >
+                    <option value="outreach">Initial Outreach</option>
+                    <option value="followup">Follow Up</option>
+                    <option value="lastchance">Last Chance</option>
+                  </Form.Select>
                 </Form.Group>
                 
                 <Form.Group className="mb-3">
-                  <Form.Label>Email Body</Form.Label>
+                  <Form.Label>Email Content</Form.Label>
                   <Form.Control
                     as="textarea"
-                    name="body"
-                    value={currentTemplate.body}
+                    name="content"
+                    value={currentTemplate.content}
                     onChange={handleInputChange}
-                    rows={10}
+                    rows={12}
                     required
+                    placeholder="Subject: Your Subject Here
+
+Dear [Recipient Name],
+
+Your email content here...
+
+Best regards,
+[Your Name]
+[Your Position]
+[Your Company]"
                   />
                   <Form.Text className="text-muted">
-                    Available placeholders: [first_name], [last_name], [company], [position], [industry], [technologies]
+                    Available placeholders: [Recipient Name], [Company Name], [Your Name], [Your Position], [Your Company]
                   </Form.Text>
                 </Form.Group>
                 
                 <Form.Group className="mb-3">
                   <Form.Check
                     type="checkbox"
-                    label="Set as default template"
+                    label="Set as default template for this category"
                     name="is_default"
                     checked={currentTemplate.is_default}
                     onChange={handleInputChange}
@@ -295,12 +386,9 @@ const TemplatesPage = () => {
             
             <Tab eventKey="preview" title="Preview">
               <Card className="bg-light">
-                <Card.Header>
-                  <strong>Subject:</strong> {getPreviewContent(currentTemplate.subject)}
-                </Card.Header>
                 <Card.Body>
                   <div style={{ whiteSpace: 'pre-wrap' }}>
-                    {getPreviewContent(currentTemplate.body)}
+                    {getPreviewContent(currentTemplate.content)}
                   </div>
                 </Card.Body>
               </Card>
