@@ -1,38 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Card, Form, Button, Alert, Modal, Tabs, Tab, Accordion, Badge } from 'react-bootstrap';
-
-// Example templates for demonstration
-const EXAMPLE_TEMPLATES = {
-  outreach: [
-    {
-      id: 1,
-      name: 'Intro Outreach',
-      content: 'Subject: Introduction\n\nDear [Recipient Name],\n\nI wanted to reach out regarding [Company Name] and our services.\n\nBest,\n[Your Name]',
-      category: 'outreach',
-      is_default: true,
-      created_at: new Date().toISOString(),
-    },
-  ],
-  followup: [
-    {
-      id: 2,
-      name: 'Follow Up',
-      content: 'Subject: Following Up\n\nHi [Recipient Name],\nJust checking in regarding my previous email.\n\nBest,\n[Your Name]',
-      category: 'followup',
-      is_default: true,
-      created_at: new Date().toISOString(),
-    },
-  ],
-  lastchance: [],
-};
-
-const LOCAL_STORAGE_KEY = "localEmailTemplates_v2";
+import { templateService } from '../services/api'; // <--- Make sure this uses HTTPS!
 
 const TemplatesPage = () => {
-  // Try to load from localStorage, else use EXAMPLE_TEMPLATES
-  const [templatesByCategory, setTemplatesByCategory] = useState(() => {
-    const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
-    return stored ? JSON.parse(stored) : EXAMPLE_TEMPLATES;
+  const [templatesByCategory, setTemplatesByCategory] = useState({
+    outreach: [],
+    followup: [],
+    lastchance: [],
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -49,7 +23,7 @@ const TemplatesPage = () => {
   const [selectedCategory, setSelectedCategory] = useState('outreach');
   const [activeTab, setActiveTab] = useState('editor');
 
-  // Placeholder data for preview
+  // Example placeholder data for preview
   const placeholderData = {
     'Recipient Name': 'John Smith',
     'Company Name': 'Acme Corporation',
@@ -58,12 +32,25 @@ const TemplatesPage = () => {
     'Your Company': 'Tech Solutions Inc.',
   };
 
-  // Sync to localStorage
+  // Load templates from API on mount
   useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(templatesByCategory));
-  }, [templatesByCategory]);
+    const loadTemplates = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const response = await templateService.getTemplatesByCategory();
+        setTemplatesByCategory(response.data);
+      } catch (err) {
+        setError('Failed to load templates from backend. (This will help us debug mixed content errors!)');
+        console.error('Error loading templates:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadTemplates();
+  }, []);
 
-  // Modal open: new template
+  // Modal open: new template (local only)
   const handleNewTemplate = (category) => {
     setSelectedCategory(category);
     setCurrentTemplate({
@@ -78,7 +65,7 @@ const TemplatesPage = () => {
     setActiveTab('editor');
   };
 
-  // Modal open: edit existing
+  // Modal open: edit existing (local only)
   const handleEditTemplate = (template) => {
     setCurrentTemplate({ ...template });
     setSelectedCategory(template.category);
@@ -87,7 +74,7 @@ const TemplatesPage = () => {
     setActiveTab('editor');
   };
 
-  // Form change
+  // Form change (local only)
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
     setCurrentTemplate({
@@ -96,39 +83,34 @@ const TemplatesPage = () => {
     });
   };
 
-  // Save (create/edit): local only
+  // Save (add/edit): local only
   const handleSaveTemplate = (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    try {
-      setTimeout(() => {
-        setTemplatesByCategory((prev) => {
-          const cat = currentTemplate.category;
-          let newCatArr = [...prev[cat]];
-          if (isEditing) {
-            newCatArr = newCatArr.map((t) =>
-              t.id === currentTemplate.id ? { ...currentTemplate } : t
-            );
-            setSuccess('Template updated locally!');
-          } else {
-            const newTemplate = {
-              ...currentTemplate,
-              id: Date.now(),
-              created_at: new Date().toISOString(),
-            };
-            newCatArr.push(newTemplate);
-            setSuccess('New template created locally!');
-          }
-          return { ...prev, [cat]: newCatArr };
-        });
-        setShowModal(false);
-        setLoading(false);
-      }, 400);
-    } catch {
-      setError('Failed to save template locally.');
+    setTimeout(() => {
+      setTemplatesByCategory((prev) => {
+        const cat = currentTemplate.category;
+        let newCatArr = [...prev[cat]];
+        if (isEditing) {
+          newCatArr = newCatArr.map((t) =>
+            t.id === currentTemplate.id ? { ...currentTemplate } : t
+          );
+          setSuccess('Template updated (locally)');
+        } else {
+          const newTemplate = {
+            ...currentTemplate,
+            id: Date.now(),
+            created_at: new Date().toISOString(),
+          };
+          newCatArr.push(newTemplate);
+          setSuccess('New template created (locally)');
+        }
+        return { ...prev, [cat]: newCatArr };
+      });
+      setShowModal(false);
       setLoading(false);
-    }
+    }, 400);
   };
 
   // Delete: local only
@@ -138,10 +120,10 @@ const TemplatesPage = () => {
       ...prev,
       [category]: prev[category].filter((t) => t.id !== id),
     }));
-    setSuccess('Template deleted locally!');
+    setSuccess('Template deleted (locally)');
   };
 
-  // Set as default: local only (one per category)
+  // Set as default: local only
   const handleSetDefault = (templateId, category) => {
     setTemplatesByCategory((prev) => ({
       ...prev,
@@ -150,7 +132,7 @@ const TemplatesPage = () => {
         is_default: t.id === templateId,
       })),
     }));
-    setSuccess('Default template set locally!');
+    setSuccess('Default template set (locally)');
   };
 
   // Preview
@@ -300,7 +282,7 @@ const TemplatesPage = () => {
         ))}
       </Accordion>
 
-      {/* Modal pour créer/éditer un template */}
+      {/* Modal for create/edit */}
       <Modal
         show={showModal}
         onHide={() => setShowModal(false)}
