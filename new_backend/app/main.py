@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import Response
 import logging
 from sqlalchemy.orm import Session
 
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 # Create FastAPI app
 app = FastAPI(title="Smart Email Generator API")
 
-# Configure CORS FIRST (before other middlewares)
+# Configure CORS FIRST
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://jolly-bush-0bae83703.6.azurestaticapps.net"],
@@ -32,7 +32,7 @@ app.add_middleware(
     max_age=600,  # Cache preflight requests for 10 minutes
 )
 
-# Add HTTPS redirection middleware AFTER CORS
+# Add HTTPS redirection middleware SECOND
 @app.middleware("http")
 async def https_redirect(request: Request, call_next):
     # Don't redirect OPTIONS requests (CORS preflight)
@@ -58,6 +58,31 @@ app.include_router(users.router, prefix="/api/users", tags=["Users"])
 app.include_router(auth_gmail.router, prefix="/api", tags=["Gmail Auth"])
 app.include_router(user_settings.router, prefix="/api", tags=["User Settings"])
 app.include_router(templates.router, prefix="/api/templates", tags=["Templates"])
+
+# Add explicit OPTIONS handlers for all API routes
+@app.options("/api/emails/{path:path}")
+async def emails_options():
+    return Response(status_code=200)
+
+@app.options("/api/friends/{path:path}")
+async def friends_options():
+    return Response(status_code=200)
+
+@app.options("/api/users/{path:path}")
+async def users_options():
+    return Response(status_code=200)
+
+@app.options("/api/templates/{path:path}")
+async def templates_options():
+    return Response(status_code=200)
+
+@app.options("/auth/{path:path}")
+async def auth_options():
+    return Response(status_code=200)
+
+@app.options("/api/{path:path}")
+async def api_options():
+    return Response(status_code=200)
 
 @app.get("/")
 async def root():
@@ -99,30 +124,4 @@ async def cors_test(request: Request):
 @app.options("/cors-test")
 async def cors_test_options():
     """Handle OPTIONS request for CORS test"""
-    return {"message": "CORS preflight successful"}
-
-# Add explicit OPTIONS handlers for CORS preflight
-@app.options("/api/templates")
-async def options_templates():
-    """Handle OPTIONS request for templates endpoint"""
-    return {}
-
-@app.options("/api/templates/{path:path}")
-async def options_templates_path():
-    """Handle OPTIONS request for templates sub-paths"""
-    return {}
-
-@app.options("/api/emails/{path:path}")
-async def options_emails_path():
-    """Handle OPTIONS request for emails sub-paths"""
-    return {}
-
-@app.options("/api/friends/{path:path}")
-async def options_friends_path():
-    """Handle OPTIONS request for friends sub-paths"""
-    return {}
-
-@app.options("/api/users/{path:path}")
-async def options_users_path():
-    """Handle OPTIONS request for users sub-paths"""
-    return {} 
+    return {"message": "CORS preflight successful"} 
