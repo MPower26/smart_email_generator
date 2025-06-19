@@ -1,64 +1,61 @@
 import axios from 'axios';
 
+// Robustly get base URL (prefer env, fallback to HTTPS default)
+let API_BASE_URL = (
+  process.env.REACT_APP_API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  'https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net'
+).replace(/^http:\/\//i, 'https://');
 
-let API_BASE_URL = 'https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net';
+// Log what base URL is being used at runtime
+console.log('[API] Using API_BASE_URL:', API_BASE_URL);
 
-
-// Force HTTPS - convert HTTP to HTTPS if needed
-API_BASE_URL = API_BASE_URL.replace(/^http:\/\//i, 'https://');
-
-console.log('API_BASE_URL utilisée :', API_BASE_URL);
+// Safety: Throw error if HTTPS is not enforced
+if (!/^https:\/\//i.test(API_BASE_URL)) {
+  throw new Error(`[API] Refusing to run: API_BASE_URL is not HTTPS! Value: ${API_BASE_URL}`);
+}
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: false
+  withCredentials: false,
 });
 
-// Add request interceptor to include authentication header and block malformed URLs
+// Intercept requests: Log and enforce HTTPS
 api.interceptors.request.use(
   (config) => {
-    // Get email from localStorage
+    // Get email from localStorage for auth
     const email = localStorage.getItem('userEmail');
     if (email) {
-      // Set Authorization header with email
       config.headers.Authorization = `Bearer ${email}`;
     }
-    
-    // Force HTTPS for any URLs that might be malformed
+
+    // Force HTTPS for any URL
     if (config.url && config.url.startsWith('http://')) {
-      config.url = config.url.replace(/^http:\/\//i, 'https://');
+      console.error('[API] Blocked non-HTTPS URL in request:', config.url);
+      throw new Error('Blocked non-HTTPS API request');
     }
-    
-    // Block any absolute URLs that might be malformed (security measure)
-    if (config.url && (config.url.startsWith('http://') || config.url.startsWith('//'))) {
-      console.error('Blocked malformed URL:', config.url);
-      throw new Error('Malformed URL detected - only relative URLs are allowed');
+    // Compose and log the full request URL
+    const requestUrl = config.url.startsWith('http')
+      ? config.url
+      : `${config.baseURL.replace(/\/$/, '')}/${config.url.replace(/^\//, '')}`;
+    if (!/^https:\/\//i.test(requestUrl)) {
+      console.error('[API] Blocked non-HTTPS full request:', requestUrl);
+      throw new Error('Blocked non-HTTPS API request');
     }
-    
-    // Log the full URL being used
-    const fullUrl = `${config.baseURL}${config.url}`;
-    console.log('Making request to:', fullUrl);
-    
+    console.log('[API] Request:', requestUrl, 'Method:', config.method);
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Add response interceptor to handle errors
+// Intercept responses: Log errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    console.error('API Error:', error.response || error.message);
-    if (error.response) {
-      console.error('Response data:', error.response.data);
-      console.error('Response status:', error.response.status);
-      console.error('Response headers:', error.response.headers);
-    }
+    console.error('[API] Error:', error?.response || error?.message || error);
     return Promise.reject(error);
   }
 );
@@ -87,33 +84,16 @@ export const emailService = {
   deleteEmail: (emailId) => api.delete(`/api/emails/${emailId}`),
 };
 
-// Template operations
+// Template API
 export const templateService = {
-  // Get all templates
   getAllTemplates: () => api.get('/api/templates/'),
-  
-  // Get templates by category
   getTemplatesByCategory: () => api.get('/api/templates/by-category/'),
-  
-  // Get templates filtered by category
   getTemplatesByCategoryFilter: (category) => api.get(`/api/templates/?category=${category}`),
-  
-  // Get default template for a category
   getDefaultTemplate: (category) => api.get(`/api/templates/default/${category}/`),
-  
-  // Get template by ID
   getTemplate: (templateId) => api.get(`/api/templates/${templateId}/`),
-  
-  // Create template
   createTemplate: (template) => api.post('/api/templates/', template),
-  
-  // Update template
   updateTemplate: (templateId, template) => api.put(`/api/templates/${templateId}/`, template),
-  
-  // Set template as default
   setDefaultTemplate: (templateId) => api.put(`/api/templates/${templateId}/set-default/`),
-  
-  // Delete template
   deleteTemplate: (templateId) => api.delete(`/api/templates/${templateId}/`),
 };
 
