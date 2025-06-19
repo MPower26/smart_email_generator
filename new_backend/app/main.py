@@ -99,4 +99,30 @@ async def cors_test(request: Request):
 @app.options("/cors-test")
 async def cors_test_options():
     """Handle OPTIONS request for CORS test"""
-    return {"message": "CORS preflight successful"} 
+    return {"message": "CORS preflight successful"}
+
+# Add explicit OPTIONS handlers for CORS preflight
+@app.options("/api/templates")
+async def options_templates():
+    """Handle OPTIONS request for templates endpoint"""
+    return {}
+
+@app.options("/api/templates/{path:path}")
+async def options_templates_path():
+    """Handle OPTIONS request for templates sub-paths"""
+    return {}
+
+@app.options("/api/emails/{path:path}")
+async def options_emails_path():
+    """Handle OPTIONS request for emails sub-paths"""
+    return {}
+
+@app.options("/api/friends/{path:path}")
+async def options_friends_path():
+    """Handle OPTIONS request for friends sub-paths"""
+    return {}
+
+@app.options("/api/users/{path:path}")
+async def options_users_path():
+    """Handle OPTIONS request for users sub-paths"""
+    return {} 
