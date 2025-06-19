@@ -35,6 +35,11 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${email}`;
     }
     
+    // Force HTTPS for any URLs that might be malformed
+    if (config.url && config.url.startsWith('http://')) {
+      config.url = config.url.replace(/^http:\/\//i, 'https://');
+    }
+    
     // Block any absolute URLs that might be malformed (security measure)
     if (config.url && (config.url.startsWith('http://') || config.url.startsWith('//'))) {
       console.error('Blocked malformed URL:', config.url);
