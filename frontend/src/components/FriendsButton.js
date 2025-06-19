@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Button, Offcanvas, Form, ListGroup, Badge, Spinner, Alert, FormCheck } from 'react-bootstrap';
 import { FaUserFriends, FaUserPlus, FaCheck, FaTimes } from 'react-icons/fa';
-import { friendService } from '../services/api';
+import { friendService } from '../services/friend.service';
 import { UserContext } from '../contexts/UserContext';
 import '../styles/FriendsButton.css';
 
