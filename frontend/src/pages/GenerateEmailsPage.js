@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Container, Row, Col, Card, Form, Button, Alert, Tabs, Tab, Badge } from 'react-bootstrap';
 import FileUpload from '../components/FileUpload';
 import EmailPreview from '../components/EmailPreview';
-import { emailService } from '../services/api';
+import { emailService, templateService } from '../services/api';
 import { UserContext } from '../contexts/UserContext';
 
 const GenerateEmailsPage = () => {
@@ -45,17 +45,29 @@ const GenerateEmailsPage = () => {
   // Load templates from the backend
   const loadTemplates = async () => {
     try {
-      const response = await emailService.getTemplates();
+      // Load templates filtered by the current email stage
+      const response = await templateService.getTemplatesByCategoryFilter(emailStage);
       setTemplates(response.data);
+      
+      // Set default template for the current stage
       if (response.data.length > 0) {
         const defaultTemplate = response.data.find(t => t.is_default);
         setSelectedTemplate(defaultTemplate ? defaultTemplate.id : response.data[0].id);
+      } else {
+        setSelectedTemplate('');
       }
     } catch (err) {
       console.error('Error loading templates:', err);
       setError('Failed to load templates. Please try again later.');
     }
   };
+
+  // Load templates when email stage changes
+  useEffect(() => {
+    if (generationMethod === 'template') {
+      loadTemplates();
+    }
+  }, [emailStage, generationMethod]);
   
   // Load emails by stage
   const loadEmailsByStage = async () => {
@@ -420,16 +432,24 @@ const GenerateEmailsPage = () => {
                 {generationMethod === 'template' && (
                   <Form.Group className="mb-3">
                     <Form.Label>Select Template</Form.Label>
-                    <Form.Select
-                      value={selectedTemplate}
-                      onChange={(e) => setSelectedTemplate(e.target.value)}
-                    >
-                      {templates.map(template => (
-                        <option key={template.id} value={template.id}>
-                          {template.name} {template.is_default && '(Default)'}
-                        </option>
-                      ))}
-                    </Form.Select>
+                    {templates.length > 0 ? (
+                      <Form.Select
+                        value={selectedTemplate}
+                        onChange={(e) => setSelectedTemplate(e.target.value)}
+                      >
+                        {templates.map(template => (
+                          <option key={template.id} value={template.id}>
+                            {template.name} {template.is_default && '(Default)'}
+                          </option>
+                        ))}
+                      </Form.Select>
+                    ) : (
+                      <div className="alert alert-warning">
+                        No templates available for {emailStage === 'outreach' ? 'Initial Outreach' : 
+                                                   emailStage === 'followup' ? 'Follow-Up' : 'Last Chance'} stage. 
+                        Please create templates in the Templates tab first.
+                      </div>
+                    )}
                   </Form.Group>
                 )}
 
