@@ -53,6 +53,9 @@ export const emailService = {
   // Get templates
   getTemplates: () => api.get('/api/emails/templates'),
   
+  // Get templates by category
+  getTemplatesByCategory: (category) => api.get(`/api/templates?category=${category}`),
+  
   // Generate emails
   generateEmails: (formData) => {
     return api.post('/api/emails/generate', formData, {
@@ -72,19 +75,31 @@ export const emailService = {
 // Template operations
 export const templateService = {
   // Get all templates
-  getAllTemplates: () => api.get('/api/emails/templates'),
+  getAllTemplates: () => api.get('/api/templates'),
+  
+  // Get templates by category
+  getTemplatesByCategory: () => api.get('/api/templates/by-category'),
+  
+  // Get templates filtered by category
+  getTemplatesByCategoryFilter: (category) => api.get(`/api/templates?category=${category}`),
+  
+  // Get default template for a category
+  getDefaultTemplate: (category) => api.get(`/api/templates/default/${category}`),
   
   // Get template by ID
-  getTemplate: (templateId) => api.get(`/api/emails/templates/${templateId}`),
+  getTemplate: (templateId) => api.get(`/api/templates/${templateId}`),
   
   // Create template
-  createTemplate: (template) => api.post('/api/emails/templates', template),
+  createTemplate: (template) => api.post('/api/templates', template),
   
   // Update template
-  updateTemplate: (templateId, template) => api.put(`/api/emails/templates/${templateId}`, template),
+  updateTemplate: (templateId, template) => api.put(`/api/templates/${templateId}`, template),
+  
+  // Set template as default
+  setDefaultTemplate: (templateId) => api.put(`/api/templates/${templateId}/set-default`),
   
   // Delete template
-  deleteTemplate: (templateId) => api.delete(`/api/emails/templates/${templateId}`),
+  deleteTemplate: (templateId) => api.delete(`/api/templates/${templateId}`),
 };
 
 // Service d'API pour les amis et le partage de cache
