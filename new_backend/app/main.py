@@ -60,28 +60,36 @@ app.include_router(user_settings.router, prefix="/api", tags=["User Settings"])
 app.include_router(templates.router, prefix="/api/templates", tags=["Templates"])
 
 # Add explicit OPTIONS handlers for all API routes
-@app.options("/api/emails/{path:path}")
-async def emails_options():
+@app.options("/api/emails/generate")
+async def emails_generate_options():
     return Response(status_code=200)
 
-@app.options("/api/friends/{path:path}")
-async def friends_options():
+@app.options("/api/emails/followup")
+async def emails_followup_options():
     return Response(status_code=200)
 
-@app.options("/api/users/{path:path}")
-async def users_options():
+@app.options("/api/emails/last-chance")
+async def emails_lastchance_options():
     return Response(status_code=200)
 
-@app.options("/api/templates/{path:path}")
-async def templates_options():
+@app.options("/api/friends/list")
+async def friends_list_options():
     return Response(status_code=200)
 
-@app.options("/auth/{path:path}")
-async def auth_options():
+@app.options("/api/users/profile")
+async def users_profile_options():
     return Response(status_code=200)
 
-@app.options("/api/{path:path}")
-async def api_options():
+@app.options("/auth/login")
+async def auth_login_options():
+    return Response(status_code=200)
+
+@app.options("/api/gmail/auth")
+async def gmail_auth_options():
+    return Response(status_code=200)
+
+@app.options("/api/settings")
+async def settings_options():
     return Response(status_code=200)
 
 @app.get("/")
