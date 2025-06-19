@@ -174,6 +174,17 @@ async def update_email_status(
             except Exception as followup_error:
                 logger.error(f"Failed to generate follow-up email: {str(followup_error)}")
                 # Don't fail the main operation if follow-up generation fails
+    
+    # Handle lastchance_due status
+    elif email.status == "lastchance_due":
+        # Generate a last chance email automatically
+        try:
+            email_generator = EmailGenerator(db)
+            lastchance_email = email_generator.generate_lastchance_email(email, current_user)
+            logger.info(f"Generated last chance email ID {lastchance_email.id} for original email ID {email_id}")
+        except Exception as lastchance_error:
+            logger.error(f"Failed to generate last chance email: {str(lastchance_error)}")
+            # Don't fail the main operation if last chance generation fails
             
     elif email.status == "draft": # Clear sent_at if reverting to draft
         email.sent_at = None
@@ -231,10 +242,11 @@ async def generate_emails(
         if template_id:
             template = db.query(EmailTemplate).filter(
                 EmailTemplate.id == template_id,
-                EmailTemplate.user_id == current_user.id
+                EmailTemplate.user_id == current_user.id,
+                EmailTemplate.category == stage  # Filter by stage/category
             ).first()
             if not template:
-                raise HTTPException(status_code=404, detail="Template not found")
+                raise HTTPException(status_code=404, detail=f"Template not found for stage '{stage}'")
         
         # Get friends_with_sharing
         friends_with_sharing = [f.id for f in current_user.friends if f.combine_contacts]
@@ -272,6 +284,55 @@ async def generate_emails(
         
     except Exception as e:
         logger.error(f"Error generating emails: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/generate-lastchance/{email_id}", response_model=Dict[str, Any])
+async def generate_lastchance_email(
+    email_id: int,
+    template_id: Optional[str] = Form(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Generate a last chance email for a specific email"""
+    logger.info(f"Generate last chance email request for email ID {email_id} by user {current_user.email}")
+    
+    # Get the original email
+    original_email = db.query(GeneratedEmail).filter(
+        GeneratedEmail.id == email_id,
+        GeneratedEmail.user_id == current_user.id
+    ).first()
+    
+    if not original_email:
+        raise HTTPException(status_code=404, detail="Email not found")
+    
+    # Get template if provided
+    template = None
+    if template_id:
+        template = db.query(EmailTemplate).filter(
+            EmailTemplate.id == template_id,
+            EmailTemplate.user_id == current_user.id,
+            EmailTemplate.category == "lastchance"
+        ).first()
+        if not template:
+            raise HTTPException(status_code=404, detail="Template not found for lastchance stage")
+    
+    try:
+        email_generator = EmailGenerator(db)
+        lastchance_email = email_generator.generate_lastchance_email(original_email, current_user, template)
+        
+        return {
+            "message": "Last chance email generated successfully",
+            "email": {
+                "id": lastchance_email.id,
+                "to": lastchance_email.recipient_email,
+                "subject": lastchance_email.subject,
+                "content": lastchance_email.content,
+                "stage": lastchance_email.stage
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error generating last chance email: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.delete("/{email_id}", status_code=status.HTTP_204_NO_CONTENT)
