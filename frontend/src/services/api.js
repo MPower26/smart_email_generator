@@ -1,13 +1,18 @@
 import axios from 'axios';
 
-// Use the configured URL in .env or default URL
-let API_BASE_URL = process.env.REACT_APP_API_URL || 'https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net';
+// Récupère la variable d'env (définie en build) ou fallback HTTPS hard-codé
+let API_BASE_URL =
+  process.env.REACT_APP_API_URL
+  || 'https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net';
 
 // Force HTTPS - convert HTTP to HTTPS if needed
 if (API_BASE_URL.startsWith('http://')) {
     API_BASE_URL = API_BASE_URL.replace('http://', 'https://');
     console.log('Converted HTTP to HTTPS:', API_BASE_URL);
 }
+
+// Additional safety: replace any http:// with https:// (case insensitive)
+API_BASE_URL = API_BASE_URL.replace(/^http:\/\//i, 'https://');
 
 console.log('Using API URL:', API_BASE_URL);
 
@@ -20,7 +25,7 @@ const api = axios.create({
   withCredentials: false  // Changed to false since we're not using cookies
 });
 
-// Add request interceptor to include authentication header
+// Add request interceptor to include authentication header and block malformed URLs
 api.interceptors.request.use(
   (config) => {
     // Get email from localStorage
@@ -28,6 +33,12 @@ api.interceptors.request.use(
     if (email) {
       // Set Authorization header with email
       config.headers.Authorization = `Bearer ${email}`;
+    }
+    
+    // Block any absolute URLs that might be malformed (security measure)
+    if (config.url && (config.url.startsWith('http://') || config.url.startsWith('//'))) {
+      console.error('Blocked malformed URL:', config.url);
+      throw new Error('Malformed URL detected - only relative URLs are allowed');
     }
     
     // Log the full URL being used
@@ -83,36 +94,6 @@ export const emailService = {
   
   // Delete email
   deleteEmail: (emailId) => api.delete(`/api/emails/${emailId}`),
-};
-
-// Template operations
-export const templateService = {
-  // Get all templates
-  getAllTemplates: () => api.get('/api/templates/'),
-  
-  // Get templates by category
-  getTemplatesByCategory: () => api.get('/api/templates/by-category/'),
-  
-  // Get templates filtered by category
-  getTemplatesByCategoryFilter: (category) => api.get(`/api/templates/?category=${category}`),
-  
-  // Get default template for a category
-  getDefaultTemplate: (category) => api.get(`/api/templates/default/${category}/`),
-  
-  // Get template by ID
-  getTemplate: (templateId) => api.get(`/api/templates/${templateId}/`),
-  
-  // Create template
-  createTemplate: (template) => api.post('/api/templates/', template),
-  
-  // Update template
-  updateTemplate: (templateId, template) => api.put(`/api/templates/${templateId}/`, template),
-  
-  // Set template as default
-  setDefaultTemplate: (templateId) => api.put(`/api/templates/${templateId}/set-default/`),
-  
-  // Delete template
-  deleteTemplate: (templateId) => api.delete(`/api/templates/${templateId}/`),
 };
 
 // Service d'API pour les amis et le partage de cache
