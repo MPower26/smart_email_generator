@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { emailService }    from '../services/email.service';
-import { templateService } from '../services/template.service';
+import { emailService, templateService } from '../services/api';
 
 const EmailGenerator = () => {
   const [file, setFile] = useState(null);
