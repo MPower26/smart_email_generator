@@ -21,28 +21,34 @@ logger = logging.getLogger(__name__)
 # Create FastAPI app
 app = FastAPI(title="Smart Email Generator API")
 
-# Add HTTPS redirection middleware
-@app.middleware("http")
-async def https_redirect(request: Request, call_next):
-    if request.headers.get("x-forwarded-proto") == "http":
-        # Redirect HTTP to HTTPS
-        url = str(request.url)
-        url = url.replace("http://", "https://", 1)
-        from fastapi.responses import RedirectResponse
-        return RedirectResponse(url=url, status_code=301)
-    response = await call_next(request)
-    return response
-
-# Configure CORS
+# Configure CORS FIRST (before other middlewares)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://jolly-bush-0bae83703.6.azurestaticapps.net"],
-    allow_credentials=True,  # Changed to True cause email won't show in outreach follow up and stuff without it
+    allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
     expose_headers=["*"],
     max_age=600,  # Cache preflight requests for 10 minutes
 )
+
+# Add HTTPS redirection middleware AFTER CORS
+@app.middleware("http")
+async def https_redirect(request: Request, call_next):
+    # Don't redirect OPTIONS requests (CORS preflight)
+    if request.method == "OPTIONS":
+        response = await call_next(request)
+        return response
+    
+    # Only redirect HTTP to HTTPS for non-OPTIONS requests
+    if request.headers.get("x-forwarded-proto") == "http":
+        url = str(request.url)
+        url = url.replace("http://", "https://", 1)
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url=url, status_code=301)
+    
+    response = await call_next(request)
+    return response
 
 # Include API routers
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
@@ -85,6 +91,12 @@ async def cors_test(request: Request):
     headers = dict(request.headers)
     return {
         "message": "CORS test successful!",
-        "request_headers": headers
-    } 
+        "request_headers": headers,
+        "origin": request.headers.get("origin"),
+        "method": request.method
+    }
 
+@app.options("/cors-test")
+async def cors_test_options():
+    """Handle OPTIONS request for CORS test"""
+    return {"message": "CORS preflight successful"} 
