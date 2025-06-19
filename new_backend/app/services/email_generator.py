@@ -257,3 +257,137 @@ Best regards,
             except Exception as e:
                 print(f"Error generating email for {email_addr}: {str(e)}")
         return generated_emails 
+
+    def generate_followup_email(
+        self,
+        original_email: GeneratedEmail,
+        user: User,
+        template: Optional[EmailTemplate] = None
+    ) -> GeneratedEmail:
+        """Generate a follow-up email based on an original email"""
+        
+        # Extract information from the original email
+        recipient_name = original_email.recipient_name
+        recipient_company = original_email.recipient_company
+        recipient_email = original_email.recipient_email
+        
+        # Build context for OpenAI API
+        prompt = f"""
+        Create a follow-up email in English for a prospect who didn't respond to the initial outreach.
+        
+        Recipient Information:
+        Name: {recipient_name}
+        Company: {recipient_company}
+        Email: {recipient_email}
+        
+        Original Email Subject: {original_email.subject}
+        Original Email Content: {original_email.content}
+        
+        Sender Information:
+        Name: {user.full_name if user.full_name else "[Your Name]"}
+        Position: {user.position if user.position else "[Your Position]"}
+        Company: {user.company_name if user.company_name else "[Your Company]"}
+        Company Description: {user.company_description if user.company_description else "[brief description of company]"}
+        
+        Please generate a professional follow-up email that:
+        1. References the previous email sent to them
+        2. Is polite and not pushy
+        3. Offers additional value or information
+        4. Has a different angle or approach than the original
+        5. Includes a clear but gentle call to action
+        6. Is concise (2-3 short paragraphs maximum)
+        7. Maintains a professional yet friendly tone
+        8. Avoids being repetitive or aggressive
+        9. If a company description is provided, use it to reinforce the value proposition
+        
+        The follow-up should feel natural and add value, not just be a reminder.
+        """
+        
+        try:
+            response = self.client.chat.completions.create(
+                model=AZURE_DEPLOYMENT_NAME,
+                messages=[
+                    {"role": "system", "content": "You are an expert email writer specializing in professional follow-up emails. Create emails that add value and feel natural, not pushy. Do not use any markdown formatting (like ** or *) in the email content."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=800
+            )
+            
+            generated_content = response.choices[0].message.content
+            
+            # Extract subject from first line of content and remove "Subject: " prefix if present
+            content_lines = generated_content.split('\n')
+            subject = content_lines[0].strip()
+            if subject.lower().startswith("subject: "):
+                subject = subject[9:].strip()
+            
+            # Find the "Best regards" line and remove everything after it
+            content = []
+            for line in content_lines[1:]:
+                if line.strip().lower() == "best regards,":
+                    break
+                content.append(line)
+            
+            # Join the content and add the correct signature
+            content = '\n'.join(content).strip()
+            
+            # Remove any markdown formatting
+            content = content.replace("**", "")
+            
+            # Replace placeholders with user information if available
+            content = content.replace("[Your Name]", user.full_name if user.full_name else "[Your Name]")
+            content = content.replace("[Your Position]", user.position if user.position else "[Your Position]")
+            content = content.replace("[Your Company]", user.company_name if user.company_name else "[Your Company]")
+            
+            # Remove any existing signature lines after "Best regards" or similar phrases
+            content_lines = content.split('\n')
+            new_content = []
+            signature_indicators = ["best regards", "sincerely", "kind regards", "warm regards", "looking forward", "thank you"]
+            
+            for line in content_lines:
+                line_lower = line.strip().lower()
+                if any(indicator in line_lower for indicator in signature_indicators):
+                    break
+                new_content.append(line)
+            
+            content = '\n'.join(new_content).strip()
+            
+            # Add consistent signature format
+            signature = f"""
+Best regards,
+{user.full_name if user.full_name else "[Your Name]"}
+{user.position if user.position else "[Your Position]"}
+{user.company_name if user.company_name else "[Your Company]"}"""
+            
+            content = f"{content}\n\n{signature}"
+            
+            # Create and save the follow-up email
+            now = datetime.utcnow()
+            followup_email = GeneratedEmail(
+                recipient_email=recipient_email,
+                recipient_name=recipient_name,
+                recipient_company=recipient_company,
+                subject=subject,
+                content=content,
+                user_id=user.id,
+                template_id=template.id if template else None,
+                status="draft",  # Start as draft so user can review
+                stage="followup",
+                follow_up_status="none",
+                follow_up_date=None,  # Will be set when sent
+                final_follow_up_date=None,
+                created_at=now,
+                # Set legacy fields for backward compatibility
+                to=recipient_email,
+                body=content
+            )
+            
+            self.db.add(followup_email)
+            self.db.commit()
+            self.db.refresh(followup_email)
+            
+            return followup_email
+            
+        except Exception as e:
+            raise Exception(f"Failed to generate follow-up email: {str(e)}") 
