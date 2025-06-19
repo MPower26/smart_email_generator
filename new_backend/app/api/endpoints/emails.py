@@ -166,6 +166,15 @@ async def update_email_status(
             # Automatically move to followup_due status
             email.status = "followup_due"
             
+            # Generate a follow-up email automatically
+            try:
+                email_generator = EmailGenerator(db)
+                followup_email = email_generator.generate_followup_email(email, current_user)
+                logger.info(f"Generated follow-up email ID {followup_email.id} for original email ID {email_id}")
+            except Exception as followup_error:
+                logger.error(f"Failed to generate follow-up email: {str(followup_error)}")
+                # Don't fail the main operation if follow-up generation fails
+            
     elif email.status == "draft": # Clear sent_at if reverting to draft
         email.sent_at = None
         email.followup_due_at = None
@@ -415,6 +424,15 @@ def send_via_gmail(email_id: int, db: Session = Depends(get_db), user: User = De
         # Set followup_due_at to now + 3 days (countdown starts immediately)
         generated_email.followup_due_at = now + timedelta(days=followup_days)
         generated_email.lastchance_due_at = now + timedelta(days=lastchance_days)
+        
+        # Generate a follow-up email automatically
+        try:
+            email_generator = EmailGenerator(db)
+            followup_email = email_generator.generate_followup_email(generated_email, user)
+            logger.info(f"Generated follow-up email ID {followup_email.id} for original email ID {email_id}")
+        except Exception as followup_error:
+            logger.error(f"Failed to generate follow-up email: {str(followup_error)}")
+            # Don't fail the main operation if follow-up generation fails
         
         db.commit()
         return {"success": True, "message": "Email sent and moved to follow-up queue"}
