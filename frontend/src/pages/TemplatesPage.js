@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Card, Form, Button, Alert, Modal, Tabs, Tab, Accordion, Badge } from 'react-bootstrap';
+import { Container, Card, Form, Button, Alert, Modal, Tabs, Tab, Accordion, Badge, OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { templateService } from '../services/api';
 
 const TemplatesPage = () => {
@@ -222,8 +222,20 @@ const TemplatesPage = () => {
                 size="sm"
                 onClick={() => handleSetDefault(template.id)}
                 disabled={loading}
+                title="Set as default template for this category"
               >
                 Set Default
+                <OverlayTrigger
+                  placement="top"
+                  overlay={
+                    <Tooltip id={`set-default-tooltip-${template.id}`}>
+                      <strong>Set as Default:</strong><br/>
+                      This template will be automatically used when generating emails for this stage if no specific template is selected.
+                    </Tooltip>
+                  }
+                >
+                  <i className="bi bi-info-circle ms-1" style={{ cursor: 'help', fontSize: '0.8rem' }}></i>
+                </OverlayTrigger>
               </Button>
             )}
             <Button 
@@ -369,13 +381,45 @@ Best regards,
                   />
                   <Form.Text className="text-muted">
                     Available placeholders: [Recipient Name], [Company Name], [Your Name], [Your Position], [Your Company]
+                    <OverlayTrigger
+                      placement="top"
+                      overlay={
+                        <Tooltip id="placeholders-tooltip">
+                          <strong>Placeholders:</strong><br/>
+                          Use these placeholders in your templates and they'll be automatically replaced with actual data when generating emails.<br/><br/>
+                          • [Recipient Name] - Contact's first and last name<br/>
+                          • [Company Name] - Contact's company name<br/>
+                          • [Your Name] - Your full name<br/>
+                          • [Your Position] - Your job title<br/>
+                          • [Your Company] - Your company name
+                        </Tooltip>
+                      }
+                    >
+                      <i className="bi bi-info-circle ms-2" style={{ cursor: 'help' }}></i>
+                    </OverlayTrigger>
                   </Form.Text>
                 </Form.Group>
                 
                 <Form.Group className="mb-3">
                   <Form.Check
                     type="checkbox"
-                    label="Set as default template for this category"
+                    label={
+                      <span>
+                        Set as default template for this category
+                        <OverlayTrigger
+                          placement="top"
+                          overlay={
+                            <Tooltip id="default-template-tooltip">
+                              <strong>Default Templates:</strong><br/>
+                              When enabled, this template will be automatically used when generating emails for this stage if no specific template is selected. 
+                              Only one template per category can be set as default.
+                            </Tooltip>
+                          }
+                        >
+                          <i className="bi bi-info-circle ms-2 text-muted" style={{ cursor: 'help' }}></i>
+                        </OverlayTrigger>
+                      </span>
+                    }
                     name="is_default"
                     checked={currentTemplate.is_default}
                     onChange={handleInputChange}
