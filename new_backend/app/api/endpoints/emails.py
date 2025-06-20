@@ -11,7 +11,7 @@ from fastapi import status
 from sqlalchemy import or_, and_
 
 from app.db.database import get_db
-from app.models.models import GeneratedEmail, User, EmailTemplate, SentEmailRecord
+from app.models.models import GeneratedEmail, User, EmailTemplate, SentEmailRecord, EmailGenerationProgress
 from app.api.auth import get_current_user
 from app.services.email_generator import EmailGenerator
 from app.services.email_service import send_verification_email, EMAIL_CONFIG
@@ -263,6 +263,39 @@ async def get_templates(
         })
     return result
 
+@router.get("/generation-progress", response_model=Dict[str, Any])
+async def get_generation_progress(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get the current email generation progress for the user"""
+    progress = db.query(EmailGenerationProgress).filter(
+        EmailGenerationProgress.user_id == current_user.id,
+        EmailGenerationProgress.status == "processing"
+    ).order_by(EmailGenerationProgress.created_at.desc()).first()
+    
+    if not progress:
+        return {
+            "status": "idle",
+            "total_contacts": 0,
+            "processed_contacts": 0,
+            "generated_emails": 0,
+            "percentage": 0
+        }
+    
+    percentage = (progress.processed_contacts / progress.total_contacts * 100) if progress.total_contacts > 0 else 0
+    
+    return {
+        "status": progress.status,
+        "total_contacts": progress.total_contacts,
+        "processed_contacts": progress.processed_contacts,
+        "generated_emails": progress.generated_emails,
+        "percentage": round(percentage, 1),
+        "stage": progress.stage,
+        "created_at": progress.created_at.isoformat(),
+        "updated_at": progress.updated_at.isoformat()
+    }
+
 @router.post("/generate", response_model=Dict[str, Any])
 async def generate_emails(
     file: UploadFile = File(...),
@@ -282,14 +315,6 @@ async def generate_emails(
         reader = csv.DictReader(csv_file)
         contacts = list(reader)
         
-        # Send initial progress update
-        await manager.send_progress(str(current_user.id), {
-            "type": "generation_start",
-            "total_contacts": len(contacts),
-            "current": 0,
-            "stage": "parsing"
-        })
-        
         # Get template if provided
         template = None
         if template_id:
@@ -307,17 +332,20 @@ async def generate_emails(
 
         email_generator = EmailGenerator(db)
         
-        # Track generation start time
-        generation_start_time = datetime.utcnow()
+        # Create progress record in database
+        progress_record = EmailGenerationProgress(
+            user_id=current_user.id,
+            total_contacts=len(contacts),
+            processed_contacts=0,
+            generated_emails=0,
+            status="processing",
+            stage=stage
+        )
+        db.add(progress_record)
+        db.commit()
+        db.refresh(progress_record)
         
-        # Send progress update for generation start
-        logger.info(f"Sending generation start progress update for user {current_user.id}")
-        await manager.send_progress(str(current_user.id), {
-            "type": "generation_start",
-            "total_contacts": len(contacts),
-            "current": 0,
-            "stage": "generating"
-        })
+        logger.info(f"Started email generation for user {current_user.id}: {len(contacts)} contacts")
         
         generated_emails = []
         for i, contact in enumerate(contacts):
@@ -331,32 +359,26 @@ async def generate_emails(
                 )
                 generated_emails.append(email)
                 
-                # Send progress update every 5 emails or for the last email
+                # Update progress in database every 5 contacts or for the last contact
                 if (i + 1) % 5 == 0 or i == len(contacts) - 1:
-                    elapsed_time = (datetime.utcnow() - generation_start_time).total_seconds()
-                    speed = (i + 1) / max(1, elapsed_time)
-                    
-                    logger.info(f"Sending generation progress update for user {current_user.id}: {i + 1}/{len(contacts)} emails generated")
-                    await manager.send_progress(str(current_user.id), {
-                        "type": "generation_progress",
-                        "stage": "generating",
-                        "current": i + 1,
-                        "total": len(contacts),
-                        "generated_count": len(generated_emails),
-                        "speed": speed
-                    })
+                    progress_record.processed_contacts = i + 1
+                    progress_record.generated_emails = len(generated_emails)
+                    progress_record.updated_at = datetime.utcnow()
+                    db.commit()
+                    logger.info(f"Updated progress for user {current_user.id}: {i + 1}/{len(contacts)} contacts processed")
                     
             except Exception as e:
                 logger.error(f"Error generating email for contact {i}: {str(e)}")
                 # Continue with next contact
         
-        # Send completion progress update
-        logger.info(f"Sending generation complete progress update for user {current_user.id}")
-        await manager.send_progress(str(current_user.id), {
-            "type": "generation_complete",
-            "total_generated": len(generated_emails),
-            "total_contacts": len(contacts)
-        })
+        # Mark progress as completed
+        progress_record.status = "completed"
+        progress_record.processed_contacts = len(contacts)
+        progress_record.generated_emails = len(generated_emails)
+        progress_record.updated_at = datetime.utcnow()
+        db.commit()
+        
+        logger.info(f"Completed email generation for user {current_user.id}: {len(generated_emails)} emails generated")
         
         # Format the emails for response
         formatted_emails = []
