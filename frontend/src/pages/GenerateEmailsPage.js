@@ -8,7 +8,6 @@ import { UserContext } from '../contexts/UserContext';
 const GenerateEmailsPage = () => {
   const { userProfile } = useContext(UserContext);
   const [file, setFile] = useState(null);
-  const [generationMethod, setGenerationMethod] = useState('ai');
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [loading, setLoading] = useState(false);
@@ -54,21 +53,30 @@ const GenerateEmailsPage = () => {
         const defaultTemplate = response.data.find(t => t.is_default);
         setSelectedTemplate(defaultTemplate ? defaultTemplate.id : response.data[0].id);
       } else {
-        setSelectedTemplate('');
+        setSelectedTemplate('ai_generated'); // Use AI generated when no templates exist
       }
     } catch (err) {
       console.error('Error loading templates:', err);
       setError('Failed to load templates. Please try again later.');
+      setSelectedTemplate('ai_generated'); // Fallback to AI generated
     }
   };
 
   // Load templates when email stage changes
   useEffect(() => {
-    if (generationMethod === 'template') {
-      loadTemplates();
-    }
-  }, [emailStage, generationMethod]);
+    loadTemplates();
+  }, [emailStage]);
   
+  // Handle template selection change
+  const handleTemplateChange = (templateId) => {
+    setSelectedTemplate(templateId);
+  };
+
+  // Handle add template button click
+  const handleAddTemplate = () => {
+    window.open('https://jolly-bush-0bae83703.6.azurestaticapps.net/templates', '_blank');
+  };
+
   // Load emails by stage
   const loadEmailsByStage = async () => {
     setLoadingEmails(true);
@@ -204,7 +212,7 @@ const GenerateEmailsPage = () => {
 
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('use_ai', generationMethod === 'ai');
+    formData.append('use_ai', selectedTemplate === 'ai_generated');
     formData.append('stage', emailStage);
     formData.append('avoid_duplicates', avoidDuplicates);
     
@@ -216,7 +224,8 @@ const GenerateEmailsPage = () => {
       if (userProfile.email) formData.append('your_contact', userProfile.email);
     }
     
-    if (generationMethod === 'template' && selectedTemplate) {
+    // Only add template_id if a specific template is selected (not AI generated)
+    if (selectedTemplate && selectedTemplate !== 'ai_generated') {
       formData.append('template_id', selectedTemplate);
     }
 
@@ -368,54 +377,41 @@ const GenerateEmailsPage = () => {
                 </Form.Group>
               
                 <Form.Group className="mb-3">
-                  <Form.Label>Generation Method</Form.Label>
-                  <div>
-                    <Form.Check
-                      type="radio"
-                      label="AI Generation (Azure OpenAI)"
-                      name="generationMethod"
-                      id="aiMethod"
-                      checked={generationMethod === 'ai'}
-                      onChange={() => setGenerationMethod('ai')}
-                      className="mb-2"
-                    />
-                    <Form.Check
-                      type="radio"
-                      label="Use Template"
-                      name="generationMethod"
-                      id="templateMethod"
-                      checked={generationMethod === 'template'}
-                      onChange={() => {
-                        setGenerationMethod('template');
-                        loadTemplates();
-                      }}
-                    />
-                  </div>
-                </Form.Group>
-
-                {generationMethod === 'template' && (
-                  <Form.Group className="mb-3">
-                    <Form.Label>Select Template</Form.Label>
-                    {templates.length > 0 ? (
+                  <Form.Label>Template Selection</Form.Label>
+                  <div className="d-flex gap-2 align-items-start">
+                    <div className="flex-grow-1">
                       <Form.Select
                         value={selectedTemplate}
-                        onChange={(e) => setSelectedTemplate(e.target.value)}
+                        onChange={(e) => handleTemplateChange(e.target.value)}
                       >
-                        {templates.map(template => (
-                          <option key={template.id} value={template.id}>
-                            {template.name} {template.is_default && '(Default)'}
-                          </option>
-                        ))}
+                        {templates.length > 0 ? (
+                          templates.map(template => (
+                            <option key={template.id} value={template.id}>
+                              {template.name} {template.is_default && '(Default)'}
+                            </option>
+                          ))
+                        ) : (
+                          <option value="ai_generated">AI Generated</option>
+                        )}
                       </Form.Select>
-                    ) : (
-                      <div className="alert alert-warning">
-                        No templates available for {emailStage === 'outreach' ? 'Initial Outreach' : 
-                                                   emailStage === 'followup' ? 'Follow-Up' : 'Last Chance'} stage. 
-                        Please create templates in the Templates tab first.
-                      </div>
-                    )}
-                  </Form.Group>
-                )}
+                      {templates.length === 0 && (
+                        <Form.Text className="text-muted">
+                          No templates available for {emailStage === 'outreach' ? 'Initial Outreach' : 
+                                                     emailStage === 'followup' ? 'Follow-Up' : 'Last Chance'}. 
+                          Emails will be generated using AI.
+                        </Form.Text>
+                      )}
+                    </div>
+                    <Button 
+                      variant="outline-primary" 
+                      size="sm"
+                      onClick={handleAddTemplate}
+                      className="mt-0"
+                    >
+                      Add Template
+                    </Button>
+                  </div>
+                </Form.Group>
 
                 <Form.Check
                   type="checkbox"
