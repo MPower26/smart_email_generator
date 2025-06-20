@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import or_
 
 from app.models.models import GeneratedEmail, User, EmailTemplate, SentEmailRecord
+from app.websocket_manager import manager
 
 # Azure OpenAI Configuration
 AZURE_OPENAI_API_KEY = "65f3a3cbcc54451d9ae6b8740303c648"
@@ -293,6 +294,22 @@ Best regards,
         generated_emails = []
         already_emailed = set()
         
+        # Send initial progress update
+        try:
+            import asyncio
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # If we're in an async context, send the progress update
+                loop.create_task(manager.send_progress(str(user.id), {
+                    "type": "generation_start",
+                    "total_contacts": len(csv_data),
+                    "current": 0,
+                    "stage": "processing"
+                }))
+        except:
+            # If we can't send WebSocket update, continue without it
+            pass
+        
         # Build set of already emailed addresses for this user (and optionally friends)
         if avoid_duplicates:
             # Check both GeneratedEmail and SentEmailRecord tables
@@ -314,7 +331,7 @@ Best regards,
             sent_emails = {r[0].lower() for r in sent_query}
             already_emailed.update(sent_emails)
 
-        for contact in csv_data:
+        for i, contact in enumerate(csv_data):
             email_addr = contact.get("Email", "").lower()
             if not email_addr:
                 continue
@@ -325,8 +342,43 @@ Best regards,
                 generated_emails.append(email)
                 if avoid_duplicates:
                     already_emailed.add(email_addr)
+                
+                # Send progress update every 5 emails or for the last email
+                if (i + 1) % 5 == 0 or i == len(csv_data) - 1:
+                    try:
+                        import asyncio
+                        loop = asyncio.get_event_loop()
+                        if loop.is_running():
+                            loop.create_task(manager.send_progress(str(user.id), {
+                                "type": "generation_progress",
+                                "stage": "generating",
+                                "current": i + 1,
+                                "total": len(csv_data),
+                                "generated_count": len(generated_emails),
+                                "speed": (i + 1) / max(1, (datetime.utcnow() - datetime.utcnow()).total_seconds())
+                            }))
+                    except:
+                        # If we can't send WebSocket update, continue without it
+                        pass
+                        
             except Exception as e:
                 print(f"Error generating email for {email_addr}: {str(e)}")
+                
+        # Send completion progress update
+        try:
+            import asyncio
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(manager.send_progress(str(user.id), {
+                    "type": "generation_complete",
+                    "total_generated": len(generated_emails),
+                    "total_contacts": len(csv_data),
+                    "stage": "complete"
+                }))
+        except:
+            # If we can't send WebSocket update, continue without it
+            pass
+            
         return generated_emails
 
     def generate_followup_email(
@@ -672,3 +724,4 @@ Best regards,
         self.db.refresh(lastchance_email)
         
         return lastchance_email 
+
