@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Container, Row, Col, Card, Form, Button, Alert, Tabs, Tab, Badge } from 'react-bootstrap';
+import { Container, Row, Col, Card, Form, Button, Alert, Tabs, Tab, Badge, Spinner } from 'react-bootstrap';
 import FileUpload from '../components/FileUpload';
 import EmailPreview from '../components/EmailPreview';
 import { emailService, templateService } from '../services/api';
@@ -327,6 +327,58 @@ const GenerateEmailsPage = () => {
     }
   };
 
+  // Handle send all emails in a stage
+  const handleSendAll = async (stage) => {
+    if (!userProfile?.gmail_access_token) {
+      setError('Gmail not connected. Please connect your Gmail account in Settings first.');
+      return;
+    }
+
+    const stageEmails = stage === 'outreach' ? outreachEmails : 
+                       stage === 'followup' ? followupEmails : 
+                       lastChanceEmails;
+    
+    const unsentEmails = stageEmails.filter(email => 
+      email.status === 'draft' || email.status === 'outreach_pending' || email.status === 'followup_due'
+    );
+
+    if (unsentEmails.length === 0) {
+      setError(`No emails to send for ${stage} stage.`);
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to send all ${unsentEmails.length} emails in the ${stage} stage? This will send them via Gmail and queue follow-up emails.`)) {
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await emailService.sendAllViaGmail(stage);
+      
+      if (response.data.success) {
+        setError(`Successfully sent ${response.data.sent_count} emails. ${response.data.failed_count > 0 ? `${response.data.failed_count} failed.` : ''}`);
+        
+        // Reload emails to reflect the changes
+        await loadEmailsByStage();
+        
+        // Show success message
+        setTimeout(() => setError(''), 5000);
+      } else {
+        throw new Error(response.data.message || 'Failed to send emails');
+      }
+    } catch (err) {
+      console.error('Error sending all emails:', err);
+      setError(
+        err.response?.data?.detail || err.response?.data?.message || 
+        'Failed to send emails. Please try again.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Container className="templates-page">
       <h1 className="mb-4">Email Campaign Manager</h1>
@@ -454,13 +506,35 @@ const GenerateEmailsPage = () => {
                 <>
                   <div className="d-flex justify-content-between align-items-center mb-3">
                     <h5>Outreach Emails ({outreachEmails.length})</h5>
-                    <Button 
-                      variant="outline-secondary" 
-                      size="sm"
-                      onClick={() => handleExportStage(outreachEmails, 'outreach')}
-                    >
-                      Export Outreach Emails
-                    </Button>
+                    <div>
+                      <Button 
+                        variant="success" 
+                        size="sm"
+                        className="me-2"
+                        onClick={() => handleSendAll('outreach')}
+                        disabled={loading || !userProfile?.gmail_access_token}
+                        title={!userProfile?.gmail_access_token ? "Connect Gmail first" : "Send all outreach emails"}
+                      >
+                        {loading ? (
+                          <>
+                            <Spinner animation="border" size="sm" className="me-1" />
+                            Sending...
+                          </>
+                        ) : (
+                          <>
+                            <i className="bi bi-send-fill me-1"></i>
+                            Send All
+                          </>
+                        )}
+                      </Button>
+                      <Button 
+                        variant="outline-secondary" 
+                        size="sm"
+                        onClick={() => handleExportStage(outreachEmails, 'outreach')}
+                      >
+                        Export Outreach Emails
+                      </Button>
+                    </div>
                   </div>
                   <div className="email-list">
                     {[...outreachEmails]
@@ -508,13 +582,35 @@ const GenerateEmailsPage = () => {
                 <>
                   <div className="d-flex justify-content-between align-items-center mb-3">
                     <h5>Follow-Up Emails ({followupEmails.length})</h5>
-                    <Button 
-                      variant="outline-secondary" 
-                      size="sm"
-                      onClick={() => handleExportStage(followupEmails, 'followup')}
-                    >
-                      Export Follow-Up Emails
-                    </Button>
+                    <div>
+                      <Button 
+                        variant="success" 
+                        size="sm"
+                        className="me-2"
+                        onClick={() => handleSendAll('followup')}
+                        disabled={loading || !userProfile?.gmail_access_token}
+                        title={!userProfile?.gmail_access_token ? "Connect Gmail first" : "Send all follow-up emails"}
+                      >
+                        {loading ? (
+                          <>
+                            <Spinner animation="border" size="sm" className="me-1" />
+                            Sending...
+                          </>
+                        ) : (
+                          <>
+                            <i className="bi bi-send-fill me-1"></i>
+                            Send All
+                          </>
+                        )}
+                      </Button>
+                      <Button 
+                        variant="outline-secondary" 
+                        size="sm"
+                        onClick={() => handleExportStage(followupEmails, 'followup')}
+                      >
+                        Export Follow-Up Emails
+                      </Button>
+                    </div>
                   </div>
                   <div className="email-list">
                     {[...followupEmails]
@@ -562,13 +658,35 @@ const GenerateEmailsPage = () => {
                 <>
                   <div className="d-flex justify-content-between align-items-center mb-3">
                     <h5>Last Chance Emails ({lastChanceEmails.length})</h5>
-                    <Button 
-                      variant="outline-secondary" 
-                      size="sm"
-                      onClick={() => handleExportStage(lastChanceEmails, 'lastchance')}
-                    >
-                      Export Last Chance Emails
-                    </Button>
+                    <div>
+                      <Button 
+                        variant="success" 
+                        size="sm"
+                        className="me-2"
+                        onClick={() => handleSendAll('lastchance')}
+                        disabled={loading || !userProfile?.gmail_access_token}
+                        title={!userProfile?.gmail_access_token ? "Connect Gmail first" : "Send all last chance emails"}
+                      >
+                        {loading ? (
+                          <>
+                            <Spinner animation="border" size="sm" className="me-1" />
+                            Sending...
+                          </>
+                        ) : (
+                          <>
+                            <i className="bi bi-send-fill me-1"></i>
+                            Send All
+                          </>
+                        )}
+                      </Button>
+                      <Button 
+                        variant="outline-secondary" 
+                        size="sm"
+                        onClick={() => handleExportStage(lastChanceEmails, 'lastchance')}
+                      >
+                        Export Last Chance Emails
+                      </Button>
+                    </div>
                   </div>
                   <div className="email-list">
                     {[...lastChanceEmails]
