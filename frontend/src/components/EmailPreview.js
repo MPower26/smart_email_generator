@@ -5,6 +5,54 @@ import { emailService } from '../services/api';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net';
 
+// Countdown Timer Component
+const CountdownTimer = ({ dueDate }) => {
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  const [isOverdue, setIsOverdue] = useState(false);
+
+  useEffect(() => {
+    const calculateTimeLeft = () => {
+      const now = new Date().getTime();
+      const due = new Date(dueDate).getTime();
+      const difference = due - now;
+
+      if (difference > 0) {
+        const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+
+        setTimeLeft({ days, hours, minutes, seconds });
+        setIsOverdue(false);
+      } else {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+        setIsOverdue(true);
+      }
+    };
+
+    calculateTimeLeft();
+    const timer = setInterval(calculateTimeLeft, 1000);
+
+    return () => clearInterval(timer);
+  }, [dueDate]);
+
+  if (isOverdue) {
+    return (
+      <Badge bg="danger" text="white" className="ms-2">
+        <i className="bi bi-exclamation-triangle me-1"></i>
+        Overdue!
+      </Badge>
+    );
+  }
+
+  return (
+    <Badge bg="warning" text="dark" className="ms-2">
+      <i className="bi bi-clock me-1"></i>
+      {timeLeft.days}d {timeLeft.hours}h {timeLeft.minutes}m {timeLeft.seconds}s
+    </Badge>
+  );
+};
+
 const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = false, isSentHighlight = false, isUnmarkedHighlight = false }) => {
   const { userProfile, fetchUserProfile } = useContext(UserContext);
   const [copied, setCopied] = useState(false);
@@ -332,23 +380,7 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
               </Badge>
             )}
             {email.followup_due_at && (
-              <Badge bg="warning" text="dark" className="ms-2">
-                <i className="bi bi-clock me-1"></i>
-                {(() => {
-                  const dueDate = new Date(email.followup_due_at);
-                  const now = new Date();
-                  const diffTime = dueDate - now;
-                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                  
-                  if (diffDays <= 0) {
-                    return 'Due now';
-                  } else if (diffDays === 1) {
-                    return 'Due tomorrow';
-                  } else {
-                    return `Due in ${diffDays} days`;
-                  }
-                })()}
-              </Badge>
+              <CountdownTimer dueDate={email.followup_due_at} />
             )}
             {userProfile?.gmail_access_token && (
               <Badge bg="success" className="ms-2">
