@@ -16,7 +16,7 @@ from app.api.auth import get_current_user
 from app.services.email_generator import EmailGenerator
 from app.services.email_service import send_verification_email, EMAIL_CONFIG
 from app.services.gmail_service import send_gmail_email
-from app.main import manager
+from app.websocket_manager import manager
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
