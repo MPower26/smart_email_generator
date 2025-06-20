@@ -11,12 +11,12 @@ from fastapi import status
 from sqlalchemy import or_, and_
 
 from app.db.database import get_db
-from app.models.models import GeneratedEmail, User, EmailTemplate
+from app.models.models import GeneratedEmail, User, EmailTemplate, SentEmailRecord
 from app.api.auth import get_current_user
 from app.services.email_generator import EmailGenerator
-from app.services.email_service import send_verification_email
-from app.config.settings import EMAIL_CONFIG
+from app.services.email_service import send_verification_email, EMAIL_CONFIG
 from app.services.gmail_service import send_gmail_email
+from app.main import manager
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -282,6 +282,14 @@ async def generate_emails(
         reader = csv.DictReader(csv_file)
         contacts = list(reader)
         
+        # Send initial progress update
+        await manager.send_progress(str(current_user.id), {
+            "type": "generation_start",
+            "total_contacts": len(contacts),
+            "current": 0,
+            "stage": "parsing"
+        })
+        
         # Get template if provided
         template = None
         if template_id:
@@ -298,15 +306,47 @@ async def generate_emails(
         dedupe_with_friends = len(friends_with_sharing) > 0
 
         email_generator = EmailGenerator(db)
-        generated_emails = email_generator.process_csv_data(
-            contacts,
-            current_user,
-            template,
-            stage,
-            avoid_duplicates=avoid_duplicates,
-            dedupe_with_friends=dedupe_with_friends,
-            friends_ids=friends_with_sharing
-        )
+        
+        # Send progress update for generation start
+        await manager.send_progress(str(current_user.id), {
+            "type": "generation_progress",
+            "stage": "generating",
+            "current": 0,
+            "total": len(contacts)
+        })
+        
+        generated_emails = []
+        for i, contact in enumerate(contacts):
+            try:
+                # Generate email for this contact
+                email = email_generator.generate_personalized_email(
+                    contact, 
+                    current_user, 
+                    template, 
+                    stage
+                )
+                generated_emails.append(email)
+                
+                # Send progress update every 5 emails or for the last email
+                if (i + 1) % 5 == 0 or i == len(contacts) - 1:
+                    await manager.send_progress(str(current_user.id), {
+                        "type": "generation_progress",
+                        "stage": "generating",
+                        "current": i + 1,
+                        "total": len(contacts),
+                        "speed": (i + 1) / max(1, (datetime.utcnow() - datetime.utcnow()).total_seconds())
+                    })
+                    
+            except Exception as e:
+                logger.error(f"Error generating email for contact {i}: {str(e)}")
+                # Continue with next contact
+        
+        # Send completion progress update
+        await manager.send_progress(str(current_user.id), {
+            "type": "generation_complete",
+            "total_generated": len(generated_emails),
+            "total_contacts": len(contacts)
+        })
         
         # Format the emails for response
         formatted_emails = []
@@ -329,6 +369,11 @@ async def generate_emails(
         
     except Exception as e:
         logger.error(f"Error generating emails: {str(e)}")
+        # Send error progress update
+        await manager.send_progress(str(current_user.id), {
+            "type": "generation_error",
+            "error": str(e)
+        })
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/generate-lastchance/{email_id}", response_model=Dict[str, Any])
@@ -578,8 +623,17 @@ async def send_all_via_gmail(
     sent_count = 0
     failed_count = 0
     errors = []
+    emails_to_delete = []  # Track outreach emails to delete
     
-    for email in emails:
+    # Send initial progress update
+    await manager.send_progress(str(current_user.id), {
+        "type": "sending_start",
+        "total_emails": len(emails),
+        "current": 0,
+        "stage": stage
+    })
+    
+    for i, email in enumerate(emails):
         try:
             # Send via Gmail
             send_gmail_email(current_user, email.recipient_email, email.subject, email.content)
@@ -606,13 +660,71 @@ async def send_all_via_gmail(
             
             sent_count += 1
             
+            # Mark outreach emails for deletion (they'll be moved to followup stage)
+            if stage == "outreach":
+                emails_to_delete.append(email.id)
+            
+            # Send progress update
+            await manager.send_progress(str(current_user.id), {
+                "type": "sending_progress",
+                "current": i + 1,
+                "total": len(emails),
+                "sent_count": sent_count,
+                "failed_count": failed_count,
+                "stage": stage
+            })
+            
         except Exception as e:
             logger.error(f"Failed to send email {email.id}: {str(e)}")
             failed_count += 1
             errors.append(f"Email to {email.recipient_email}: {str(e)}")
+            
+            # Send error progress update
+            await manager.send_progress(str(current_user.id), {
+                "type": "sending_error",
+                "current": i + 1,
+                "total": len(emails),
+                "error": str(e),
+                "recipient": email.recipient_email
+            })
     
-    # Commit all changes
+    # Commit all changes first
     db.commit()
+    
+    # Send completion progress update
+    await manager.send_progress(str(current_user.id), {
+        "type": "sending_complete",
+        "total_sent": sent_count,
+        "total_failed": failed_count,
+        "total_emails": len(emails),
+        "stage": stage
+    })
+    
+    # Delete outreach emails after successful sending (they're now in followup stage)
+    if stage == "outreach" and emails_to_delete:
+        try:
+            # Create a record of sent emails for duplicate detection
+            for email_id in emails_to_delete:
+                # Store minimal info for duplicate detection
+                sent_record = SentEmailRecord(
+                    user_id=current_user.id,
+                    recipient_email=next(e.recipient_email for e in emails if e.id == email_id),
+                    sent_at=datetime.utcnow(),
+                    stage="outreach"
+                )
+                db.add(sent_record)
+            
+            # Delete the original outreach emails
+            db.query(GeneratedEmail).filter(
+                GeneratedEmail.id.in_(emails_to_delete)
+            ).delete(synchronize_session=False)
+            
+            db.commit()
+            logger.info(f"Deleted {len(emails_to_delete)} outreach emails after sending")
+            
+        except Exception as delete_error:
+            logger.error(f"Error deleting outreach emails: {str(delete_error)}")
+            # Don't fail the operation if deletion fails
     
     return {
         "success": True,
@@ -622,4 +734,3 @@ async def send_all_via_gmail(
         "total_count": len(emails),
         "errors": errors if errors else None
     } 
-
