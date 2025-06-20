@@ -90,6 +90,9 @@ export const emailService = {
   // Send all emails in a stage via Gmail
   sendAllViaGmail: (stage) => api.post(`/api/emails/send_all_via_gmail/${stage}`),
   
+  // Get email generation progress
+  getGenerationProgress: () => api.get('/api/emails/generation-progress'),
+  
   // Delete email
   deleteEmail: (emailId) => api.delete(`/api/emails/${emailId}`),
 };
