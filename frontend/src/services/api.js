@@ -31,14 +31,17 @@ api.interceptors.request.use(
       console.error('[API] Blocked non-HTTPS URL in request:', config.url);
       throw new Error('Blocked non-HTTPS API request');
     }
-    // Compose and log the full request URL
-    const requestUrl = config.url.startsWith('http')
+    // compose the URL exactly as you had
+    let requestUrl = config.url.startsWith('http')
       ? config.url
       : `${config.baseURL.replace(/\/$/, '')}/${config.url.replace(/^\//, '')}`;
-    if (!/^https:\/\//i.test(requestUrl)) {
+    
+    // ALLOW both https:// AND protocol-relative //…
+    if (!/^https:\/\//i.test(requestUrl) && !/^\/\//.test(requestUrl)) {
       console.error('[API] Blocked non-HTTPS full request:', requestUrl);
       throw new Error('Blocked non-HTTPS API request');
     }
+
     console.log('[API] Request:', requestUrl, 'Method:', config.method);
     return config;
   },
