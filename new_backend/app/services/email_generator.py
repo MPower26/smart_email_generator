@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from sqlalchemy import or_
 
-from app.models.models import GeneratedEmail, User, EmailTemplate
+from app.models.models import GeneratedEmail, User, EmailTemplate, SentEmailRecord
 
 # Azure OpenAI Configuration
 AZURE_OPENAI_API_KEY = "65f3a3cbcc54451d9ae6b8740303c648"
@@ -292,14 +292,27 @@ Best regards,
     ) -> List[GeneratedEmail]:
         generated_emails = []
         already_emailed = set()
+        
         # Build set of already emailed addresses for this user (and optionally friends)
         if avoid_duplicates:
+            # Check both GeneratedEmail and SentEmailRecord tables
             conditions = [GeneratedEmail.user_id == user.id]
             if dedupe_with_friends and friends_ids:
                 conditions.append(GeneratedEmail.user_id.in_(friends_ids))
+            
+            # Get emails from GeneratedEmail table
             query = self.db.query(GeneratedEmail.recipient_email).filter(or_(*conditions))
             emails = {r[0].lower() for r in query}
             already_emailed.update(emails)
+            
+            # Get emails from SentEmailRecord table
+            sent_conditions = [SentEmailRecord.user_id == user.id]
+            if dedupe_with_friends and friends_ids:
+                sent_conditions.append(SentEmailRecord.user_id.in_(friends_ids))
+            
+            sent_query = self.db.query(SentEmailRecord.recipient_email).filter(or_(*sent_conditions))
+            sent_emails = {r[0].lower() for r in sent_query}
+            already_emailed.update(sent_emails)
 
         for contact in csv_data:
             email_addr = contact.get("Email", "").lower()
@@ -314,7 +327,7 @@ Best regards,
                     already_emailed.add(email_addr)
             except Exception as e:
                 print(f"Error generating email for {email_addr}: {str(e)}")
-        return generated_emails 
+        return generated_emails
 
     def generate_followup_email(
         self,
