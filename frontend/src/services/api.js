@@ -77,11 +77,18 @@ export const emailService = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      timeout: 600000, // 10 minutes timeout
     });
   },
   
   // Update email status (mark as sent, etc.)
   updateEmailStatus: (emailId, data) => api.put(`/api/emails/${emailId}/status`, data),
+  
+  // Update email content (for editing)
+  updateEmailContent: (emailId, data) => api.put(`/api/emails/${emailId}/content`, data),
+  
+  // Send all emails in a stage via Gmail
+  sendAllViaGmail: (stage) => api.post(`/api/emails/send_all_via_gmail/${stage}`),
   
   // Delete email
   deleteEmail: (emailId) => api.delete(`/api/emails/${emailId}`),
@@ -144,4 +151,3 @@ export const friendService = {
 };
 
 export default api;
-
