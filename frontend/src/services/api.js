@@ -1,11 +1,8 @@
 import axios from 'axios';
 
-// Robustly get base URL (prefer env, fallback to HTTPS default)
 let API_BASE_URL = (
-  process.env.REACT_APP_API_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  'https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net'
-).replace(/^http:\/\//i, 'https://');
+  '//smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net'
+);
 
 // Log what base URL is being used at runtime
 console.log('[API] Using API_BASE_URL:', API_BASE_URL);
