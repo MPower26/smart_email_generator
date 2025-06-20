@@ -19,7 +19,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Create FastAPI app
-app = FastAPI(title="Smart Email Generator API")
+app = FastAPI(title="Smart Email Generator API", redirect_slashes=False)
 
 # Configure CORS
 app.add_middleware(
