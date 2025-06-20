@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Container, Row, Col, Card, Form, Button, Alert, Tabs, Tab, Badge, Spinner } from 'react-bootstrap';
+import { Container, Row, Col, Card, Form, Button, Alert, Tabs, Tab, Badge, Spinner, OverlayTrigger, Tooltip } from 'react-bootstrap';
 import FileUpload from '../components/FileUpload';
 import EmailPreview from '../components/EmailPreview';
 import { emailService, templateService } from '../services/api';
@@ -395,6 +395,22 @@ const GenerateEmailsPage = () => {
               <FileUpload onFileSelect={handleFileChange} acceptedTypes=".csv" />
 
               <h5 className="mt-4 mb-3">Generation Options</h5>
+              
+              {/* Template Reminder */}
+              <Alert variant="info" className="mb-3">
+                <i className="bi bi-info-circle me-2"></i>
+                <strong>Pro Tip:</strong> Before generating emails, make sure you have created templates for Initial Outreach, Follow-Up, and Last Chance stages. 
+                This will ensure your emails are personalized and consistent. 
+                <Button 
+                  variant="link" 
+                  className="p-0 ms-2" 
+                  onClick={handleAddTemplate}
+                  style={{ textDecoration: 'none' }}
+                >
+                  Create templates now →
+                </Button>
+              </Alert>
+              
               <Form>
                 <Form.Group className="mb-3">
                   <Form.Label>Email Stage</Form.Label>
@@ -465,13 +481,31 @@ const GenerateEmailsPage = () => {
                   </div>
                 </Form.Group>
 
-                <Form.Check
-                  type="checkbox"
-                  label="Avoid duplicates"
-                  checked={avoidDuplicates}
-                  onChange={e => setAvoidDuplicates(e.target.checked)}
-                  className="mb-3"
-                />
+                <Form.Group className="mb-3">
+                  <Form.Check
+                    type="checkbox"
+                    label={
+                      <span>
+                        Avoid duplicates
+                        <OverlayTrigger
+                          placement="top"
+                          overlay={
+                            <Tooltip id="avoid-duplicates-tooltip">
+                              <strong>Avoid Duplicates:</strong><br/>
+                              When enabled, the system will check if you've already sent emails to these contacts and skip them. 
+                              This prevents accidentally sending multiple emails to the same person.
+                            </Tooltip>
+                          }
+                        >
+                          <i className="bi bi-info-circle ms-2 text-muted" style={{ cursor: 'help' }}></i>
+                        </OverlayTrigger>
+                      </span>
+                    }
+                    checked={avoidDuplicates}
+                    onChange={e => setAvoidDuplicates(e.target.checked)}
+                    className="mb-3"
+                  />
+                </Form.Group>
 
                 {error && <Alert variant="danger">{error}</Alert>}
 
