@@ -2,6 +2,7 @@ from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime, T
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from ..db.database import Base
+from datetime import datetime
 
 # Association table for user friendships
 user_friendship = Table(
@@ -72,6 +73,9 @@ class User(Base):
         foreign_keys=[FriendRequest.to_user_id],
         backref="receiver"
     )
+
+    # New relationships
+    generation_progress = relationship("EmailGenerationProgress", back_populates="user")
 
 class VerificationCode(Base):
     __tablename__ = "verification_codes"
@@ -144,3 +148,22 @@ class SentEmailRecord(Base):
     
     # Relationship with user
     user = relationship("User")
+
+class EmailGenerationProgress(Base):
+    __tablename__ = "email_generation_progress"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    total_contacts = Column(Integer, nullable=False)
+    processed_contacts = Column(Integer, default=0)
+    generated_emails = Column(Integer, default=0)
+    status = Column(String, default="processing")  # processing, completed, error
+    stage = Column(String, nullable=False)  # outreach, followup, lastchance
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationship
+    user = relationship("User", back_populates="generation_progress")
+    
+    def __repr__(self):
+        return f"<EmailGenerationProgress(id={self.id}, user_id={self.user_id}, status={self.status})>"
