@@ -83,15 +83,28 @@ export const emailService = {
 
 // Template API
 export const templateService = {
-  getAllTemplates: () => api.get('/api/templates/'),
-  getTemplatesByCategory: () => api.get('/api/templates/by-category/'),
-  getTemplatesByCategoryFilter: (category) => api.get(`/api/templates/?category=${category}`),
-  getDefaultTemplate: (category) => api.get(`/api/templates/default/${category}/`),
-  getTemplate: (templateId) => api.get(`/api/templates/${templateId}/`),
-  createTemplate: (template) => api.post('/api/templates/', template),
-  updateTemplate: (templateId, template) => api.put(`/api/templates/${templateId}/`, template),
-  setDefaultTemplate: (templateId) => api.put(`/api/templates/${templateId}/set-default/`),
-  deleteTemplate: (templateId) => api.delete(`/api/templates/${templateId}/`),
+  getAllTemplates:        () => api.get('/api/templates'),
+  getTemplatesByCategory: () => api.get('/api/templates/by-category'),
+  getTemplatesByCategoryFilter: (category) =>
+    api.get(`/api/templates?category=${category}`),
+
+  getDefaultTemplate:     (category) =>
+    api.get(`/api/templates/default/${category}`),
+
+  getTemplate:            (templateId) =>
+    api.get(`/api/templates/${templateId}`),
+
+  createTemplate:         (template) =>
+    api.post('/api/templates', template),
+
+  updateTemplate:         (templateId, template) =>
+    api.put(`/api/templates/${templateId}`, template),
+
+  setDefaultTemplate:     (templateId) =>
+    api.put(`/api/templates/${templateId}/set-default`),
+
+  deleteTemplate:         (templateId) =>
+    api.delete(`/api/templates/${templateId}`)
 };
 
 // Service d'API pour les amis et le partage de cache
