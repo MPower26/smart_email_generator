@@ -307,12 +307,16 @@ async def generate_emails(
 
         email_generator = EmailGenerator(db)
         
+        # Track generation start time
+        generation_start_time = datetime.utcnow()
+        
         # Send progress update for generation start
+        logger.info(f"Sending generation start progress update for user {current_user.id}")
         await manager.send_progress(str(current_user.id), {
-            "type": "generation_progress",
-            "stage": "generating",
+            "type": "generation_start",
+            "total_contacts": len(contacts),
             "current": 0,
-            "total": len(contacts)
+            "stage": "generating"
         })
         
         generated_emails = []
@@ -329,12 +333,17 @@ async def generate_emails(
                 
                 # Send progress update every 5 emails or for the last email
                 if (i + 1) % 5 == 0 or i == len(contacts) - 1:
+                    elapsed_time = (datetime.utcnow() - generation_start_time).total_seconds()
+                    speed = (i + 1) / max(1, elapsed_time)
+                    
+                    logger.info(f"Sending generation progress update for user {current_user.id}: {i + 1}/{len(contacts)} emails generated")
                     await manager.send_progress(str(current_user.id), {
                         "type": "generation_progress",
                         "stage": "generating",
                         "current": i + 1,
                         "total": len(contacts),
-                        "speed": (i + 1) / max(1, (datetime.utcnow() - datetime.utcnow()).total_seconds())
+                        "generated_count": len(generated_emails),
+                        "speed": speed
                     })
                     
             except Exception as e:
@@ -342,6 +351,7 @@ async def generate_emails(
                 # Continue with next contact
         
         # Send completion progress update
+        logger.info(f"Sending generation complete progress update for user {current_user.id}")
         await manager.send_progress(str(current_user.id), {
             "type": "generation_complete",
             "total_generated": len(generated_emails),
