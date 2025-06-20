@@ -140,6 +140,7 @@ class EmailGenerator:
             5. Keep the same structure and flow as the original template
             6. If a company description is provided, use it to explain how your company's offerings align with the recipient's needs
             7. Do not use any markdown formatting (like ** or *) in the email content
+            8. Avoid using em dashes (—) - use regular dashes (-) or other appropriate punctuation instead
             """
         else:
             # Use hardcoded prompt as fallback
@@ -173,6 +174,7 @@ class EmailGenerator:
             5. Is concise and to the point (aim for 3-4 short paragraphs maximum)
             6. If a company description is provided, use it to explain how your company's offerings align with the recipient's needs
             7. Avoid unnecessary details and keep the message focused on value proposition
+            8. Avoid using em dashes (—) - use regular dashes (-) or other appropriate punctuation instead
             """
         
         try:
@@ -392,6 +394,7 @@ Best regards,
             7. Maintains a professional yet friendly tone
             8. Avoids being repetitive or aggressive
             9. If a company description is provided, use it to reinforce the value proposition
+            10. Avoid using em dashes (—) - use regular dashes (-) or other appropriate punctuation instead
             
             The follow-up should feel natural and add value, not just be a reminder.
             """
@@ -563,6 +566,7 @@ Best regards,
             7. Maintains dignity and professionalism
             8. Leaves the door open for future contact
             9. If a company description is provided, use it to reinforce the value proposition
+            10. Avoid using em dashes (—) - use regular dashes (-) or other appropriate punctuation instead
             
             This should feel like a final, respectful attempt to connect, not a desperate plea.
             """
