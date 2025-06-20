@@ -8,7 +8,7 @@ if (!/^https:\/\//i.test(API_BASE_URL) && !/^\/\//.test(API_BASE_URL)) {
 }
 
 // Log what base URL is being used at runtime
-console.log('[API] Using API_BASE_URL:', API_BASE_URL);
+console.log('[AP] Using API_BASE_URL:', API_BASE_URL);
 
 // Safety: Throw error if HTTPS is not enforced
 if (!/^https:\/\//i.test(API_BASE_URL)) {
