@@ -201,6 +201,42 @@ async def update_email_status(
         "stage": email.stage
     }
 
+@router.put("/{email_id}/content", response_model=Dict[str, Any])
+async def update_email_content(
+    email_id: int,
+    data: Dict[str, str] = Body(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update the content of an email"""
+    logger.info(f"Update email content request for email ID {email_id} by user {current_user.email}")
+    
+    email = db.query(GeneratedEmail).filter(
+        GeneratedEmail.id == email_id,
+        GeneratedEmail.user_id == current_user.id
+    ).first()
+    
+    if not email:
+        raise HTTPException(status_code=404, detail="Email not found")
+    
+    # Update content fields
+    if "subject" in data:
+        email.subject = data["subject"]
+    if "content" in data:
+        email.content = data["content"]
+        email.body = data["content"]  # Update legacy field too
+    
+    db.commit()
+    db.refresh(email)
+    
+    return {
+        "id": email.id,
+        "subject": email.subject,
+        "content": email.content,
+        "status": email.status,
+        "stage": email.stage
+    }
+
 @router.get("/templates", response_model=List[Dict[str, Any]])
 async def get_templates(
     current_user: User = Depends(get_current_user),
@@ -498,4 +534,82 @@ def send_via_gmail(email_id: int, db: Session = Depends(get_db), user: User = De
         db.commit()
         return {"success": True, "message": "Email sent and moved to follow-up queue"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e)) 
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/send_all_via_gmail/{stage}")
+async def send_all_via_gmail(
+    stage: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Send all emails in a specific stage via Gmail"""
+    logger.info(f"Send all emails request for stage '{stage}' by user {current_user.email}")
+    
+    if stage not in ["outreach", "followup", "lastchance"]:
+        raise HTTPException(status_code=400, detail="Invalid stage. Must be one of: outreach, followup, lastchance")
+    
+    # Get all emails for the user in the specified stage that haven't been sent yet
+    emails = db.query(GeneratedEmail).filter(
+        GeneratedEmail.user_id == current_user.id,
+        GeneratedEmail.stage == stage,
+        GeneratedEmail.status.in_(["draft", "outreach_pending", "followup_due"])
+    ).all()
+    
+    if not emails:
+        return {
+            "success": True, 
+            "message": f"No emails to send for {stage} stage",
+            "sent_count": 0,
+            "total_count": 0
+        }
+    
+    if not current_user.gmail_access_token:
+        raise HTTPException(status_code=400, detail="Gmail not connected. Please connect your Gmail account first.")
+    
+    sent_count = 0
+    failed_count = 0
+    errors = []
+    
+    for email in emails:
+        try:
+            # Send via Gmail
+            send_gmail_email(current_user, email.recipient_email, email.subject, email.content)
+            
+            # Update email status
+            email.status = "followup_due"
+            email.sent_at = datetime.utcnow()
+            
+            # Set followup timestamps based on user's interval settings
+            now = datetime.utcnow()
+            followup_days = current_user.followup_interval_days or 3
+            lastchance_days = current_user.lastchance_interval_days or 6
+            
+            email.followup_due_at = now + timedelta(days=followup_days)
+            email.lastchance_due_at = now + timedelta(days=lastchance_days)
+            
+            # Generate follow-up email automatically
+            try:
+                email_generator = EmailGenerator(db)
+                followup_email = email_generator.generate_followup_email(email, current_user)
+                logger.info(f"Generated follow-up email ID {followup_email.id} for original email ID {email.id}")
+            except Exception as followup_error:
+                logger.error(f"Failed to generate follow-up email: {str(followup_error)}")
+            
+            sent_count += 1
+            
+        except Exception as e:
+            logger.error(f"Failed to send email {email.id}: {str(e)}")
+            failed_count += 1
+            errors.append(f"Email to {email.recipient_email}: {str(e)}")
+    
+    # Commit all changes
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": f"Sent {sent_count} emails successfully",
+        "sent_count": sent_count,
+        "failed_count": failed_count,
+        "total_count": len(emails),
+        "errors": errors if errors else None
+    } 
