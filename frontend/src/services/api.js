@@ -1,13 +1,19 @@
 import axios from 'axios';
 
-let API_BASE_URL = '//smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net';
+// Robustly get base URL (prefer env, fallback to HTTPS default)
+let API_BASE_URL = (
+  process.env.REACT_APP_API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  'https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net'
+).replace(/^http:\/\//i, 'https://');
 
-// Force it into https:// form
-if (API_BASE_URL.startsWith('//')) {
-  API_BASE_URL = 'https:' + API_BASE_URL;
-}
-
+// Log what base URL is being used at runtime
 console.log('[API] Using API_BASE_URL:', API_BASE_URL);
+
+// Safety: Throw error if HTTPS is not enforced
+if (!/^https:\/\//i.test(API_BASE_URL)) {
+  throw new Error(`[API] Refusing to run: API_BASE_URL is not HTTPS! Value: ${API_BASE_URL}`);
+}
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -31,17 +37,14 @@ api.interceptors.request.use(
       console.error('[API] Blocked non-HTTPS URL in request:', config.url);
       throw new Error('Blocked non-HTTPS API request');
     }
-    // compose the URL exactly as you had
-    let requestUrl = config.url.startsWith('http')
+    // Compose and log the full request URL
+    const requestUrl = config.url.startsWith('http')
       ? config.url
       : `${config.baseURL.replace(/\/$/, '')}/${config.url.replace(/^\//, '')}`;
-    
-    // ALLOW both https:// AND protocol-relative //…
-    if (!/^https:\/\//i.test(requestUrl) && !/^\/\//.test(requestUrl)) {
+    if (!/^https:\/\//i.test(requestUrl)) {
       console.error('[API] Blocked non-HTTPS full request:', requestUrl);
       throw new Error('Blocked non-HTTPS API request');
     }
-
     console.log('[API] Request:', requestUrl, 'Method:', config.method);
     return config;
   },
@@ -65,6 +68,9 @@ export const emailService = {
   // Get templates by category
   getTemplatesByCategory: (category) => api.get(`/api/templates?category=${category}`),
   
+  // Get emails by stage (consolidated method)
+  getEmailsByStage: (stage) => api.get(`/api/emails/by-stage/${stage}/`),
+  
   // Generate emails
   generateEmails: (formData) => {
     return api.post('/api/emails/generate', formData, {
@@ -83,28 +89,15 @@ export const emailService = {
 
 // Template API
 export const templateService = {
-  getAllTemplates:        () => api.get('/api/templates'),
-  getTemplatesByCategory: () => api.get('/api/templates/by-category'),
-  getTemplatesByCategoryFilter: (category) =>
-    api.get(`/api/templates?category=${category}`),
-
-  getDefaultTemplate:     (category) =>
-    api.get(`/api/templates/default/${category}`),
-
-  getTemplate:            (templateId) =>
-    api.get(`/api/templates/${templateId}`),
-
-  createTemplate:         (template) =>
-    api.post('/api/templates', template),
-
-  updateTemplate:         (templateId, template) =>
-    api.put(`/api/templates/${templateId}`, template),
-
-  setDefaultTemplate:     (templateId) =>
-    api.put(`/api/templates/${templateId}/set-default`),
-
-  deleteTemplate:         (templateId) =>
-    api.delete(`/api/templates/${templateId}`)
+  getAllTemplates: () => api.get('/api/templates/'),
+  getTemplatesByCategory: () => api.get('/api/templates/by-category/'),
+  getTemplatesByCategoryFilter: (category) => api.get(`/api/templates/?category=${category}`),
+  getDefaultTemplate: (category) => api.get(`/api/templates/default/${category}/`),
+  getTemplate: (templateId) => api.get(`/api/templates/${templateId}/`),
+  createTemplate: (template) => api.post('/api/templates/', template),
+  updateTemplate: (templateId, template) => api.put(`/api/templates/${templateId}/`, template),
+  setDefaultTemplate: (templateId) => api.put(`/api/templates/${templateId}/set-default/`),
+  deleteTemplate: (templateId) => api.delete(`/api/templates/${templateId}/`),
 };
 
 // Service d'API pour les amis et le partage de cache
