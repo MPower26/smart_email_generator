@@ -83,41 +83,97 @@ class EmailGenerator:
     ) -> GeneratedEmail:
         """Generate a personalized email using Azure OpenAI API"""
         
+        # If no template provided, try to get the default template for this stage
+        if not template:
+            template = self.db.query(EmailTemplate).filter(
+                EmailTemplate.user_id == user.id,
+                EmailTemplate.category == stage,
+                EmailTemplate.is_default == True
+            ).first()
+        
         # Extract information from company website
         website_info = self.extract_website_info(contact_data.get("Website", ""))
         
         # Build context for OpenAI API
-        prompt = f"""
-        Create a personalized outreach email in English for:
-        
-        First Name: {contact_data.get('First Name', '')}
-        Last Name: {contact_data.get('Last Name', '')}
-        Title: {contact_data.get('Title', '')}
-        Company: {contact_data.get('Company', '')}
-        Industry: {contact_data.get('Industry', '')}
-        Keywords: {contact_data.get('Keywords', '')}
-        SEO Description: {contact_data.get('SEO Description', '')}
-        
-        Company Information:
-        {website_info}
-        
-        Sender Information:
-        Name: [Your Name]
-        Position: [Your Position]
-        Company: [Your Company]
-        Company Description: {user.company_description if user.company_description else "[brief description of company]"}
-        
-        Stage: {stage}
-        
-        Please generate a professional, personalized email that:
-        1. References specific details about the recipient's company
-        2. Demonstrates understanding of their industry
-        3. Maintains a professional yet engaging tone
-        4. Includes a clear call to action
-        5. Is concise and to the point (aim for 3-4 short paragraphs maximum)
-        6. If a company description is provided, use it to explain how your company's offerings align with the recipient's needs
-        7. Avoid unnecessary details and keep the message focused on value proposition
-        """
+        if template:
+            # Use template as a prompt for ChatGPT
+            template_content = template.content
+            
+            # Replace placeholders in template with actual data for the prompt
+            template_content = template_content.replace("[Recipient Name]", contact_data.get('First Name', '') + ' ' + contact_data.get('Last Name', ''))
+            template_content = template_content.replace("[Company Name]", contact_data.get('Company', ''))
+            template_content = template_content.replace("[Your Name]", user.full_name if user.full_name else "[Your Name]")
+            template_content = template_content.replace("[Your Position]", user.position if user.position else "[Your Position]")
+            template_content = template_content.replace("[Your Company]", user.company_name if user.company_name else "[Your Company]")
+            
+            prompt = f"""
+            Rewrite this email template in the same style without syntax or grammatical mistakes, using the web scraping knowledge and names in the list given to you. Personalize it based on the recipient's information and company details.
+            
+            Template to rewrite:
+            {template_content}
+            
+            Recipient Information:
+            First Name: {contact_data.get('First Name', '')}
+            Last Name: {contact_data.get('Last Name', '')}
+            Title: {contact_data.get('Title', '')}
+            Company: {contact_data.get('Company', '')}
+            Industry: {contact_data.get('Industry', '')}
+            Keywords: {contact_data.get('Keywords', '')}
+            SEO Description: {contact_data.get('SEO Description', '')}
+            
+            Company Information from Web Scraping:
+            {website_info}
+            
+            Sender Information:
+            Name: {user.full_name if user.full_name else "[Your Name]"}
+            Position: {user.position if user.position else "[Your Position]"}
+            Company: {user.company_name if user.company_name else "[Your Company]"}
+            Company Description: {user.company_description if user.company_description else "[brief description of company]"}
+            
+            Stage: {stage}
+            
+            Please:
+            1. Maintain the same tone and style as the template
+            2. Personalize it with the recipient's specific information
+            3. Incorporate relevant details from the web scraping
+            4. Ensure proper grammar and syntax
+            5. Keep the same structure and flow as the original template
+            6. If a company description is provided, use it to explain how your company's offerings align with the recipient's needs
+            7. Do not use any markdown formatting (like ** or *) in the email content
+            """
+        else:
+            # Use hardcoded prompt as fallback
+            prompt = f"""
+            Create a personalized outreach email in English for:
+            
+            First Name: {contact_data.get('First Name', '')}
+            Last Name: {contact_data.get('Last Name', '')}
+            Title: {contact_data.get('Title', '')}
+            Company: {contact_data.get('Company', '')}
+            Industry: {contact_data.get('Industry', '')}
+            Keywords: {contact_data.get('Keywords', '')}
+            SEO Description: {contact_data.get('SEO Description', '')}
+            
+            Company Information:
+            {website_info}
+            
+            Sender Information:
+            Name: [Your Name]
+            Position: [Your Position]
+            Company: [Your Company]
+            Company Description: {user.company_description if user.company_description else "[brief description of company]"}
+            
+            Stage: {stage}
+            
+            Please generate a professional, personalized email that:
+            1. References specific details about the recipient's company
+            2. Demonstrates understanding of their industry
+            3. Maintains a professional yet engaging tone
+            4. Includes a clear call to action
+            5. Is concise and to the point (aim for 3-4 short paragraphs maximum)
+            6. If a company description is provided, use it to explain how your company's offerings align with the recipient's needs
+            7. Avoid unnecessary details and keep the message focused on value proposition
+            """
         
         try:
             response = self.client.chat.completions.create(
