@@ -140,14 +140,22 @@ async def health_check():
 @app.websocket("/ws/progress/{user_id}")
 async def websocket_progress(websocket: WebSocket, user_id: str):
     """WebSocket endpoint for real-time progress tracking"""
-    await manager.connect(websocket, user_id)
+    logger.info(f"WebSocket connection attempt for user: {user_id}")
     try:
+        await manager.connect(websocket, user_id)
+        logger.info(f"WebSocket connected successfully for user: {user_id}")
+        
         while True:
             # Keep connection alive
             data = await websocket.receive_text()
+            logger.debug(f"Received WebSocket message from {user_id}: {data}")
             # Echo back to confirm connection
             await websocket.send_text(json.dumps({"type": "ping", "message": "connected"}))
     except WebSocketDisconnect:
+        logger.info(f"WebSocket disconnected for user: {user_id}")
+        manager.disconnect(websocket, user_id)
+    except Exception as e:
+        logger.error(f"WebSocket error for user {user_id}: {str(e)}")
         manager.disconnect(websocket, user_id)
 
 @app.post("/scheduled/followup-check")
