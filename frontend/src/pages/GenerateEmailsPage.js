@@ -227,10 +227,24 @@ const GenerateEmailsPage = () => {
             ...prev,
             status: 'error'
           }));
+          setError(`Email generation failed: ${progress.error || 'Unknown error'}`);
+          stopProgressPolling();
+        } else if (progress.status === 'idle') {
+          // No active generation, stop polling
           stopProgressPolling();
         }
       } catch (error) {
         console.error('Error polling progress:', error);
+        
+        // If we get a 500 error, it might be a temporary database issue
+        if (error.response?.status === 500) {
+          console.log('Database error during progress polling, will retry...');
+          // Don't stop polling for 500 errors, just log and continue
+        } else {
+          // For other errors, stop polling and show error
+          setError(`Progress tracking error: ${error.message}`);
+          stopProgressPolling();
+        }
       }
     }, 2000); // Poll every 2 seconds
     
