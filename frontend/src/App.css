@@ -372,3 +372,16 @@ body {
 .modal-header, .modal-footer {
   border-color: #333333;
 } 
+
+/* Only on the TemplatesPage */
+.templates-page .card {
+  /* keep your grey background, but force all card text white */
+  color: var(--light-color) !important;
+}
+
+/* Ensure even “muted” and small text turn white */
+.templates-page .card .text-muted,
+.templates-page .card small,
+.templates-page .card .badge {
+  color: var(--light-color) !important;
+}
