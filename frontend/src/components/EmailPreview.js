@@ -66,6 +66,14 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
   const [editedSubject, setEditedSubject] = useState(email.subject || '');
   const [editedContent, setEditedContent] = useState(email.body || email.content || '');
   const [showEditModal, setShowEditModal] = useState(false);
+  
+  // Progress tracking for individual email sending
+  const [sendingProgress, setSendingProgress] = useState({
+    current: 0,
+    total: 1,
+    startTime: null,
+    status: 'idle'
+  });
 
   // This effect will collapse emails when tab changes
   useEffect(() => {
@@ -157,7 +165,25 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
     }
 
     setIsSending(true);
+    
+    // Start progress tracking
+    const startTime = Date.now();
+    setSendingProgress({
+      current: 0,
+      total: 1,
+      startTime: startTime,
+      status: 'processing'
+    });
+
     try {
+      // Simulate progress (since we can't track actual Gmail API progress)
+      const progressInterval = setInterval(() => {
+        setSendingProgress(prev => ({
+          ...prev,
+          current: Math.min(prev.current + 0.2, 1)
+        }));
+      }, 200);
+
       const response = await fetch(`${BACKEND_URL}/api/emails/send_via_gmail?email_id=${email.id}`, {
         method: 'POST',
         headers: {
@@ -165,6 +191,10 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
           'Authorization': `Bearer ${userProfile.email}`
         }
       });
+
+      // Complete progress
+      clearInterval(progressInterval);
+      setSendingProgress(prev => ({ ...prev, current: 1, status: 'completed' }));
 
       if (response.ok) {
         const result = await response.json();
@@ -184,8 +214,21 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
       console.error('Error sending via Gmail:', error);
       setError(error.message || 'Failed to send email via Gmail. Please try again.');
       setTimeout(() => setError(null), 5000);
+      
+      // Mark progress as error
+      setSendingProgress(prev => ({ ...prev, status: 'error' }));
     } finally {
       setIsSending(false);
+      
+      // Reset progress after a delay
+      setTimeout(() => {
+        setSendingProgress({
+          current: 0,
+          total: 1,
+          startTime: null,
+          status: 'idle'
+        });
+      }, 2000);
     }
   };
 
@@ -465,23 +508,35 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
 
                 {/* Primary action: Gmail if connected, Connect Gmail if not */}
                 {userProfile?.gmail_access_token ? (
-                  <Button 
-                    variant="primary" 
-                    size="sm"
-                    className="me-2"
-                    onClick={handleSendViaGmail}
-                    disabled={isSending}
-                    title="Send via Gmail API"
-                  >
-                    {isSending ? (
-                      <>
-                        <Spinner animation="border" size="sm" className="me-1" />
-                        Sending...
-                      </>
-                    ) : (
-                      'Send via Gmail'
+                  <div className="d-inline-block me-2">
+                    <Button 
+                      variant="primary" 
+                      size="sm"
+                      onClick={handleSendViaGmail}
+                      disabled={isSending}
+                      title="Send via Gmail API"
+                    >
+                      {isSending ? (
+                        <>
+                          <Spinner animation="border" size="sm" className="me-1" />
+                          Sending...
+                        </>
+                      ) : (
+                        'Send via Gmail'
+                      )}
+                    </Button>
+                    {sendingProgress.status === 'processing' && (
+                      <div className="mt-1">
+                        <div className="progress" style={{ height: '2px', width: '100px' }}>
+                          <div 
+                            className="progress-bar bg-success" 
+                            style={{ width: `${(sendingProgress.current / sendingProgress.total) * 100}%` }}
+                          ></div>
+                        </div>
+                        <small className="text-muted">Sending...</small>
+                      </div>
                     )}
-                  </Button>
+                  </div>
                 ) : (
                   <Button 
                     variant="primary" 
