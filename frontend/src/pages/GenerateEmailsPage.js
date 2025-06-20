@@ -89,72 +89,36 @@ const GenerateEmailsPage = () => {
       
       // Fetch outreach emails and filter out outreach_sent (they belong in Follow-Up)
       try {
-        const response = await fetch('https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net/api/emails/by-stage/outreach', {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${userEmail}`
-          },
-          credentials: 'include'
-        });
+        const response = await emailService.getEmailsByStage('outreach');
+        console.log('Outreach data:', response.data);
+        // Filter out outreach_sent emails - they belong in Follow-Up
+        const filteredOutreachEmails = response.data.filter(email => email.status !== 'outreach_sent');
+        setOutreachEmails(filteredOutreachEmails);
         
-        if (response.ok) {
-          const data = await response.json();
-          console.log('Outreach data:', data);
-          // Filter out outreach_sent emails - they belong in Follow-Up
-          const filteredOutreachEmails = data.filter(email => email.status !== 'outreach_sent');
-          setOutreachEmails(filteredOutreachEmails);
-          
-          // Store outreach_sent emails to add to Follow-Up
-          outreachSentEmails = data.filter(email => email.status === 'outreach_sent' && email.followup_due_at);
-        } else {
-          console.error('Failed to fetch outreach emails:', response.status);
-        }
+        // Store outreach_sent emails to add to Follow-Up
+        outreachSentEmails = response.data.filter(email => email.status === 'outreach_sent' && email.followup_due_at);
       } catch (err) {
         console.error('Error fetching outreach emails:', err);
       }
       
       // Fetch follow-up emails and combine with outreach_sent emails
       try {
-        const response = await fetch('https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net/api/emails/by-stage/followup', {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${userEmail}`
-          },
-          credentials: 'include'
-        });
+        const response = await emailService.getEmailsByStage('followup');
+        console.log('Follow-up data:', response.data);
+        console.log('Outreach_sent emails to add:', outreachSentEmails);
         
-        if (response.ok) {
-          const data = await response.json();
-          console.log('Follow-up data:', data);
-          console.log('Outreach_sent emails to add:', outreachSentEmails);
-          
-          // Combine followup emails with outreach_sent emails that have followup_due_at
-          const combinedFollowupEmails = [...data, ...outreachSentEmails];
-          setFollowupEmails(combinedFollowupEmails);
-        } else {
-          console.error('Failed to fetch follow-up emails:', response.status);
-        }
+        // Combine followup emails with outreach_sent emails that have followup_due_at
+        const combinedFollowupEmails = [...response.data, ...outreachSentEmails];
+        setFollowupEmails(combinedFollowupEmails);
       } catch (err) {
         console.error('Error fetching follow-up emails:', err);
       }
       
       // Fetch last chance emails
       try {
-        const response = await fetch('https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net/api/emails/by-stage/lastchance', {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${userEmail}`
-          },
-          credentials: 'include'
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          console.log('Last chance data:', data);
-          setLastChanceEmails(data);
-        } else {
-          console.error('Failed to fetch last chance emails:', response.status);
-        }
+        const response = await emailService.getEmailsByStage('lastchance');
+        console.log('Last chance data:', response.data);
+        setLastChanceEmails(response.data);
       } catch (err) {
         console.error('Error fetching last chance emails:', err);
       }
@@ -355,7 +319,7 @@ const GenerateEmailsPage = () => {
   };
 
   return (
-    <Container>
+    <Container className="templates-page">
       <h1 className="mb-4">Email Campaign Manager</h1>
 
       <Tabs
