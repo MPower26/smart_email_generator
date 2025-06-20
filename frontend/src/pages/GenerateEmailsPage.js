@@ -5,7 +5,6 @@ import EmailPreview from '../components/EmailPreview';
 import ProgressTracker from '../components/ProgressTracker';
 import { emailService, templateService } from '../services/api';
 import { UserContext } from '../contexts/UserContext';
-import WebSocketService from '../services/websocket';
 
 const GenerateEmailsPage = () => {
   const { userProfile } = useContext(UserContext);
@@ -53,6 +52,9 @@ const GenerateEmailsPage = () => {
     speed: 0,
     status: 'idle'
   });
+
+  // Polling for progress updates
+  const [progressPolling, setProgressPolling] = useState(null);
 
   // Track which tab's emails should be collapsed
   const isTabCollapsed = (tabName) => {
@@ -185,60 +187,6 @@ const GenerateEmailsPage = () => {
   useEffect(() => {
     loadTemplates();
     loadEmailsByStage();
-
-    // Connect to WebSocket for real-time progress updates
-    if (userProfile?.email) {
-      WebSocketService.connect(userProfile.email);
-      WebSocketService.onProgress(handleProgressUpdate);
-    }
-
-    // Add event listener for email updates from friend sharing
-    const handleEmailsUpdated = (event) => {
-      const updatedEmails = event.detail;
-      
-      // Update each email in the appropriate list
-      updatedEmails.forEach(updatedEmail => {
-        switch (updatedEmail.stage) {
-          case 'outreach':
-            setOutreachEmails(prevEmails => {
-              const newEmails = [...prevEmails];
-              const index = newEmails.findIndex(e => e.id === updatedEmail.id);
-              if (index !== -1) {
-                newEmails[index] = updatedEmail;
-              }
-              return newEmails;
-            });
-            break;
-          case 'followup':
-            setFollowupEmails(prevEmails => {
-              const newEmails = [...prevEmails];
-              const index = newEmails.findIndex(e => e.id === updatedEmail.id);
-              if (index !== -1) {
-                newEmails[index] = updatedEmail;
-              }
-              return newEmails;
-            });
-            break;
-          case 'lastchance':
-            setLastChanceEmails(prevEmails => {
-              const newEmails = [...prevEmails];
-              const index = newEmails.findIndex(e => e.id === updatedEmail.id);
-              if (index !== -1) {
-                newEmails[index] = updatedEmail;
-              }
-              return newEmails;
-            });
-            break;
-        }
-      });
-    };
-
-    window.addEventListener('emailsUpdated', handleEmailsUpdated);
-
-    return () => {
-      window.removeEventListener('emailsUpdated', handleEmailsUpdated);
-      WebSocketService.disconnect();
-    };
   }, [userProfile]);
 
   // Debug user profile
@@ -249,86 +197,60 @@ const GenerateEmailsPage = () => {
     console.log('Profile in localStorage:', storedProfile ? JSON.parse(storedProfile) : null);
   }, [userProfile]);
 
-  // Handle real-time progress updates from WebSocket
-  const handleProgressUpdate = (data) => {
-    console.log('Progress update received:', data);
+  // Start polling for progress updates
+  const startProgressPolling = () => {
+    const interval = setInterval(async () => {
+      try {
+        const response = await emailService.getGenerationProgress();
+        const progress = response.data;
+        
+        if (progress.status === 'processing') {
+          setGenerationProgress({
+            type: 'generation',
+            current: progress.processed_contacts,
+            total: progress.total_contacts,
+            startTime: Date.now() - 1000, // Approximate start time
+            speed: progress.processed_contacts / Math.max(1, (Date.now() - (Date.now() - 1000)) / 1000),
+            status: 'processing'
+          });
+        } else if (progress.status === 'completed') {
+          setGenerationProgress(prev => ({
+            ...prev,
+            current: progress.generated_emails,
+            status: 'completed'
+          }));
+          stopProgressPolling();
+          // Reload emails after completion
+          loadEmailsByStage();
+        } else if (progress.status === 'error') {
+          setGenerationProgress(prev => ({
+            ...prev,
+            status: 'error'
+          }));
+          stopProgressPolling();
+        }
+      } catch (error) {
+        console.error('Error polling progress:', error);
+      }
+    }, 2000); // Poll every 2 seconds
     
-    switch (data.type) {
-      case 'generation_start':
-        setGenerationProgress({
-          type: 'generation',
-          current: 0,
-          total: data.total_contacts,
-          startTime: Date.now(),
-          speed: 0,
-          status: 'processing'
-        });
-        break;
-        
-      case 'generation_progress':
-        setGenerationProgress(prev => ({
-          ...prev,
-          current: data.current,
-          total: data.total,
-          speed: data.speed || 0,
-          status: 'processing'
-        }));
-        break;
-        
-      case 'generation_complete':
-        setGenerationProgress(prev => ({
-          ...prev,
-          current: data.total_generated,
-          status: 'completed'
-        }));
-        break;
-        
-      case 'generation_error':
-        setGenerationProgress(prev => ({
-          ...prev,
-          status: 'error'
-        }));
-        setError(data.error);
-        break;
-        
-      case 'sending_start':
-        setSendingProgress({
-          type: 'sending',
-          current: 0,
-          total: data.total_emails,
-          startTime: Date.now(),
-          speed: 0,
-          status: 'processing'
-        });
-        break;
-        
-      case 'sending_progress':
-        setSendingProgress(prev => ({
-          ...prev,
-          current: data.current,
-          total: data.total,
-          speed: data.current / Math.max(1, (Date.now() - prev.startTime) / 1000),
-          status: 'processing'
-        }));
-        break;
-        
-      case 'sending_complete':
-        setSendingProgress(prev => ({
-          ...prev,
-          current: data.total_sent,
-          status: 'completed'
-        }));
-        break;
-        
-      case 'sending_error':
-        setSendingProgress(prev => ({
-          ...prev,
-          status: 'error'
-        }));
-        setError(`Failed to send email to ${data.recipient}: ${data.error}`);
-        break;
+    setProgressPolling(interval);
+  };
+
+  // Stop polling for progress updates
+  const stopProgressPolling = () => {
+    if (progressPolling) {
+      clearInterval(progressPolling);
+      setProgressPolling(null);
     }
   };
+
+  // Cleanup polling on component unmount
+  useEffect(() => {
+    return () => {
+      stopProgressPolling();
+    };
+  }, []);
 
   // Generate emails
   const handleGenerateEmails = async () => {
@@ -426,12 +348,10 @@ const GenerateEmailsPage = () => {
       // Complete upload progress
       setUploadProgress(prev => ({ ...prev, status: 'completed' }));
       
-      // Generation progress is now handled by WebSocket updates
+      // Start polling for generation progress
+      startProgressPolling();
       
       if (response.data && response.data.emails) {
-        // Reload emails after generation is complete
-        await loadEmailsByStage();
-        
         // Switch to appropriate tab based on the stage of generated emails
         setActiveTab(emailStage);
       } else {
@@ -734,40 +654,6 @@ const GenerateEmailsPage = () => {
                     disabled={loading || !file}
                   >
                     {loading ? 'Generating...' : 'Generate Emails'}
-                  </Button>
-                  
-                  {/* Test button for WebSocket debugging */}
-                  <Button
-                    variant="outline-secondary"
-                    size="sm"
-                    className="mt-2"
-                    onClick={async () => {
-                      console.log('Testing WebSocket connection...');
-                      try {
-                        // Test the simple WebSocket endpoint
-                        const testResult = await WebSocketService.testConnection();
-                        console.log('WebSocket test successful:', testResult);
-                        alert('WebSocket connection test successful! Check console for details.');
-                        
-                        // Also test the progress WebSocket
-                        WebSocketService.sendMessage({
-                          type: 'test',
-                          message: 'Testing WebSocket connection'
-                        });
-                        
-                        // Simulate a progress update for testing
-                        handleProgressUpdate({
-                          type: 'generation_start',
-                          total_contacts: 100,
-                          current: 0
-                        });
-                      } catch (error) {
-                        console.error('WebSocket test failed:', error);
-                        alert(`WebSocket connection test failed: ${error.message}`);
-                      }
-                    }}
-                  >
-                    Test WebSocket Connection
                   </Button>
                 </div>
               </Form>
