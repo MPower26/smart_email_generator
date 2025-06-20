@@ -598,15 +598,22 @@ async def send_all_via_gmail(
 ):
     """Send all emails in a specific stage via Gmail"""
     logger.info(f"Send all emails request for stage '{stage}' by user {current_user.email}")
-    
+
     if stage not in ["outreach", "followup", "lastchance"]:
         raise HTTPException(status_code=400, detail="Invalid stage. Must be one of: outreach, followup, lastchance")
-    
+
+    # Define which statuses are considered 'sendable' for each stage
+    sendable_statuses = ["draft", "outreach_pending"]
+    if stage == "followup":
+        sendable_statuses.append("followup_due")
+    elif stage == "lastchance":
+        sendable_statuses.append("lastchance_due")
+
     # Get all emails for the user in the specified stage that haven't been sent yet
     emails = db.query(GeneratedEmail).filter(
         GeneratedEmail.user_id == current_user.id,
         GeneratedEmail.stage == stage,
-        GeneratedEmail.status.in_(["draft", "outreach_pending", "followup_due"])
+        GeneratedEmail.status.in_(sendable_statuses)
     ).all()
     
     if not emails:
@@ -623,8 +630,9 @@ async def send_all_via_gmail(
     sent_count = 0
     failed_count = 0
     errors = []
-    emails_to_delete = []  # Track outreach emails to delete
-    
+    emails_to_delete = []  # Track emails to delete after they are processed
+    email_generator = EmailGenerator(db)
+
     # Send initial progress update
     await manager.send_progress(str(current_user.id), {
         "type": "sending_start",
@@ -638,31 +646,44 @@ async def send_all_via_gmail(
             # Send via Gmail
             send_gmail_email(current_user, email.recipient_email, email.subject, email.content)
             
-            # Update email status
-            email.status = "followup_due"
-            email.sent_at = datetime.utcnow()
-            
-            # Set followup timestamps based on user's interval settings
-            now = datetime.utcnow()
-            followup_days = current_user.followup_interval_days or 3
-            lastchance_days = current_user.lastchance_interval_days or 6
-            
-            email.followup_due_at = now + timedelta(days=followup_days)
-            email.lastchance_due_at = now + timedelta(days=lastchance_days)
-            
-            # Generate follow-up email automatically
-            try:
-                email_generator = EmailGenerator(db)
-                followup_email = email_generator.generate_followup_email(email, current_user)
-                logger.info(f"Generated follow-up email ID {followup_email.id} for original email ID {email.id}")
-            except Exception as followup_error:
-                logger.error(f"Failed to generate follow-up email: {str(followup_error)}")
-            
-            sent_count += 1
-            
-            # Mark outreach emails for deletion (they'll be moved to followup stage)
+            # --- STAGE-SPECIFIC LOGIC ---
             if stage == "outreach":
-                emails_to_delete.append(email.id)
+                email.status = "followup_due"
+                email.sent_at = datetime.utcnow()
+                
+                # Set followup timestamps
+                now = datetime.utcnow()
+                followup_days = current_user.followup_interval_days or 3
+                lastchance_days = current_user.lastchance_interval_days or 6
+                email.followup_due_at = now + timedelta(days=followup_days)
+                email.lastchance_due_at = now + timedelta(days=lastchance_days)
+                
+                # Generate a follow-up email automatically
+                try:
+                    email_generator.generate_followup_email(email, current_user)
+                    logger.info(f"Generated follow-up email for original email ID {email.id}")
+                except Exception as followup_error:
+                    logger.error(f"Failed to generate follow-up email: {str(followup_error)}")
+                
+            elif stage == "followup":
+                email.status = "lastchance_due"
+                email.sent_at = datetime.utcnow()
+                
+                # Generate a last chance email automatically
+                try:
+                    email_generator.generate_lastchance_email(email, current_user)
+                    logger.info(f"Generated last chance email for original email ID {email.id}")
+                except Exception as lastchance_error:
+                    logger.error(f"Failed to generate last chance email: {str(lastchance_error)}")
+
+            elif stage == "lastchance":
+                email.status = "completed"
+                email.sent_at = datetime.utcnow()
+                # This is the final email, no new email is generated.
+
+            # Mark the processed email for deletion
+            emails_to_delete.append(email)
+            sent_count += 1
             
             # Send progress update
             await manager.send_progress(str(current_user.id), {
@@ -688,7 +709,7 @@ async def send_all_via_gmail(
                 "recipient": email.recipient_email
             })
     
-    # Commit all changes first
+    # Commit status changes for sent emails
     db.commit()
     
     # Send completion progress update
@@ -700,31 +721,34 @@ async def send_all_via_gmail(
         "stage": stage
     })
     
-    # Delete outreach emails after successful sending (they're now in followup stage)
-    if stage == "outreach" and emails_to_delete:
+    # Create sent records and delete the old emails
+    if emails_to_delete:
         try:
-            # Create a record of sent emails for duplicate detection
-            for email_id in emails_to_delete:
-                # Store minimal info for duplicate detection
+            email_ids_to_delete = []
+            for sent_email in emails_to_delete:
+                # Create a record of the sent email for duplicate detection
                 sent_record = SentEmailRecord(
                     user_id=current_user.id,
-                    recipient_email=next(e.recipient_email for e in emails if e.id == email_id),
-                    sent_at=datetime.utcnow(),
-                    stage="outreach"
+                    recipient_email=sent_email.recipient_email,
+                    sent_at=sent_email.sent_at or datetime.utcnow(),
+                    stage=sent_email.stage
                 )
                 db.add(sent_record)
+                email_ids_to_delete.append(sent_email.id)
             
-            # Delete the original outreach emails
+            db.commit() # Commit the new sent records
+            
+            # Delete the original emails
             db.query(GeneratedEmail).filter(
-                GeneratedEmail.id.in_(emails_to_delete)
+                GeneratedEmail.id.in_(email_ids_to_delete)
             ).delete(synchronize_session=False)
             
             db.commit()
-            logger.info(f"Deleted {len(emails_to_delete)} outreach emails after sending")
+            logger.info(f"Deleted {len(email_ids_to_delete)} emails from stage '{stage}' after sending and recording")
             
         except Exception as delete_error:
-            logger.error(f"Error deleting outreach emails: {str(delete_error)}")
-            # Don't fail the operation if deletion fails
+            logger.error(f"Error during post-send cleanup for stage '{stage}': {str(delete_error)}")
+            # Don't fail the operation if deletion fails; the main task is done.
     
     return {
         "success": True,
