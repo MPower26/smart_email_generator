@@ -11,22 +11,13 @@ class WebSocketService {
   connect(userId) {
     this.userId = userId;
     
-    // Get the base URL and ensure it's properly formatted for WebSocket
-    let baseUrl = process.env.REACT_APP_BACKEND_URL || 
-                  'https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net';
+    // Use a simple, direct WebSocket URL
+    const wsUrl = 'wss://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net/ws/progress/' + encodeURIComponent(userId);
     
-    // Convert to WebSocket URL
-    let wsUrl = baseUrl.replace('https://', 'wss://').replace('http://', 'ws://');
-    
-    // Ensure no trailing slash
-    wsUrl = wsUrl.replace(/\/$/, '');
-    
-    const fullWsUrl = `${wsUrl}/ws/progress/${encodeURIComponent(userId)}`;
-    
-    console.log('Attempting WebSocket connection to:', fullWsUrl);
+    console.log('Attempting WebSocket connection to:', wsUrl);
     
     try {
-      this.ws = new WebSocket(fullWsUrl);
+      this.ws = new WebSocket(wsUrl);
       
       this.ws.onopen = () => {
         console.log('WebSocket connected successfully');
