@@ -5,6 +5,7 @@ import EmailPreview from '../components/EmailPreview';
 import ProgressTracker from '../components/ProgressTracker';
 import { emailService, templateService } from '../services/api';
 import { UserContext } from '../contexts/UserContext';
+import WebSocketService from '../services/websocket';
 
 const GenerateEmailsPage = () => {
   const { userProfile } = useContext(UserContext);
@@ -174,6 +175,12 @@ const GenerateEmailsPage = () => {
     loadTemplates();
     loadEmailsByStage();
 
+    // Connect to WebSocket for real-time progress updates
+    if (userProfile?.email) {
+      WebSocketService.connect(userProfile.email);
+      WebSocketService.onProgress(handleProgressUpdate);
+    }
+
     // Add event listener for email updates from friend sharing
     const handleEmailsUpdated = (event) => {
       const updatedEmails = event.detail;
@@ -219,6 +226,7 @@ const GenerateEmailsPage = () => {
 
     return () => {
       window.removeEventListener('emailsUpdated', handleEmailsUpdated);
+      WebSocketService.disconnect();
     };
   }, [userProfile]);
 
@@ -230,10 +238,108 @@ const GenerateEmailsPage = () => {
     console.log('Profile in localStorage:', storedProfile ? JSON.parse(storedProfile) : null);
   }, [userProfile]);
 
+  // Handle real-time progress updates from WebSocket
+  const handleProgressUpdate = (data) => {
+    console.log('Progress update received:', data);
+    
+    switch (data.type) {
+      case 'generation_start':
+        setGenerationProgress({
+          type: 'generation',
+          current: 0,
+          total: data.total_contacts,
+          startTime: Date.now(),
+          speed: 0,
+          status: 'processing'
+        });
+        break;
+        
+      case 'generation_progress':
+        setGenerationProgress(prev => ({
+          ...prev,
+          current: data.current,
+          total: data.total,
+          speed: data.speed || 0,
+          status: 'processing'
+        }));
+        break;
+        
+      case 'generation_complete':
+        setGenerationProgress(prev => ({
+          ...prev,
+          current: data.total_generated,
+          status: 'completed'
+        }));
+        break;
+        
+      case 'generation_error':
+        setGenerationProgress(prev => ({
+          ...prev,
+          status: 'error'
+        }));
+        setError(data.error);
+        break;
+        
+      case 'sending_start':
+        setSendingProgress({
+          type: 'sending',
+          current: 0,
+          total: data.total_emails,
+          startTime: Date.now(),
+          speed: 0,
+          status: 'processing'
+        });
+        break;
+        
+      case 'sending_progress':
+        setSendingProgress(prev => ({
+          ...prev,
+          current: data.current,
+          total: data.total,
+          speed: data.current / Math.max(1, (Date.now() - prev.startTime) / 1000),
+          status: 'processing'
+        }));
+        break;
+        
+      case 'sending_complete':
+        setSendingProgress(prev => ({
+          ...prev,
+          current: data.total_sent,
+          status: 'completed'
+        }));
+        break;
+        
+      case 'sending_error':
+        setSendingProgress(prev => ({
+          ...prev,
+          status: 'error'
+        }));
+        setError(`Failed to send email to ${data.recipient}: ${data.error}`);
+        break;
+    }
+  };
+
   // Generate emails
   const handleGenerateEmails = async () => {
     if (!file) {
       setError('Please select a CSV file.');
+      return;
+    }
+
+    // Check if templates exist for all categories
+    const hasOutreachTemplate = templates.some(t => t.category === 'outreach');
+    const hasFollowupTemplate = templates.some(t => t.category === 'followup');
+    const hasLastchanceTemplate = templates.some(t => t.category === 'lastchance');
+
+    if (!hasOutreachTemplate || !hasFollowupTemplate || !hasLastchanceTemplate) {
+      setError(
+        'You must create templates for all email stages before generating emails. ' +
+        'Please create templates for: ' +
+        (!hasOutreachTemplate ? 'Initial Outreach, ' : '') +
+        (!hasFollowupTemplate ? 'Follow-Up, ' : '') +
+        (!hasLastchanceTemplate ? 'Last Chance' : '') +
+        '. You can create templates in the Templates section.'
+      );
       return;
     }
 
@@ -294,32 +400,7 @@ const GenerateEmailsPage = () => {
       // Complete upload progress
       setUploadProgress(prev => ({ ...prev, status: 'completed' }));
       
-      // Start generation progress tracking
-      const generationStartTime = Date.now();
-      setGenerationProgress({
-        type: 'generation',
-        current: 0,
-        total: response.data?.emails?.length || 0,
-        startTime: generationStartTime,
-        speed: 0,
-        status: 'processing'
-      });
-
-      // Simulate generation progress
-      const generationInterval = setInterval(() => {
-        setGenerationProgress(prev => {
-          const elapsed = (Date.now() - generationStartTime) / 1000;
-          const speed = prev.current / elapsed;
-          const newCurrent = Math.min(prev.current + 1, prev.total);
-          
-          if (newCurrent >= prev.total) {
-            clearInterval(generationInterval);
-            return { ...prev, current: prev.total, speed, status: 'completed' };
-          }
-          
-          return { ...prev, current: newCurrent, speed };
-        });
-      }, 200);
+      // Generation progress is now handled by WebSocket updates
       
       if (response.data && response.data.emails) {
         // Reload emails after generation is complete
@@ -327,11 +408,6 @@ const GenerateEmailsPage = () => {
         
         // Switch to appropriate tab based on the stage of generated emails
         setActiveTab(emailStage);
-        
-        // Complete generation progress
-        setTimeout(() => {
-          setGenerationProgress(prev => ({ ...prev, status: 'completed' }));
-        }, 1000);
       } else {
         throw new Error('Invalid response format from server');
       }
@@ -452,38 +528,10 @@ const GenerateEmailsPage = () => {
     setLoading(true);
     setError('');
 
-    // Start sending progress tracking
-    const sendingStartTime = Date.now();
-    setSendingProgress({
-      type: 'sending',
-      current: 0,
-      total: unsentEmails.length,
-      startTime: sendingStartTime,
-      speed: 0,
-      status: 'processing'
-    });
+    // Sending progress is now handled by WebSocket updates
 
     try {
-      // Simulate sending progress (since we can't track actual Gmail API progress)
-      const sendingInterval = setInterval(() => {
-        setSendingProgress(prev => {
-          const elapsed = (Date.now() - sendingStartTime) / 1000;
-          const speed = prev.current / elapsed;
-          const newCurrent = Math.min(prev.current + 1, prev.total);
-          
-          if (newCurrent >= prev.total) {
-            clearInterval(sendingInterval);
-            return { ...prev, current: prev.total, speed, status: 'completed' };
-          }
-          
-          return { ...prev, current: newCurrent, speed };
-        });
-      }, 1000); // Simulate 1 email per second
-
       const response = await emailService.sendAllViaGmail(stage);
-      
-      // Complete sending progress
-      setSendingProgress(prev => ({ ...prev, status: 'completed' }));
       
       if (response.data.success) {
         setError(`Successfully sent ${response.data.sent_count} emails. ${response.data.failed_count > 0 ? `${response.data.failed_count} failed.` : ''}`);
@@ -900,4 +948,3 @@ const GenerateEmailsPage = () => {
 };
 
 export default GenerateEmailsPage; 
-
