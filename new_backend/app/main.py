@@ -1,10 +1,12 @@
-from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi import FastAPI, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 import logging
 from sqlalchemy.orm import Session
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+import json
+from typing import Dict, List
 
 from app.api.endpoints import emails, friends, auth_gmail, user_settings, templates
 from app.api import auth
@@ -50,6 +52,37 @@ scheduler.add_job(
 # Start the scheduler
 scheduler.start()
 logger.info("Background scheduler started")
+
+# WebSocket connection manager for real-time progress
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: Dict[str, List[WebSocket]] = {}
+
+    async def connect(self, websocket: WebSocket, user_id: str):
+        await websocket.accept()
+        if user_id not in self.active_connections:
+            self.active_connections[user_id] = []
+        self.active_connections[user_id].append(websocket)
+        logger.info(f"WebSocket connected for user {user_id}")
+
+    def disconnect(self, websocket: WebSocket, user_id: str):
+        if user_id in self.active_connections:
+            self.active_connections[user_id].remove(websocket)
+            if not self.active_connections[user_id]:
+                del self.active_connections[user_id]
+        logger.info(f"WebSocket disconnected for user {user_id}")
+
+    async def send_progress(self, user_id: str, progress_data: dict):
+        if user_id in self.active_connections:
+            for connection in self.active_connections[user_id]:
+                try:
+                    await connection.send_text(json.dumps(progress_data))
+                except Exception as e:
+                    logger.error(f"Error sending progress to WebSocket: {str(e)}")
+                    # Remove broken connection
+                    self.active_connections[user_id].remove(connection)
+
+manager = ConnectionManager()
 
 # Create FastAPI app
 app = FastAPI(title="Smart Email Generator API", redirect_slashes=False)
@@ -133,6 +166,19 @@ async def root():
 async def health_check():
     """Health check endpoint for monitoring the API status"""
     return {"status": "healthy"}
+
+@app.websocket("/ws/progress/{user_id}")
+async def websocket_progress(websocket: WebSocket, user_id: str):
+    """WebSocket endpoint for real-time progress tracking"""
+    await manager.connect(websocket, user_id)
+    try:
+        while True:
+            # Keep connection alive
+            data = await websocket.receive_text()
+            # Echo back to confirm connection
+            await websocket.send_text(json.dumps({"type": "ping", "message": "connected"}))
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, user_id)
 
 @app.post("/scheduled/followup-check")
 async def run_followup_check(db: Session = Depends(get_db)):
