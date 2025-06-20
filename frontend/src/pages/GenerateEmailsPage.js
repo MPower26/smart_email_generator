@@ -735,6 +735,28 @@ const GenerateEmailsPage = () => {
                   >
                     {loading ? 'Generating...' : 'Generate Emails'}
                   </Button>
+                  
+                  {/* Test button for WebSocket debugging */}
+                  <Button
+                    variant="outline-secondary"
+                    size="sm"
+                    className="mt-2"
+                    onClick={() => {
+                      console.log('Testing WebSocket connection...');
+                      WebSocketService.sendMessage({
+                        type: 'test',
+                        message: 'Testing WebSocket connection'
+                      });
+                      // Simulate a progress update for testing
+                      handleProgressUpdate({
+                        type: 'generation_start',
+                        total_contacts: 100,
+                        current: 0
+                      });
+                    }}
+                  >
+                    Test WebSocket Connection
+                  </Button>
                 </div>
               </Form>
             </Card.Body>
