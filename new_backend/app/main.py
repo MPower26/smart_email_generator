@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 import logging
 from sqlalchemy.orm import Session
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 from app.api.endpoints import emails, friends, auth_gmail, user_settings, templates
 from app.api import auth
@@ -17,6 +19,37 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+# Initialize background scheduler
+scheduler = BackgroundScheduler()
+
+def run_followup_check_job():
+    """Background job to check and notify about followups"""
+    try:
+        logger.info("Starting scheduled followup check job")
+        # Create a new database session for the background job
+        from app.db.database import SessionLocal
+        db = SessionLocal()
+        try:
+            check_and_notify_followups(db)
+            logger.info("Scheduled followup check job completed successfully")
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Error in scheduled followup check job: {str(e)}")
+
+# Schedule the followup check to run every hour
+scheduler.add_job(
+    func=run_followup_check_job,
+    trigger=CronTrigger(hour="*"),  # Run every hour
+    id="followup_check_job",
+    name="Check and notify followups",
+    replace_existing=True
+)
+
+# Start the scheduler
+scheduler.start()
+logger.info("Background scheduler started")
 
 # Create FastAPI app
 app = FastAPI(title="Smart Email Generator API", redirect_slashes=False)
@@ -133,3 +166,10 @@ async def cors_test(request: Request):
 async def cors_test_options():
     """Handle OPTIONS request for CORS test"""
     return {"message": "CORS preflight successful"} 
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Clean up resources when the app shuts down"""
+    logger.info("Shutting down background scheduler")
+    scheduler.shutdown()
+    logger.info("Background scheduler stopped") 
