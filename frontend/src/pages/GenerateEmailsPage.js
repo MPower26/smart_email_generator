@@ -351,7 +351,9 @@ const GenerateEmailsPage = () => {
       // Start polling for generation progress
       startProgressPolling();
       
-      if (response.data && response.data.emails) {
+      if (response.data && response.data.status === 'processing') {
+        // Email generation started in background
+        console.log('Email generation started in background:', response.data);
         // Switch to appropriate tab based on the stage of generated emails
         setActiveTab(emailStage);
       } else {
