@@ -132,3 +132,15 @@ class GeneratedEmail(Base):
     followup_due_at = Column(DateTime, nullable=True)
     lastchance_due_at = Column(DateTime, nullable=True)
     status = Column(String, default="outreach_pending")  # outreach_sent, followup_due, lastchance_due, sent, etc.
+
+class SentEmailRecord(Base):
+    __tablename__ = "sent_email_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    recipient_email = Column(String(255), index=True)
+    sent_at = Column(DateTime(timezone=True), server_default=func.now())
+    stage = Column(String(50))  # outreach, followup, lastchance
+    
+    # Relationship with user
+    user = relationship("User")
