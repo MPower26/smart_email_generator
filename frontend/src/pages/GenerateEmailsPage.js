@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Container, Row, Col, Card, Form, Button, Alert, Tabs, Tab, Badge, Spinner, OverlayTrigger, Tooltip } from 'react-bootstrap';
 import FileUpload from '../components/FileUpload';
 import EmailPreview from '../components/EmailPreview';
+import ProgressTracker from '../components/ProgressTracker';
 import { emailService, templateService } from '../services/api';
 import { UserContext } from '../contexts/UserContext';
 
@@ -22,6 +23,35 @@ const GenerateEmailsPage = () => {
   const [loadingEmails, setLoadingEmails] = useState(false);
   const [lastAction, setLastAction] = useState({ id: null, type: null }); // { id: emailId, type: 'sent' | 'unmarked' }
   const [avoidDuplicates, setAvoidDuplicates] = useState(true);
+
+  // Progress tracking state
+  const [uploadProgress, setUploadProgress] = useState({
+    type: 'upload',
+    current: 0,
+    total: 0,
+    fileSize: 0,
+    startTime: null,
+    speed: 0,
+    status: 'idle'
+  });
+  
+  const [generationProgress, setGenerationProgress] = useState({
+    type: 'generation',
+    current: 0,
+    total: 0,
+    startTime: null,
+    speed: 0,
+    status: 'idle'
+  });
+  
+  const [sendingProgress, setSendingProgress] = useState({
+    type: 'sending',
+    current: 0,
+    total: 0,
+    startTime: null,
+    speed: 0,
+    status: 'idle'
+  });
 
   // Track which tab's emails should be collapsed
   const isTabCollapsed = (tabName) => {
@@ -210,6 +240,19 @@ const GenerateEmailsPage = () => {
     setLoading(true);
     setError('');
 
+    // Start upload progress tracking
+    const uploadStartTime = Date.now();
+    const fileSize = file.size;
+    setUploadProgress({
+      type: 'upload',
+      current: 0,
+      total: fileSize,
+      fileSize: fileSize,
+      startTime: uploadStartTime,
+      speed: 0,
+      status: 'processing'
+    });
+
     const formData = new FormData();
     formData.append('file', file);
     formData.append('use_ai', selectedTemplate === 'ai_generated');
@@ -230,7 +273,53 @@ const GenerateEmailsPage = () => {
     }
 
     try {
+      // Simulate upload progress (since we can't track actual upload progress with FormData)
+      const uploadInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          const elapsed = (Date.now() - uploadStartTime) / 1000;
+          const speed = prev.current / elapsed;
+          const newCurrent = Math.min(prev.current + fileSize * 0.1, fileSize);
+          
+          if (newCurrent >= fileSize) {
+            clearInterval(uploadInterval);
+            return { ...prev, current: fileSize, speed, status: 'completed' };
+          }
+          
+          return { ...prev, current: newCurrent, speed };
+        });
+      }, 100);
+
       const response = await emailService.generateEmails(formData);
+      
+      // Complete upload progress
+      setUploadProgress(prev => ({ ...prev, status: 'completed' }));
+      
+      // Start generation progress tracking
+      const generationStartTime = Date.now();
+      setGenerationProgress({
+        type: 'generation',
+        current: 0,
+        total: response.data?.emails?.length || 0,
+        startTime: generationStartTime,
+        speed: 0,
+        status: 'processing'
+      });
+
+      // Simulate generation progress
+      const generationInterval = setInterval(() => {
+        setGenerationProgress(prev => {
+          const elapsed = (Date.now() - generationStartTime) / 1000;
+          const speed = prev.current / elapsed;
+          const newCurrent = Math.min(prev.current + 1, prev.total);
+          
+          if (newCurrent >= prev.total) {
+            clearInterval(generationInterval);
+            return { ...prev, current: prev.total, speed, status: 'completed' };
+          }
+          
+          return { ...prev, current: newCurrent, speed };
+        });
+      }, 200);
       
       if (response.data && response.data.emails) {
         // Reload emails after generation is complete
@@ -238,6 +327,11 @@ const GenerateEmailsPage = () => {
         
         // Switch to appropriate tab based on the stage of generated emails
         setActiveTab(emailStage);
+        
+        // Complete generation progress
+        setTimeout(() => {
+          setGenerationProgress(prev => ({ ...prev, status: 'completed' }));
+        }, 1000);
       } else {
         throw new Error('Invalid response format from server');
       }
@@ -247,6 +341,10 @@ const GenerateEmailsPage = () => {
         err.response?.data?.detail || err.response?.data?.message || 
         'Failed to generate emails. Please check your file and try again.'
       );
+      
+      // Mark progress as error
+      setUploadProgress(prev => ({ ...prev, status: 'error' }));
+      setGenerationProgress(prev => ({ ...prev, status: 'error' }));
     } finally {
       setLoading(false);
     }
@@ -354,8 +452,38 @@ const GenerateEmailsPage = () => {
     setLoading(true);
     setError('');
 
+    // Start sending progress tracking
+    const sendingStartTime = Date.now();
+    setSendingProgress({
+      type: 'sending',
+      current: 0,
+      total: unsentEmails.length,
+      startTime: sendingStartTime,
+      speed: 0,
+      status: 'processing'
+    });
+
     try {
+      // Simulate sending progress (since we can't track actual Gmail API progress)
+      const sendingInterval = setInterval(() => {
+        setSendingProgress(prev => {
+          const elapsed = (Date.now() - sendingStartTime) / 1000;
+          const speed = prev.current / elapsed;
+          const newCurrent = Math.min(prev.current + 1, prev.total);
+          
+          if (newCurrent >= prev.total) {
+            clearInterval(sendingInterval);
+            return { ...prev, current: prev.total, speed, status: 'completed' };
+          }
+          
+          return { ...prev, current: newCurrent, speed };
+        });
+      }, 1000); // Simulate 1 email per second
+
       const response = await emailService.sendAllViaGmail(stage);
+      
+      // Complete sending progress
+      setSendingProgress(prev => ({ ...prev, status: 'completed' }));
       
       if (response.data.success) {
         setError(`Successfully sent ${response.data.sent_count} emails. ${response.data.failed_count > 0 ? `${response.data.failed_count} failed.` : ''}`);
@@ -374,6 +502,9 @@ const GenerateEmailsPage = () => {
         err.response?.data?.detail || err.response?.data?.message || 
         'Failed to send emails. Please try again.'
       );
+      
+      // Mark progress as error
+      setSendingProgress(prev => ({ ...prev, status: 'error' }));
     } finally {
       setLoading(false);
     }
@@ -508,6 +639,19 @@ const GenerateEmailsPage = () => {
                 </Form.Group>
 
                 {error && <Alert variant="danger">{error}</Alert>}
+
+                {/* Progress Trackers */}
+                {uploadProgress.status !== 'idle' && (
+                  <ProgressTracker {...uploadProgress} />
+                )}
+                
+                {generationProgress.status !== 'idle' && (
+                  <ProgressTracker {...generationProgress} />
+                )}
+                
+                {sendingProgress.status !== 'idle' && (
+                  <ProgressTracker {...sendingProgress} />
+                )}
 
                 <div className="d-grid mt-4">
                   <Button
@@ -756,3 +900,4 @@ const GenerateEmailsPage = () => {
 };
 
 export default GenerateEmailsPage; 
+
