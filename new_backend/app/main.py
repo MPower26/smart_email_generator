@@ -137,6 +137,15 @@ async def health_check():
     """Health check endpoint for monitoring the API status"""
     return {"status": "healthy"}
 
+@app.get("/websocket-test")
+async def websocket_test():
+    """Test endpoint to verify WebSocket support"""
+    return {
+        "message": "WebSocket test endpoint",
+        "websocket_support": True,
+        "endpoint": "/ws/progress/{user_id}"
+    }
+
 @app.websocket("/ws/progress/{user_id}")
 async def websocket_progress(websocket: WebSocket, user_id: str):
     """WebSocket endpoint for real-time progress tracking"""
