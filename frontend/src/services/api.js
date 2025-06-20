@@ -68,8 +68,8 @@ export const emailService = {
   // Get templates by category
   getTemplatesByCategory: (category) => api.get(`/api/templates?category=${category}`),
   
-  // Get emails by stage (consolidated method)
-  getEmailsByStage: (stage) => api.get(`/api/emails/by-stage/${stage}/`),
+  // Get emails by stage (consolidated method) - NO trailing slash to match backend
+  getEmailsByStage: (stage) => api.get(`/api/emails/by-stage/${stage}`),
   
   // Generate emails
   generateEmails: (formData) => {
@@ -87,17 +87,17 @@ export const emailService = {
   deleteEmail: (emailId) => api.delete(`/api/emails/${emailId}`),
 };
 
-// Template API
+// Template API - Fixed to match backend routes exactly
 export const templateService = {
   getAllTemplates: () => api.get('/api/templates/'),
-  getTemplatesByCategory: () => api.get('/api/templates/by-category/'),
+  getTemplatesByCategory: () => api.get('/api/templates/by-category'),
   getTemplatesByCategoryFilter: (category) => api.get(`/api/templates/?category=${category}`),
-  getDefaultTemplate: (category) => api.get(`/api/templates/default/${category}/`),
-  getTemplate: (templateId) => api.get(`/api/templates/${templateId}/`),
+  getDefaultTemplate: (category) => api.get(`/api/templates/default/${category}`),
+  getTemplate: (templateId) => api.get(`/api/templates/${templateId}`),
   createTemplate: (template) => api.post('/api/templates/', template),
-  updateTemplate: (templateId, template) => api.put(`/api/templates/${templateId}/`, template),
-  setDefaultTemplate: (templateId) => api.put(`/api/templates/${templateId}/set-default/`),
-  deleteTemplate: (templateId) => api.delete(`/api/templates/${templateId}/`),
+  updateTemplate: (templateId, template) => api.put(`/api/templates/${templateId}`, template),
+  setDefaultTemplate: (templateId) => api.put(`/api/templates/${templateId}/set-default`),
+  deleteTemplate: (templateId) => api.delete(`/api/templates/${templateId}`),
 };
 
 // Service d'API pour les amis et le partage de cache
@@ -144,3 +144,4 @@ export const friendService = {
 };
 
 export default api;
+
