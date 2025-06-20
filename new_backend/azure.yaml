@@ -16,4 +16,6 @@ services:
         value: "true"
       - name: PYTHONPATH
         value: "/home/site/wwwroot"
+      - name: WEBSOCKET_ENABLED
+        value: "true"
     startup_command: /home/site/wwwroot/deploy.sh 
