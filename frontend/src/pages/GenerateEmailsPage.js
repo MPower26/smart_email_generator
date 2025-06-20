@@ -741,18 +741,30 @@ const GenerateEmailsPage = () => {
                     variant="outline-secondary"
                     size="sm"
                     className="mt-2"
-                    onClick={() => {
+                    onClick={async () => {
                       console.log('Testing WebSocket connection...');
-                      WebSocketService.sendMessage({
-                        type: 'test',
-                        message: 'Testing WebSocket connection'
-                      });
-                      // Simulate a progress update for testing
-                      handleProgressUpdate({
-                        type: 'generation_start',
-                        total_contacts: 100,
-                        current: 0
-                      });
+                      try {
+                        // Test the simple WebSocket endpoint
+                        const testResult = await WebSocketService.testConnection();
+                        console.log('WebSocket test successful:', testResult);
+                        alert('WebSocket connection test successful! Check console for details.');
+                        
+                        // Also test the progress WebSocket
+                        WebSocketService.sendMessage({
+                          type: 'test',
+                          message: 'Testing WebSocket connection'
+                        });
+                        
+                        // Simulate a progress update for testing
+                        handleProgressUpdate({
+                          type: 'generation_start',
+                          total_contacts: 100,
+                          current: 0
+                        });
+                      } catch (error) {
+                        console.error('WebSocket test failed:', error);
+                        alert(`WebSocket connection test failed: ${error.message}`);
+                      }
                     }}
                   >
                     Test WebSocket Connection
