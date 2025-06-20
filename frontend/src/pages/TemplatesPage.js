@@ -1,56 +1,61 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Card, Form, Button, Alert, Modal, Tabs, Tab, Accordion, Badge } from 'react-bootstrap';
-import { templateService } from '../services/api'; // <--- Make sure this uses HTTPS!
+import { templateService } from '../services/api';
 
 const TemplatesPage = () => {
   const [templatesByCategory, setTemplatesByCategory] = useState({
     outreach: [],
     followup: [],
-    lastchance: [],
+    lastchance: []
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  
+  // Modal state
   const [showModal, setShowModal] = useState(false);
   const [currentTemplate, setCurrentTemplate] = useState({
     id: null,
     name: '',
     content: '',
     category: 'outreach',
-    is_default: false,
+    is_default: false
   });
   const [isEditing, setIsEditing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('outreach');
+  
+  // Variables pour l'aperçu des placeholders
   const [activeTab, setActiveTab] = useState('editor');
-
-  // Example placeholder data for preview
   const placeholderData = {
     'Recipient Name': 'John Smith',
     'Company Name': 'Acme Corporation',
     'Your Name': 'Jane Doe',
     'Your Position': 'Sales Manager',
-    'Your Company': 'Tech Solutions Inc.',
+    'Your Company': 'Tech Solutions Inc.'
   };
 
-  // Load templates from API on mount
+  // Charger les templates au chargement de la page
   useEffect(() => {
-    const loadTemplates = async () => {
-      setLoading(true);
-      setError('');
-      try {
-        const response = await templateService.getTemplatesByCategory();
-        setTemplatesByCategory(response.data);
-      } catch (err) {
-        setError('Failed to load templates from backend. (This will help us debug mixed content errors!)');
-        console.error('Error loading templates:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
     loadTemplates();
   }, []);
 
-  // Modal open: new template (local only)
+  // Fonction pour charger les templates
+  const loadTemplates = async () => {
+    setLoading(true);
+    setError('');
+    
+    try {
+      const response = await templateService.getTemplatesByCategory();
+      setTemplatesByCategory(response.data);
+    } catch (err) {
+      setError('Failed to load templates. Please try again later.');
+      console.error('Error loading templates:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Ouvrir le modal de création de template
   const handleNewTemplate = (category) => {
     setSelectedCategory(category);
     setCurrentTemplate({
@@ -58,129 +63,150 @@ const TemplatesPage = () => {
       name: '',
       content: '',
       category: category,
-      is_default: false,
+      is_default: false
     });
     setIsEditing(false);
     setShowModal(true);
     setActiveTab('editor');
   };
 
-  // Modal open: edit existing (local only)
+  // Ouvrir le modal d'édition avec un template existant
   const handleEditTemplate = (template) => {
-    setCurrentTemplate({ ...template });
+    setCurrentTemplate({
+      id: template.id,
+      name: template.name,
+      content: template.content,
+      category: template.category,
+      is_default: template.is_default
+    });
     setSelectedCategory(template.category);
     setIsEditing(true);
     setShowModal(true);
     setActiveTab('editor');
   };
 
-  // Form change (local only)
+  // Mettre à jour les champs du formulaire
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
     setCurrentTemplate({
       ...currentTemplate,
-      [name]: type === 'checkbox' ? checked : value,
+      [name]: type === 'checkbox' ? checked : value
     });
   };
 
-  // Save (add/edit): local only
-  const handleSaveTemplate = (e) => {
+  // Sauvegarder un template (création ou modification)
+  const handleSaveTemplate = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    setTimeout(() => {
-      setTemplatesByCategory((prev) => {
-        const cat = currentTemplate.category;
-        let newCatArr = [...prev[cat]];
-        if (isEditing) {
-          newCatArr = newCatArr.map((t) =>
-            t.id === currentTemplate.id ? { ...currentTemplate } : t
-          );
-          setSuccess('Template updated (locally)');
-        } else {
-          const newTemplate = {
-            ...currentTemplate,
-            id: Date.now(),
-            created_at: new Date().toISOString(),
-          };
-          newCatArr.push(newTemplate);
-          setSuccess('New template created (locally)');
-        }
-        return { ...prev, [cat]: newCatArr };
-      });
+    
+    try {
+      let response;
+      
+      if (isEditing) {
+        // Mettre à jour un template existant
+        response = await templateService.updateTemplate(currentTemplate.id, currentTemplate);
+        setSuccess('Template updated successfully!');
+      } else {
+        // Créer un nouveau template
+        response = await templateService.createTemplate(currentTemplate);
+        setSuccess('New template created successfully!');
+      }
+      
+      // Recharger la liste des templates
+      await loadTemplates();
       setShowModal(false);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to save template. Please try again.');
+      console.error('Error saving template:', err);
+    } finally {
       setLoading(false);
-    }, 400);
+    }
   };
 
-  // Delete: local only
-  const handleDeleteTemplate = (id, category) => {
+  // Supprimer un template
+  const handleDeleteTemplate = async (id) => {
     if (!window.confirm('Are you sure you want to delete this template?')) return;
-    setTemplatesByCategory((prev) => ({
-      ...prev,
-      [category]: prev[category].filter((t) => t.id !== id),
-    }));
-    setSuccess('Template deleted (locally)');
+    
+    setLoading(true);
+    setError('');
+    
+    try {
+      await templateService.deleteTemplate(id);
+      setSuccess('Template deleted successfully!');
+      // Recharger la liste des templates
+      await loadTemplates();
+    } catch (err) {
+      setError('Failed to delete template. Please try again.');
+      console.error('Error deleting template:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Set as default: local only
-  const handleSetDefault = (templateId, category) => {
-    setTemplatesByCategory((prev) => ({
-      ...prev,
-      [category]: prev[category].map((t) => ({
-        ...t,
-        is_default: t.id === templateId,
-      })),
-    }));
-    setSuccess('Default template set (locally)');
+  // Set template as default
+  const handleSetDefault = async (templateId) => {
+    setLoading(true);
+    setError('');
+    
+    try {
+      await templateService.setDefaultTemplate(templateId);
+      setSuccess('Default template updated successfully!');
+      await loadTemplates();
+    } catch (err) {
+      setError('Failed to set default template. Please try again.');
+      console.error('Error setting default template:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Preview
+  // Fonction pour afficher l'aperçu avec les placeholders remplacés
   const getPreviewContent = (content) => {
     if (!content) return '';
+    
     let preview = content;
+    
+    // Remplacer les placeholders par les valeurs d'exemple
     Object.entries(placeholderData).forEach(([key, value]) => {
       const regex = new RegExp(`\\[${key}\\]`, 'gi');
       preview = preview.replace(regex, value);
     });
+    
     return preview;
   };
 
-  // Labels
+  // Get category display name
   const getCategoryDisplayName = (category) => {
     switch (category) {
-      case 'outreach':
-        return 'Initial Outreach';
-      case 'followup':
-        return 'Follow Up';
-      case 'lastchance':
-        return 'Last Chance';
-      default:
-        return category;
-    }
-  };
-  const getCategoryDescription = (category) => {
-    switch (category) {
-      case 'outreach':
-        return 'Templates for initial contact emails';
-      case 'followup':
-        return 'Templates for follow-up emails after no response';
-      case 'lastchance':
-        return 'Templates for final follow-up attempts';
-      default:
-        return '';
+      case 'outreach': return 'Initial Outreach';
+      case 'followup': return 'Follow Up';
+      case 'lastchance': return 'Last Chance';
+      default: return category;
     }
   };
 
-  // Render card
-  const renderTemplateCard = (template, category) => (
+  // Get category description
+  const getCategoryDescription = (category) => {
+    switch (category) {
+      case 'outreach': return 'Templates for initial contact emails';
+      case 'followup': return 'Templates for follow-up emails after no response';
+      case 'lastchance': return 'Templates for final follow-up attempts';
+      default: return '';
+    }
+  };
+
+  // Render template card
+  const renderTemplateCard = (template) => (
     <Card key={template.id} className="mb-3">
       <Card.Body>
         <div className="d-flex justify-content-between align-items-start">
           <div className="flex-grow-1">
             <div className="d-flex align-items-center mb-2">
               <h6 className="mb-0 me-2">{template.name}</h6>
-              {template.is_default && <Badge bg="success">Default</Badge>}
+              {template.is_default && (
+                <Badge bg="success">Default</Badge>
+              )}
             </div>
             <p className="text-muted small mb-2">
               {template.content.substring(0, 150)}...
@@ -191,26 +217,26 @@ const TemplatesPage = () => {
           </div>
           <div className="d-flex flex-column gap-1">
             {!template.is_default && (
-              <Button
-                variant="outline-success"
+              <Button 
+                variant="outline-success" 
                 size="sm"
-                onClick={() => handleSetDefault(template.id, category)}
+                onClick={() => handleSetDefault(template.id)}
                 disabled={loading}
               >
                 Set Default
               </Button>
             )}
-            <Button
-              variant="outline-primary"
+            <Button 
+              variant="outline-primary" 
               size="sm"
               onClick={() => handleEditTemplate(template)}
             >
               Edit
             </Button>
-            <Button
-              variant="outline-danger"
+            <Button 
+              variant="outline-danger" 
               size="sm"
-              onClick={() => handleDeleteTemplate(template.id, category)}
+              onClick={() => handleDeleteTemplate(template.id)}
             >
               Delete
             </Button>
@@ -221,16 +247,12 @@ const TemplatesPage = () => {
   );
 
   return (
-    <Container>
+    <Container className="templates-page">
       <h1 className="mb-4">Email Templates</h1>
-
+      
       {error && <Alert variant="danger">{error}</Alert>}
-      {success && (
-        <Alert variant="success" onClose={() => setSuccess('')} dismissible>
-          {success}
-        </Alert>
-      )}
-
+      {success && <Alert variant="success" onClose={() => setSuccess('')} dismissible>{success}</Alert>}
+      
       {loading && (
         <div className="text-center mb-4">
           <div className="spinner-border text-primary" role="status">
@@ -238,7 +260,7 @@ const TemplatesPage = () => {
           </div>
         </div>
       )}
-
+      
       <Accordion defaultActiveKey="outreach">
         {['outreach', 'followup', 'lastchance'].map((category) => (
           <Accordion.Item key={category} eventKey={category}>
@@ -265,12 +287,10 @@ const TemplatesPage = () => {
             </Accordion.Header>
             <Accordion.Body>
               <p className="text-muted mb-3">{getCategoryDescription(category)}</p>
-
+              
               {templatesByCategory[category]?.length > 0 ? (
                 <div>
-                  {templatesByCategory[category].map((template) =>
-                    renderTemplateCard(template, category)
-                  )}
+                  {templatesByCategory[category].map(template => renderTemplateCard(template))}
                 </div>
               ) : (
                 <Alert variant="info">
@@ -281,10 +301,10 @@ const TemplatesPage = () => {
           </Accordion.Item>
         ))}
       </Accordion>
-
-      {/* Modal for create/edit */}
-      <Modal
-        show={showModal}
+      
+      {/* Modal pour créer/éditer un template */}
+      <Modal 
+        show={showModal} 
         onHide={() => setShowModal(false)}
         size="lg"
         backdrop="static"
@@ -312,21 +332,21 @@ const TemplatesPage = () => {
                     required
                   />
                 </Form.Group>
-
+                
                 <Form.Group className="mb-3">
                   <Form.Label>Category</Form.Label>
                   <Form.Select
                     name="category"
                     value={currentTemplate.category}
                     onChange={handleInputChange}
-                    disabled={isEditing}
+                    disabled={isEditing} // Don't allow changing category when editing
                   >
                     <option value="outreach">Initial Outreach</option>
                     <option value="followup">Follow Up</option>
                     <option value="lastchance">Last Chance</option>
                   </Form.Select>
                 </Form.Group>
-
+                
                 <Form.Group className="mb-3">
                   <Form.Label>Email Content</Form.Label>
                   <Form.Control
@@ -336,7 +356,7 @@ const TemplatesPage = () => {
                     onChange={handleInputChange}
                     rows={12}
                     required
-                    placeholder={`Subject: Your Subject Here
+                    placeholder="Subject: Your Subject Here
 
 Dear [Recipient Name],
 
@@ -345,13 +365,13 @@ Your email content here...
 Best regards,
 [Your Name]
 [Your Position]
-[Your Company]`}
+[Your Company]"
                   />
                   <Form.Text className="text-muted">
                     Available placeholders: [Recipient Name], [Company Name], [Your Name], [Your Position], [Your Company]
                   </Form.Text>
                 </Form.Group>
-
+                
                 <Form.Group className="mb-3">
                   <Form.Check
                     type="checkbox"
@@ -363,7 +383,7 @@ Best regards,
                 </Form.Group>
               </Form>
             </Tab>
-
+            
             <Tab eventKey="preview" title="Preview">
               <Card className="bg-light">
                 <Card.Body>
@@ -379,8 +399,8 @@ Best regards,
           <Button variant="secondary" onClick={() => setShowModal(false)}>
             Cancel
           </Button>
-          <Button
-            variant="primary"
+          <Button 
+            variant="primary" 
             onClick={handleSaveTemplate}
             disabled={loading}
           >
@@ -392,4 +412,4 @@ Best regards,
   );
 };
 
-export default TemplatesPage;
+export default TemplatesPage; 
