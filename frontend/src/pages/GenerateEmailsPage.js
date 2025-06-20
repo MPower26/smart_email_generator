@@ -93,6 +93,17 @@ const GenerateEmailsPage = () => {
     }
   };
 
+  // Load all templates for validation (not just stage-specific)
+  const loadAllTemplates = async () => {
+    try {
+      const response = await templateService.getAllTemplates();
+      return response.data;
+    } catch (err) {
+      console.error('Error loading all templates:', err);
+      return [];
+    }
+  };
+
   // Load templates when email stage changes
   useEffect(() => {
     loadTemplates();
@@ -326,18 +337,23 @@ const GenerateEmailsPage = () => {
       return;
     }
 
+    // Load all templates for validation
+    const allTemplates = await loadAllTemplates();
+    
     // Check if templates exist for all categories
-    const hasOutreachTemplate = templates.some(t => t.category === 'outreach');
-    const hasFollowupTemplate = templates.some(t => t.category === 'followup');
-    const hasLastchanceTemplate = templates.some(t => t.category === 'lastchance');
+    const hasOutreachTemplate = allTemplates.some(t => t.category === 'outreach');
+    const hasFollowupTemplate = allTemplates.some(t => t.category === 'followup');
+    const hasLastchanceTemplate = allTemplates.some(t => t.category === 'lastchance');
 
     if (!hasOutreachTemplate || !hasFollowupTemplate || !hasLastchanceTemplate) {
+      const missingTemplates = [];
+      if (!hasOutreachTemplate) missingTemplates.push('Initial Outreach');
+      if (!hasFollowupTemplate) missingTemplates.push('Follow-Up');
+      if (!hasLastchanceTemplate) missingTemplates.push('Last Chance');
+      
       setError(
         'You must create templates for all email stages before generating emails. ' +
-        'Please create templates for: ' +
-        (!hasOutreachTemplate ? 'Initial Outreach, ' : '') +
-        (!hasFollowupTemplate ? 'Follow-Up, ' : '') +
-        (!hasLastchanceTemplate ? 'Last Chance' : '') +
+        'Please create templates for: ' + missingTemplates.join(', ') +
         '. You can create templates in the Templates section.'
       );
       return;
