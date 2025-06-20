@@ -29,14 +29,21 @@ class ConnectionManager:
 
     async def send_progress(self, user_id: str, progress_data: dict):
         """Send progress data to all connections for a specific user."""
+        logger.info(f"Attempting to send progress to user {user_id}: {progress_data}")
+        
         if user_id in self.active_connections:
+            logger.info(f"Found {len(self.active_connections[user_id])} active connections for user {user_id}")
             # Create a copy of the list to iterate over, as connections might be removed during the loop
             for connection in list(self.active_connections[user_id]):
                 try:
                     await connection.send_text(json.dumps(progress_data))
-                except Exception:
+                    logger.info(f"Successfully sent progress to user {user_id}")
+                except Exception as e:
+                    logger.error(f"Failed to send progress to user {user_id}: {str(e)}")
                     # If sending fails, assume the connection is broken and remove it
                     self.disconnect(connection, user_id)
+        else:
+            logger.warning(f"No active connections found for user {user_id}")
 
 # Create a single, shared instance of the manager
 manager = ConnectionManager() 
