@@ -30,9 +30,11 @@ fi
 # Start the FastAPI application with gunicorn
 echo "Starting FastAPI application with Gunicorn..."
 exec gunicorn --bind=0.0.0.0:$PORT \
-    --workers=4 \
+    --workers=2 \
     --worker-class=uvicorn.workers.UvicornWorker \
-    --timeout=120 \
+    --timeout=600 \
+    --max-requests=1000 \
+    --max-requests-jitter=100 \
     --access-logfile=- \
     --error-logfile=- \
     --log-level=debug \
