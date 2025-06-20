@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Button, Offcanvas, Form, ListGroup, Badge, Spinner, Alert, FormCheck } from 'react-bootstrap';
+import { Button, Offcanvas, Form, ListGroup, Badge, Spinner, Alert, FormCheck, OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { FaUserFriends, FaUserPlus, FaCheck, FaTimes } from 'react-icons/fa';
 import { friendService } from '../services/api';
 import { UserContext } from '../contexts/UserContext';
@@ -335,7 +335,21 @@ const FriendsButton = () => {
         }}
       >
         <Offcanvas.Header closeButton>
-          <Offcanvas.Title>Friends</Offcanvas.Title>
+          <Offcanvas.Title>
+            Friends
+            <OverlayTrigger
+              placement="bottom"
+              overlay={
+                <Tooltip id="friends-overview-tooltip">
+                  <strong>Friends Feature:</strong><br/>
+                  Connect with other users to share contact lists and avoid duplicate outreach. 
+                  When a friend has already contacted someone in your list, you'll see it marked as "sent by friend".
+                </Tooltip>
+              }
+            >
+              <i className="bi bi-info-circle ms-2 text-muted" style={{ cursor: 'help', fontSize: '0.9rem' }}></i>
+            </OverlayTrigger>
+          </Offcanvas.Title>
         </Offcanvas.Header>
         <Offcanvas.Body>
           {/* Navigation between tabs */}
@@ -405,6 +419,18 @@ const FriendsButton = () => {
                                 onChange={() => handleToggleSharing(friend.id, friend.combine_contacts)}
                                 disabled={loading}
                               />
+                              <OverlayTrigger
+                                placement="top"
+                                overlay={
+                                  <Tooltip id={`share-tooltip-${friend.id}`}>
+                                    <strong>Contact Sharing:</strong><br/>
+                                    When enabled, you'll see emails that this friend has already sent to contacts in your list. 
+                                    This helps avoid duplicate outreach and shows you which prospects have already been contacted.
+                                  </Tooltip>
+                                }
+                              >
+                                <i className="bi bi-info-circle ms-2 text-muted" style={{ cursor: 'help', fontSize: '0.9rem' }}></i>
+                              </OverlayTrigger>
                             </div>
                             <Button 
                               variant="link" 
