@@ -2,9 +2,9 @@ import axios from 'axios';
 
 let API_BASE_URL = '//smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net';
 
-// Accept both "https://" and protocol-relative ("//…")
-if (!/^https:\/\//i.test(API_BASE_URL) && !/^\/\//.test(API_BASE_URL)) {
-  throw new Error(`[API] Refusing to run: API_BASE_URL is not secure: ${API_BASE_URL}`);
+// Force it into https:// form
+if (API_BASE_URL.startsWith('//')) {
+  API_BASE_URL = 'https:' + API_BASE_URL;
 }
 
 console.log('[API] Using API_BASE_URL:', API_BASE_URL);
