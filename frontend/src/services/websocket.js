@@ -10,20 +10,33 @@ class WebSocketService {
 
   connect(userId) {
     this.userId = userId;
-    const wsUrl = process.env.REACT_APP_BACKEND_URL?.replace('https://', 'wss://').replace('http://', 'ws://') || 
-                  'wss://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net';
+    
+    // Get the base URL and ensure it's properly formatted for WebSocket
+    let baseUrl = process.env.REACT_APP_BACKEND_URL || 
+                  'https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net';
+    
+    // Convert to WebSocket URL
+    let wsUrl = baseUrl.replace('https://', 'wss://').replace('http://', 'ws://');
+    
+    // Ensure no trailing slash
+    wsUrl = wsUrl.replace(/\/$/, '');
+    
+    const fullWsUrl = `${wsUrl}/ws/progress/${encodeURIComponent(userId)}`;
+    
+    console.log('Attempting WebSocket connection to:', fullWsUrl);
     
     try {
-      this.ws = new WebSocket(`${wsUrl}/ws/progress/${userId}`);
+      this.ws = new WebSocket(fullWsUrl);
       
       this.ws.onopen = () => {
-        console.log('WebSocket connected');
+        console.log('WebSocket connected successfully');
         this.reconnectAttempts = 0;
       };
       
       this.ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          console.log('WebSocket message received:', data);
           if (this.onProgressCallback) {
             this.onProgressCallback(data);
           }
@@ -32,8 +45,8 @@ class WebSocketService {
         }
       };
       
-      this.ws.onclose = () => {
-        console.log('WebSocket disconnected');
+      this.ws.onclose = (event) => {
+        console.log('WebSocket disconnected:', event.code, event.reason);
         this.attemptReconnect();
       };
       
@@ -54,6 +67,8 @@ class WebSocketService {
       setTimeout(() => {
         this.connect(this.userId);
       }, this.reconnectDelay * this.reconnectAttempts);
+    } else {
+      console.log('Max reconnection attempts reached. WebSocket connection failed.');
     }
   }
 
