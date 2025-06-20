@@ -79,6 +79,47 @@ class WebSocketService {
       this.ws.send(JSON.stringify(message));
     }
   }
+
+  // Test WebSocket connection
+  async testConnection() {
+    return new Promise((resolve, reject) => {
+      const testWs = new WebSocket('wss://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net/ws/test');
+      
+      testWs.onopen = () => {
+        console.log('Test WebSocket connected successfully');
+        resolve(true);
+      };
+      
+      testWs.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('Test WebSocket message received:', data);
+          testWs.close();
+          resolve(data);
+        } catch (error) {
+          console.error('Error parsing test WebSocket message:', error);
+          testWs.close();
+          reject(error);
+        }
+      };
+      
+      testWs.onerror = (error) => {
+        console.error('Test WebSocket error:', error);
+        testWs.close();
+        reject(error);
+      };
+      
+      testWs.onclose = () => {
+        console.log('Test WebSocket closed');
+      };
+      
+      // Timeout after 5 seconds
+      setTimeout(() => {
+        testWs.close();
+        reject(new Error('Test WebSocket connection timeout'));
+      }, 5000);
+    });
+  }
 }
 
 export default new WebSocketService(); 
