@@ -71,11 +71,20 @@ async def get_emails_by_stage(
             )
         ).all()
     else:
-        # For other stages, use the original logic
-        emails = db.query(GeneratedEmail).filter(
-            GeneratedEmail.user_id == current_user.id,
-            GeneratedEmail.stage == stage
-        ).all()
+        # For other stages, use the original logic but filter out sent emails from outreach
+        if stage == "outreach":
+            # For outreach stage, only show emails that haven't been sent yet
+            emails = db.query(GeneratedEmail).filter(
+                GeneratedEmail.user_id == current_user.id,
+                GeneratedEmail.stage == stage,
+                GeneratedEmail.status.in_(["draft", "outreach_pending"])
+            ).all()
+        else:
+            # For other stages (like lastchance), use the original logic
+            emails = db.query(GeneratedEmail).filter(
+                GeneratedEmail.user_id == current_user.id,
+                GeneratedEmail.stage == stage
+            ).all()
     
     logger.info(f"[EMAILS] Found {len(emails)} emails for user {current_user.email} (ID: {current_user.id}) in stage '{stage}'")
     
@@ -613,3 +622,4 @@ async def send_all_via_gmail(
         "total_count": len(emails),
         "errors": errors if errors else None
     } 
+
