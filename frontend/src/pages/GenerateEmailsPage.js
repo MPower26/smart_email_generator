@@ -339,11 +339,21 @@ const GenerateEmailsPage = () => {
 
     // Load all templates for validation
     const allTemplates = await loadAllTemplates();
+    console.log('All templates loaded for validation:', allTemplates);
     
     // Check if templates exist for all categories
     const hasOutreachTemplate = allTemplates.some(t => t.category === 'outreach');
     const hasFollowupTemplate = allTemplates.some(t => t.category === 'followup');
     const hasLastchanceTemplate = allTemplates.some(t => t.category === 'lastchance');
+
+    console.log('Template validation results:', {
+      hasOutreachTemplate,
+      hasFollowupTemplate,
+      hasLastchanceTemplate,
+      outreachTemplates: allTemplates.filter(t => t.category === 'outreach'),
+      followupTemplates: allTemplates.filter(t => t.category === 'followup'),
+      lastchanceTemplates: allTemplates.filter(t => t.category === 'lastchance')
+    });
 
     if (!hasOutreachTemplate || !hasFollowupTemplate || !hasLastchanceTemplate) {
       const missingTemplates = [];
