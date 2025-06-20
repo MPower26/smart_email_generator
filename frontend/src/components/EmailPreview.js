@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Card, Button, Badge, Collapse, Alert, Spinner } from 'react-bootstrap';
+import { Card, Button, Badge, Collapse, Alert, Spinner, Form, Modal } from 'react-bootstrap';
 import { UserContext } from '../contexts/UserContext';
+import { emailService } from '../services/api';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net';
 
@@ -12,6 +13,11 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editedSubject, setEditedSubject] = useState(email.subject || '');
+  const [editedContent, setEditedContent] = useState(email.body || email.content || '');
+  const [showEditModal, setShowEditModal] = useState(false);
 
   // This effect will collapse emails when tab changes
   useEffect(() => {
@@ -240,6 +246,49 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
     }
   };
 
+  // Handler for opening edit modal
+  const handleEdit = (e) => {
+    e.stopPropagation();
+    setEditedSubject(email.subject || '');
+    setEditedContent(email.body || email.content || '');
+    setShowEditModal(true);
+  };
+
+  // Handler for saving edited email
+  const handleSaveEdit = async () => {
+    setIsSaving(true);
+    setError(null);
+    
+    try {
+      await emailService.updateEmailContent(email.id, {
+        subject: editedSubject,
+        content: editedContent
+      });
+      
+      // Update local email object
+      email.subject = editedSubject;
+      email.content = editedContent;
+      email.body = editedContent;
+      
+      setShowEditModal(false);
+      setError(null);
+    } catch (error) {
+      console.error('Error saving email:', error);
+      setError(error.message || 'Failed to save email changes.');
+      setTimeout(() => setError(null), 5000);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Handler for canceling edit
+  const handleCancelEdit = () => {
+    setShowEditModal(false);
+    setEditedSubject(email.subject || '');
+    setEditedContent(email.body || email.content || '');
+    setError(null);
+  };
+
   // Determine highlight classes based on props
   const getHighlightClasses = () => {
     if (isSentHighlight) {
@@ -372,6 +421,16 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
                   {copied ? 'Copied!' : 'Copy Body'}
                 </Button>
 
+                <Button 
+                  variant="outline-info"
+                  size="sm" 
+                  className="me-2"
+                  onClick={handleEdit}
+                  title="Edit Email"
+                >
+                  <i className="bi bi-pencil-fill"></i> Edit
+                </Button>
+
                 {/* Primary action: Gmail if connected, Connect Gmail if not */}
                 {userProfile?.gmail_access_token ? (
                   <Button 
@@ -436,6 +495,57 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
           </Card.Body>
         </div>
       </Collapse>
+
+      {/* Edit Email Modal */}
+      <Modal show={showEditModal} onHide={handleCancelEdit} size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>Edit Email</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form>
+            <Form.Group className="mb-3">
+              <Form.Label>Subject</Form.Label>
+              <Form.Control
+                type="text"
+                value={editedSubject}
+                onChange={(e) => setEditedSubject(e.target.value)}
+                placeholder="Email subject"
+              />
+            </Form.Group>
+            
+            <Form.Group className="mb-3">
+              <Form.Label>Content</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={15}
+                value={editedContent}
+                onChange={(e) => setEditedContent(e.target.value)}
+                placeholder="Email content"
+                style={{ fontFamily: 'monospace' }}
+              />
+            </Form.Group>
+          </Form>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={handleCancelEdit}>
+            Cancel
+          </Button>
+          <Button 
+            variant="primary" 
+            onClick={handleSaveEdit}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <>
+                <Spinner animation="border" size="sm" className="me-1" />
+                Saving...
+              </>
+            ) : (
+              'Save Changes'
+            )}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </Card>
   );
 };
