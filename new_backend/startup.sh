@@ -16,16 +16,16 @@ echo "Installed packages:"
 pip list
 
 # Verify dependencies are installed
-if ! python -c "import sendgrid, websockets, wsproto" 2>/dev/null; then
-    echo "Dependencies not found, installing requirements..."
+if ! python -c "import sendgrid" 2>/dev/null; then
+    echo "SendGrid not found, installing dependencies..."
     pip install -r requirements.txt
 fi
 
-# Verify WebSocket dependencies specifically
-echo "Verifying WebSocket dependencies..."
-python -c "import websockets; print('websockets version:', websockets.__version__)"
-python -c "import wsproto; print('wsproto version:', wsproto.__version__)"
-python -c "import uvicorn; print('uvicorn version:', uvicorn.__version__)"
+# Verify WebSocket dependencies are installed
+if ! python -c "import websockets" 2>/dev/null; then
+    echo "WebSocket dependencies not found, installing..."
+    pip install websockets wsproto
+fi
 
 # Start the FastAPI application with gunicorn
 echo "Starting FastAPI application with Gunicorn..."
