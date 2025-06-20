@@ -269,32 +269,81 @@ async def get_generation_progress(
     db: Session = Depends(get_db)
 ):
     """Get the current email generation progress for the user"""
-    progress = db.query(EmailGenerationProgress).filter(
-        EmailGenerationProgress.user_id == current_user.id,
-        EmailGenerationProgress.status == "processing"
-    ).order_by(EmailGenerationProgress.created_at.desc()).first()
-    
-    if not progress:
+    try:
+        logger.info(f"Getting generation progress for user {current_user.id}")
+        
+        # Check if the table exists first
+        try:
+            # Try a simple query to check if table exists
+            table_check = db.execute("SELECT COUNT(*) FROM email_generation_progress WHERE 1=0").scalar()
+            logger.info("Table email_generation_progress exists")
+        except Exception as table_check_error:
+            logger.error(f"Table email_generation_progress does not exist: {str(table_check_error)}")
+            return {
+                "status": "idle",
+                "total_contacts": 0,
+                "processed_contacts": 0,
+                "generated_emails": 0,
+                "percentage": 0,
+                "error": "Database table not available - please run the SQL migration"
+            }
+        
+        try:
+            progress = db.query(EmailGenerationProgress).filter(
+                EmailGenerationProgress.user_id == current_user.id,
+                EmailGenerationProgress.status == "processing"
+            ).order_by(EmailGenerationProgress.created_at.desc()).first()
+            
+            logger.info(f"Query executed successfully for user {current_user.id}")
+            
+        except Exception as query_error:
+            logger.error(f"Database error when querying progress: {str(query_error)}")
+            # Return idle status if table doesn't exist or other DB error
+            return {
+                "status": "idle",
+                "total_contacts": 0,
+                "processed_contacts": 0,
+                "generated_emails": 0,
+                "percentage": 0,
+                "error": f"Database query error: {str(query_error)}"
+            }
+        
+        if not progress:
+            logger.info(f"No active progress found for user {current_user.id}")
+            return {
+                "status": "idle",
+                "total_contacts": 0,
+                "processed_contacts": 0,
+                "generated_emails": 0,
+                "percentage": 0
+            }
+        
+        percentage = (progress.processed_contacts / progress.total_contacts * 100) if progress.total_contacts > 0 else 0
+        
+        logger.info(f"Progress for user {current_user.id}: {progress.processed_contacts}/{progress.total_contacts} ({percentage:.1f}%)")
+        
         return {
-            "status": "idle",
+            "status": progress.status,
+            "total_contacts": progress.total_contacts,
+            "processed_contacts": progress.processed_contacts,
+            "generated_emails": progress.generated_emails,
+            "percentage": round(percentage, 1),
+            "stage": progress.stage,
+            "created_at": progress.created_at.isoformat(),
+            "updated_at": progress.updated_at.isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in get_generation_progress for user {current_user.id}: {str(e)}")
+        # Return a safe default response instead of throwing an error
+        return {
+            "status": "error",
             "total_contacts": 0,
             "processed_contacts": 0,
             "generated_emails": 0,
-            "percentage": 0
+            "percentage": 0,
+            "error": str(e)
         }
-    
-    percentage = (progress.processed_contacts / progress.total_contacts * 100) if progress.total_contacts > 0 else 0
-    
-    return {
-        "status": progress.status,
-        "total_contacts": progress.total_contacts,
-        "processed_contacts": progress.processed_contacts,
-        "generated_emails": progress.generated_emails,
-        "percentage": round(percentage, 1),
-        "stage": progress.stage,
-        "created_at": progress.created_at.isoformat(),
-        "updated_at": progress.updated_at.isoformat()
-    }
 
 @router.post("/generate", response_model=Dict[str, Any])
 async def generate_emails(
