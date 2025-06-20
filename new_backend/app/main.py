@@ -7,6 +7,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 import json
 from typing import Dict, List
+import asyncio
+from datetime import datetime
 
 from app.api.endpoints import emails, friends, auth_gmail, user_settings, templates
 from app.api import auth
@@ -140,11 +142,48 @@ async def health_check():
 @app.get("/websocket-test")
 async def websocket_test():
     """Test endpoint to verify WebSocket support"""
-    return {
-        "message": "WebSocket test endpoint",
-        "websocket_support": True,
-        "endpoint": "/ws/progress/{user_id}"
-    }
+    try:
+        import websockets
+        import wsproto
+        return {
+            "message": "WebSocket test endpoint",
+            "websocket_support": True,
+            "websockets_version": websockets.__version__,
+            "wsproto_version": wsproto.__version__,
+            "endpoint": "/ws/progress/{user_id}"
+        }
+    except ImportError as e:
+        return {
+            "message": "WebSocket test endpoint",
+            "websocket_support": False,
+            "error": f"Missing WebSocket dependency: {str(e)}",
+            "endpoint": "/ws/progress/{user_id}"
+        }
+
+@app.websocket("/ws/test")
+async def websocket_test_connection(websocket: WebSocket):
+    """Simple WebSocket test endpoint"""
+    logger.info("WebSocket test connection attempt")
+    try:
+        await websocket.accept()
+        logger.info("WebSocket test connection accepted")
+        
+        # Send a test message
+        await websocket.send_text(json.dumps({
+            "type": "test",
+            "message": "WebSocket connection successful!",
+            "timestamp": datetime.utcnow().isoformat()
+        }))
+        
+        # Keep connection alive for a moment
+        await asyncio.sleep(1)
+        
+        await websocket.close()
+        logger.info("WebSocket test connection closed")
+        
+    except Exception as e:
+        logger.error(f"WebSocket test connection error: {str(e)}")
+        await websocket.close()
 
 @app.websocket("/ws/progress/{user_id}")
 async def websocket_progress(websocket: WebSocket, user_id: str):
