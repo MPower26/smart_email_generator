@@ -134,7 +134,7 @@ async def update_email_status(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Update the status of an email (e.g., 'draft', 'outreach_sent', 'followup_due', 'lastchance_due')"""
+    """Update the status of an email (e.g., to 'draft', 'not-interested')."""
     email = db.query(GeneratedEmail).filter(
         GeneratedEmail.id == email_id,
         GeneratedEmail.user_id == current_user.id
@@ -143,47 +143,63 @@ async def update_email_status(
         raise HTTPException(status_code=404, detail="Email not found")
     
     new_status = data.get("status")
-    valid_statuses = ['draft', 'outreach_sent', 'followup_due', 'lastchance_due', 'sent by friend', 'completed']
+    # This endpoint is for simple status changes, not for sending.
+    valid_statuses = ['draft', 'not-interested', 'replied']
     if new_status not in valid_statuses:
-         raise HTTPException(status_code=400, detail=f"Invalid status value. Must be one of: {', '.join(valid_statuses)}")
+         raise HTTPException(
+             status_code=400, 
+             detail=f"Invalid status for this endpoint. Use 'send' endpoint for sending. Valid statuses are: {', '.join(valid_statuses)}"
+         )
          
-    # Set original status before any changes
-    original_status = email.status
-
-    # Update status and timestamps
     email.status = new_status
-    if new_status.endswith('_sent'):
-        email.sent_at = datetime.utcnow()
-
-        # If an outreach email is sent, generate a follow-up
-        if original_status == "outreach":
-            try:
-                email_generator = EmailGenerator(db)
-                followup_email = email_generator.generate_followup_email(email, current_user)
-                logger.info(f"Generated follow-up email ID {followup_email.id} for original email ID {email_id}")
-            except Exception as e:
-                logger.error(f"Failed to generate follow-up for email {email_id}: {e}")
-
-        # If a follow-up email is sent, generate a last chance email
-        elif original_status == "followup":
-            try:
-                email_generator = EmailGenerator(db)
-                last_chance_email = email_generator.generate_last_chance_email(email, current_user)
-                logger.info(f"Generated last chance email ID {last_chance_email.id} for original email ID {email_id}")
-            except Exception as e:
-                logger.error(f"Failed to generate last chance for email {email_id}: {e}")
-
-    # For manual status updates like 'not-interested'
-    else:
-        email.status = new_status
-        
     db.commit()
     db.refresh(email)
     
-    # After commit, the original email's status is what we set it to
-    logger.info(f"Updated email {email_id} from status '{original_status}' to '{email.status}'")
-    
     return {"message": "Email status updated successfully", "email_id": email_id, "new_status": email.status}
+
+@router.post("/send/{email_id}", response_model=Dict[str, Any])
+async def send_email(
+    email_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Marks an email as sent and triggers the next stage generation."""
+    email = db.query(GeneratedEmail).filter(
+        GeneratedEmail.id == email_id,
+        GeneratedEmail.user_id == current_user.id
+    ).first()
+    if not email:
+        raise HTTPException(status_code=404, detail="Email not found")
+
+    original_stage = email.stage
+    new_status = f"{original_stage}_sent"
+    email.status = new_status
+    email.sent_at = datetime.utcnow()
+
+    # If an outreach email is sent, generate a follow-up
+    if original_stage == "outreach":
+        try:
+            email_generator = EmailGenerator(db)
+            followup_email = email_generator.generate_followup_email(email, current_user)
+            logger.info(f"Generated follow-up email ID {followup_email.id} for original email ID {email_id}")
+        except Exception as e:
+            logger.error(f"Failed to generate follow-up for email {email_id}: {e}")
+
+    # If a follow-up email is sent, generate a last chance email
+    elif original_stage == "followup":
+        try:
+            email_generator = EmailGenerator(db)
+            last_chance_email = email_generator.generate_last_chance_email(email, current_user)
+            logger.info(f"Generated last chance email ID {last_chance_email.id} for original email ID {email_id}")
+        except Exception as e:
+            logger.error(f"Failed to generate last chance for email {email_id}: {e}")
+            
+    db.commit()
+    db.refresh(email)
+    
+    logger.info(f"Sent email {email_id} and updated status from '{original_stage}' to '{new_status}'")
+    
+    return {"message": "Email sent successfully and next stage triggered", "email_id": email_id, "new_status": new_status}
 
 @router.put("/{email_id}/content", response_model=Dict[str, Any])
 async def update_email_content(
