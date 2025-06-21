@@ -118,15 +118,14 @@ class GeneratedEmail(Base):
     content = Column(Text)
     user_id = Column(Integer, ForeignKey("users.id"))
     template_id = Column(Integer, ForeignKey("email_templates.id"), nullable=True)
-    status = Column(String(50))  # draft, sent, failed
     stage = Column(String(50), default="outreach")  # outreach, followup, lastchance
-    follow_up_status = Column(String(50))  # none, scheduled, sent
+    follow_up_status = Column(String(50), nullable=True)  # none, scheduled, sent
     follow_up_date = Column(DateTime(timezone=True), nullable=True)
     final_follow_up_date = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     sent_at = Column(DateTime(timezone=True), nullable=True)
-    to = Column(String(255))  # Legacy field
-    body = Column(Text)  # Legacy field
+    to = Column(String(255), nullable=True)  # Legacy field
+    body = Column(Text, nullable=True)  # Legacy field
 
     # Relationships
     user = relationship("User", back_populates="generated_emails", foreign_keys=[user_id])
@@ -135,19 +134,8 @@ class GeneratedEmail(Base):
     # EMail flow
     followup_due_at = Column(DateTime, nullable=True)
     lastchance_due_at = Column(DateTime, nullable=True)
-    status = Column(String, default="outreach_pending")  # outreach_sent, followup_due, lastchance_due, sent, etc.
-
-class SentEmailRecord(Base):
-    __tablename__ = "sent_email_records"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    recipient_email = Column(String(255), index=True)
-    sent_at = Column(DateTime(timezone=True), server_default=func.now())
-    stage = Column(String(50))  # outreach, followup, lastchance
-    
-    # Relationship with user
-    user = relationship("User")
+    status = Column(String(50), default="outreach_pending")  # outreach_sent, followup_due, lastchance_due, sent, etc.
+    thread_id = Column(String(255), nullable=True) # For Gmail threading
 
 class EmailGenerationProgress(Base):
     __tablename__ = "email_generation_progress"
@@ -168,3 +156,4 @@ class EmailGenerationProgress(Base):
     
     def __repr__(self):
         return f"<EmailGenerationProgress(id={self.id}, user_id={self.user_id}, status={self.status})>"
+
