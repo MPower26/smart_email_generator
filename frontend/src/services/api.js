@@ -92,7 +92,7 @@ export const emailService = {
   },
   
   // Update email status (mark as sent, etc.)
-  updateEmailStatus: (emailId, data) => api.put(`/api/emails/${emailId}/status`, data),
+  updateEmailStatus: (emailId, data) => api.put(`/emails/${emailId}/status`, data),
   
   // Update email content (for editing)
   updateEmailContent: (emailId, data) => api.put(`/api/emails/${emailId}/content`, data),
@@ -104,7 +104,9 @@ export const emailService = {
   getGenerationProgress: () => api.get('/api/emails/generation-progress'),
   
   // Delete email
-  deleteEmail: (emailId) => api.delete(`/api/emails/${emailId}`),
+  deleteEmail: (emailId) => api.delete(`/emails/${emailId}`),
+
+  sendEmail: (emailId) => api.post(`/emails/send/${emailId}`),
 };
 
 // Template API - Fixed to match backend routes exactly
