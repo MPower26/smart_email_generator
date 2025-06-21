@@ -255,7 +255,7 @@ async def get_templates(
     return result
 
 @router.get("/generation-progress", response_model=Dict[str, Any])
-async def get_generation_progress(
+async def get_generation_progress_generic(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -409,6 +409,36 @@ async def generate_emails(
     except Exception as e:
         logger.error(f"Error starting email generation: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/generation-progress/{progress_id}", response_model=Dict[str, Any])
+async def get_generation_progress_by_id(
+    progress_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get email generation progress by its specific ID."""
+    try:
+        progress = db.query(EmailGenerationProgress).filter(
+            EmailGenerationProgress.id == progress_id,
+            EmailGenerationProgress.user_id == current_user.id
+        ).first()
+
+        if not progress:
+            # This is a valid case if polling starts before the record is findable
+            return {"status": "not_found"}
+
+        percentage = (progress.processed_contacts / progress.total_contacts * 100) if progress.total_contacts > 0 else 0
+        
+        return {
+            "status": progress.status,
+            "total_contacts": progress.total_contacts,
+            "processed_contacts": progress.processed_contacts,
+            "generated_emails": progress.generated_emails,
+            "percentage": round(percentage, 1)
+        }
+    except Exception as e:
+        logger.error(f"Error in get_generation_progress_by_id for progress_id {progress_id}: {str(e)}")
+        return {"status": "error", "error": str(e)}
 
 async def generate_emails_background(
     contacts: List[Dict[str, Any]],
