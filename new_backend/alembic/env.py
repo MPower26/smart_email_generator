@@ -13,8 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 load_dotenv()
 
 # Import all models here
-from app.models.user import User
-from app.models.verification import VerificationCode
+from app.models.models import User, VerificationCode, EmailTemplate, GeneratedEmail, SentEmailRecord, EmailGenerationProgress, FriendRequest
 from app.db.database import Base
 
 # this is the Alembic Config object, which provides
