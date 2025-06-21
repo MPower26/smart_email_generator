@@ -72,12 +72,22 @@ export const emailService = {
   getEmailsByStage: (stage) => api.get(`/api/emails/by-stage/${stage}`),
   
   // Generate emails
-  generateEmails: (formData) => {
+  generateEmails: (file, templateId, stage, avoidDuplicates, onUploadProgress) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('stage', stage);
+    formData.append('avoid_duplicates', String(avoidDuplicates));
+
+    if (templateId) {
+      formData.append('template_id', templateId);
+    }
+    
     return api.post('/api/emails/generate', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
       timeout: 600000, // 10 minutes timeout
+      onUploadProgress,
     });
   },
   
