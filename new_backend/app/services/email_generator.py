@@ -684,3 +684,20 @@ Best regards,
         self.db.refresh(lastchance_email)
         
         return lastchance_email 
+
+    def mark_generation_complete(self, progress_id: int):
+        """
+        Finalizes the generation process by updating the progress record.
+        This ensures the UI gets a 'completed' status even for very fast jobs.
+        """
+        try:
+            progress_record = self.db.query(EmailGenerationProgress).filter(
+                EmailGenerationProgress.id == progress_id
+            ).first()
+            if progress_record:
+                # Ensure the generated count matches the processed count upon completion
+                progress_record.generated_emails = progress_record.processed_contacts
+                progress_record.status = "completed"
+                self.db.commit()
+        except Exception as e:
+            logger.error(f"Error marking generation as complete for progress_id {progress_id}: {e}")
