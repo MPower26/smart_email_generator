@@ -185,8 +185,22 @@ const GenerateEmailsPage = () => {
 
   // Load data when component mounts or user profile changes
   useEffect(() => {
+    // Check for ongoing generation when the page loads
+    const checkInitialProgress = async () => {
+      try {
+        const response = await emailService.getGenerationProgress();
+        if (response.data?.status === 'processing') {
+          setIsGenerating(true);
+          startProgressPolling();
+        }
+      } catch (error) {
+        console.error("Failed to check initial progress", error);
+      }
+    };
+
     loadTemplates();
     loadEmailsByStage();
+    checkInitialProgress();
   }, [userProfile]);
 
   // Debug user profile
@@ -199,6 +213,11 @@ const GenerateEmailsPage = () => {
 
   // Start polling for progress updates
   const startProgressPolling = () => {
+    // Clear any existing interval
+    if (progressPolling) {
+      clearInterval(progressPolling);
+    }
+
     const interval = setInterval(async () => {
       try {
         const response = await emailService.getGenerationProgress();
@@ -209,42 +228,39 @@ const GenerateEmailsPage = () => {
             type: 'generation',
             current: progress.processed_contacts,
             total: progress.total_contacts,
-            startTime: Date.now() - 1000, // Approximate start time
-            speed: progress.processed_contacts / Math.max(1, (Date.now() - (Date.now() - 1000)) / 1000),
+            startTime: Date.now() - 2000, // Approximate start time
+            speed: progress.processed_contacts / Math.max(1, (Date.now() - (Date.now() - 2000)) / 1000),
             status: 'processing'
           });
         } else if (progress.status === 'completed') {
           setGenerationProgress(prev => ({
             ...prev,
-            current: progress.generated_emails,
+            current: progress.total_contacts, // Show 100%
             status: 'completed'
           }));
           stopProgressPolling();
-          // Reload emails after completion
           loadEmailsByStage();
+          setTimeout(() => setIsGenerating(false), 2000); // Wait 2s before hiding progress
         } else if (progress.status === 'error') {
           setGenerationProgress(prev => ({
             ...prev,
             status: 'error'
           }));
-          setError(`Email generation failed: ${progress.error || 'Unknown error'}`);
+          setError(`Email generation failed: ${progress.error_message || 'Unknown error'}`);
           stopProgressPolling();
+          setTimeout(() => setIsGenerating(false), 5000); // Keep error visible for 5s
         } else if (progress.status === 'idle') {
-          // No active generation, stop polling
+          // If the status is idle, it means the job finished before we could poll.
+          // Assume completion and stop.
           stopProgressPolling();
+          setIsGenerating(false);
+          loadEmailsByStage();
         }
       } catch (error) {
         console.error('Error polling progress:', error);
-        
-        // If we get a 500 error, it might be a temporary database issue
-        if (error.response?.status === 500) {
-          console.log('Database error during progress polling, will retry...');
-          // Don't stop polling for 500 errors, just log and continue
-        } else {
-          // For other errors, stop polling and show error
-          setError(`Progress tracking error: ${error.message}`);
-          stopProgressPolling();
-        }
+        setError(`Progress tracking error: ${error.message}`);
+        stopProgressPolling();
+        setIsGenerating(false);
       }
     }, 2000); // Poll every 2 seconds
     
@@ -256,6 +272,7 @@ const GenerateEmailsPage = () => {
     if (progressPolling) {
       clearInterval(progressPolling);
       setProgressPolling(null);
+      console.log('Progress polling stopped.');
     }
   };
 
@@ -275,14 +292,14 @@ const GenerateEmailsPage = () => {
 
     setLoading(true);
     setError('');
+    setIsGenerating(true); // Immediately show the progress view
     
     // Reset progress trackers
     setUploadProgress(prev => ({ ...prev, status: 'processing', current: 0, total: file.size, startTime: Date.now() }));
-    setGenerationProgress(prev => ({ ...prev, status: 'idle', current: 0, total: 0 }));
+    setGenerationProgress(prev => ({ ...prev, status: 'processing', current: 0, total: 0 }));
     setSendingProgress(prev => ({ ...prev, status: 'idle', current: 0, total: 0 }));
 
     try {
-      // Step 1: Start email generation
       await emailService.generateEmails(
         file,
         selectedTemplate,
@@ -298,11 +315,8 @@ const GenerateEmailsPage = () => {
         }
       );
       
-      // Update upload progress to completed
       setUploadProgress(prev => ({ ...prev, status: 'completed', current: prev.total }));
       
-      // Step 2: Start polling for generation progress
-      setGenerationProgress(prev => ({ ...prev, status: 'processing', startTime: Date.now() }));
       startProgressPolling();
 
     } catch (err) {
@@ -310,12 +324,12 @@ const GenerateEmailsPage = () => {
       setError(errorMessage);
       console.error('Email generation failed:', err);
       
-      // Update progress trackers to show error
       setUploadProgress(prev => ({ ...prev, status: 'error' }));
       setGenerationProgress(prev => ({ ...prev, status: 'error' }));
+      setIsGenerating(false); // Hide progress on immediate failure
 
     } finally {
-      setLoading(false); // Keep this to re-enable the button if there's an error
+      setLoading(false);
     }
   };
 
@@ -450,6 +464,8 @@ const GenerateEmailsPage = () => {
       setLoading(false);
     }
   };
+
+  const [isGenerating, setIsGenerating] = useState(false);
 
   return (
     <Container className="templates-page">
