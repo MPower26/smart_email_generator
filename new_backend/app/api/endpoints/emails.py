@@ -11,7 +11,7 @@ from fastapi import status
 from sqlalchemy import or_, and_, text
 
 from app.db.database import get_db
-from app.models.models import GeneratedEmail, User, EmailTemplate, SentEmailRecord, EmailGenerationProgress
+from app.models.models import GeneratedEmail, User, EmailTemplate, EmailGenerationProgress
 from app.api.auth import get_current_user
 from app.services.email_generator import EmailGenerator
 from app.services.email_service import send_verification_email, EMAIL_CONFIG
@@ -895,4 +895,3 @@ async def send_all_via_gmail(
         "total_count": len(emails),
         "errors": errors if errors else None
     } 
-
