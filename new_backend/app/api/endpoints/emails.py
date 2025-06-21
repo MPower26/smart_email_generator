@@ -347,6 +347,7 @@ async def get_generation_progress(
 
 @router.post("/generate", response_model=Dict[str, Any])
 async def generate_emails(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     template_id: Optional[str] = Form(None),
     stage: str = Form("outreach"),
@@ -394,19 +395,17 @@ async def generate_emails(
         
         logger.info(f"Started email generation for user {current_user.id}: {len(contacts)} contacts")
         
-        # Start background task for email generation
-        import asyncio
-        asyncio.create_task(
-            generate_emails_background(
-                contacts, 
-                current_user, 
-                template, 
-                stage, 
-                avoid_duplicates, 
-                dedupe_with_friends, 
-                friends_with_sharing,
-                progress_record.id
-            )
+        # Start background task for email generation using FastAPI's system
+        background_tasks.add_task(
+            generate_emails_background,
+            contacts, 
+            current_user, 
+            template, 
+            stage, 
+            avoid_duplicates, 
+            dedupe_with_friends, 
+            friends_with_sharing,
+            progress_record.id
         )
         
         return {
