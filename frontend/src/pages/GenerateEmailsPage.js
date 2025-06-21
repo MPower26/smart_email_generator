@@ -108,7 +108,7 @@ const GenerateEmailsPage = () => {
 
   // Load templates when email stage changes
   useEffect(() => {
-    loadTemplates();
+      loadTemplates();
   }, [emailStage]);
   
   // Handle template selection change
@@ -120,7 +120,7 @@ const GenerateEmailsPage = () => {
   const handleAddTemplate = () => {
     window.open('https://jolly-bush-0bae83703.6.azurestaticapps.net/templates', '_blank');
   };
-
+  
   // Load emails by stage
   const loadEmailsByStage = async () => {
     setLoadingEmails(true);
@@ -542,9 +542,9 @@ const GenerateEmailsPage = () => {
                       >
                         {templates.length > 0 ? (
                           templates.map(template => (
-                            <option key={template.id} value={template.id}>
-                              {template.name} {template.is_default && '(Default)'}
-                            </option>
+                          <option key={template.id} value={template.id}>
+                            {template.name} {template.is_default && '(Default)'}
+                          </option>
                           ))
                         ) : (
                           <option value="ai_generated">AI Generated</option>
@@ -552,7 +552,7 @@ const GenerateEmailsPage = () => {
                       </Form.Select>
                       {templates.length === 0 && (
                         <Form.Text className="text-muted">
-                          No templates available for {emailStage === 'outreach' ? 'Initial Outreach' : 
+                        No templates available for {emailStage === 'outreach' ? 'Initial Outreach' : 
                                                      emailStage === 'followup' ? 'Follow-Up' : 'Last Chance'}. 
                           Emails will be generated using AI.
                         </Form.Text>
@@ -566,12 +566,12 @@ const GenerateEmailsPage = () => {
                     >
                       Add Template
                     </Button>
-                  </div>
-                </Form.Group>
+                      </div>
+                  </Form.Group>
 
                 <Form.Group className="mb-3">
-                  <Form.Check
-                    type="checkbox"
+                <Form.Check
+                  type="checkbox"
                     label={
                       <span>
                         Avoid duplicates
@@ -589,10 +589,10 @@ const GenerateEmailsPage = () => {
                         </OverlayTrigger>
                       </span>
                     }
-                    checked={avoidDuplicates}
-                    onChange={e => setAvoidDuplicates(e.target.checked)}
-                    className="mb-3"
-                  />
+                  checked={avoidDuplicates}
+                  onChange={e => setAvoidDuplicates(e.target.checked)}
+                  className="mb-3"
+                />
                 </Form.Group>
 
                 {error && <Alert variant="danger">{error}</Alert>}
@@ -614,9 +614,23 @@ const GenerateEmailsPage = () => {
                   <Button
                     variant="primary"
                     onClick={handleGenerateEmails}
-                    disabled={loading || !file}
+                    disabled={isGenerating || loading || !file}
                   >
-                    {loading ? 'Generating...' : 'Generate Emails'}
+                    {isGenerating ? (
+                      <>
+                        <Spinner
+                          as="span"
+                          animation="border"
+                          size="sm"
+                          role="status"
+                          aria-hidden="true"
+                          className="me-2"
+                        />
+                        Generating...
+                      </>
+                    ) : (
+                      'Generate Emails'
+                    )}
                   </Button>
                 </div>
               </Form>
@@ -662,13 +676,13 @@ const GenerateEmailsPage = () => {
                           </>
                         )}
                       </Button>
-                      <Button 
-                        variant="outline-secondary" 
-                        size="sm"
-                        onClick={() => handleExportStage(outreachEmails, 'outreach')}
-                      >
-                        Export Outreach Emails
-                      </Button>
+                    <Button 
+                      variant="outline-secondary" 
+                      size="sm"
+                      onClick={() => handleExportStage(outreachEmails, 'outreach')}
+                    >
+                      Export Outreach Emails
+                    </Button>
                     </div>
                   </div>
                   <div className="email-list">
@@ -738,13 +752,13 @@ const GenerateEmailsPage = () => {
                           </>
                         )}
                       </Button>
-                      <Button 
-                        variant="outline-secondary" 
-                        size="sm"
-                        onClick={() => handleExportStage(followupEmails, 'followup')}
-                      >
-                        Export Follow-Up Emails
-                      </Button>
+                    <Button 
+                      variant="outline-secondary" 
+                      size="sm"
+                      onClick={() => handleExportStage(followupEmails, 'followup')}
+                    >
+                      Export Follow-Up Emails
+                    </Button>
                     </div>
                   </div>
                   <div className="email-list">
@@ -814,13 +828,13 @@ const GenerateEmailsPage = () => {
                           </>
                         )}
                       </Button>
-                      <Button 
-                        variant="outline-secondary" 
-                        size="sm"
-                        onClick={() => handleExportStage(lastChanceEmails, 'lastchance')}
-                      >
-                        Export Last Chance Emails
-                      </Button>
+                    <Button 
+                      variant="outline-secondary" 
+                      size="sm"
+                      onClick={() => handleExportStage(lastChanceEmails, 'lastchance')}
+                    >
+                      Export Last Chance Emails
+                    </Button>
                     </div>
                   </div>
                   <div className="email-list">
