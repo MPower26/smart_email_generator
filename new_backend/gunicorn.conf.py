@@ -7,11 +7,13 @@ bind = f"0.0.0.0:{os.getenv('PORT', '8000')}"
 backlog = 2048
 
 # Worker processes
-workers = multiprocessing.cpu_count() * 2 + 1
+workers = 1
 worker_class = 'uvicorn.workers.UvicornWorker'
 worker_connections = 1000
-timeout = 120
+timeout = 600
 keepalive = 2
+max_requests = 1000
+max_requests_jitter = 50
 
 # Logging
 accesslog = '-'
