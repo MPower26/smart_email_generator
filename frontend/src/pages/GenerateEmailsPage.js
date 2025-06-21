@@ -269,122 +269,53 @@ const GenerateEmailsPage = () => {
   // Generate emails
   const handleGenerateEmails = async () => {
     if (!file) {
-      setError('Please select a CSV file.');
-      return;
-    }
-
-    // Load all templates for validation
-    const allTemplates = await loadAllTemplates();
-    console.log('All templates loaded for validation:', allTemplates);
-    
-    // Check if templates exist for all categories
-    const hasOutreachTemplate = allTemplates.some(t => t.category === 'outreach');
-    const hasFollowupTemplate = allTemplates.some(t => t.category === 'followup');
-    const hasLastchanceTemplate = allTemplates.some(t => t.category === 'lastchance');
-
-    console.log('Template validation results:', {
-      hasOutreachTemplate,
-      hasFollowupTemplate,
-      hasLastchanceTemplate,
-      outreachTemplates: allTemplates.filter(t => t.category === 'outreach'),
-      followupTemplates: allTemplates.filter(t => t.category === 'followup'),
-      lastchanceTemplates: allTemplates.filter(t => t.category === 'lastchance')
-    });
-
-    if (!hasOutreachTemplate || !hasFollowupTemplate || !hasLastchanceTemplate) {
-      const missingTemplates = [];
-      if (!hasOutreachTemplate) missingTemplates.push('Initial Outreach');
-      if (!hasFollowupTemplate) missingTemplates.push('Follow-Up');
-      if (!hasLastchanceTemplate) missingTemplates.push('Last Chance');
-      
-      setError(
-        'You must create templates for all email stages before generating emails. ' +
-        'Please create templates for: ' + missingTemplates.join(', ') +
-        '. You can create templates in the Templates section.'
-      );
+      setError('Please select a CSV file to upload.');
       return;
     }
 
     setLoading(true);
     setError('');
-
-    // Start upload progress tracking
-    const uploadStartTime = Date.now();
-    const fileSize = file.size;
-    setUploadProgress({
-      type: 'upload',
-      current: 0,
-      total: fileSize,
-      fileSize: fileSize,
-      startTime: uploadStartTime,
-      speed: 0,
-      status: 'processing'
-    });
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('use_ai', selectedTemplate === 'ai_generated');
-    formData.append('stage', emailStage);
-    formData.append('avoid_duplicates', avoidDuplicates);
     
-    // Add user profile information if available
-    if (userProfile) {
-      if (userProfile.full_name) formData.append('your_name', userProfile.full_name);
-      if (userProfile.position) formData.append('your_position', userProfile.position);
-      if (userProfile.company_name) formData.append('company_name', userProfile.company_name);
-      if (userProfile.email) formData.append('your_contact', userProfile.email);
-    }
-    
-    // Only add template_id if a specific template is selected (not AI generated)
-    if (selectedTemplate && selectedTemplate !== 'ai_generated') {
-      formData.append('template_id', selectedTemplate);
-    }
+    // Reset progress trackers
+    setUploadProgress(prev => ({ ...prev, status: 'processing', current: 0, total: file.size, startTime: Date.now() }));
+    setGenerationProgress(prev => ({ ...prev, status: 'idle', current: 0, total: 0 }));
+    setSendingProgress(prev => ({ ...prev, status: 'idle', current: 0, total: 0 }));
 
     try {
-      // Simulate upload progress (since we can't track actual upload progress with FormData)
-      const uploadInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          const elapsed = (Date.now() - uploadStartTime) / 1000;
-          const speed = prev.current / elapsed;
-          const newCurrent = Math.min(prev.current + fileSize * 0.1, fileSize);
-          
-          if (newCurrent >= fileSize) {
-            clearInterval(uploadInterval);
-            return { ...prev, current: fileSize, speed, status: 'completed' };
-          }
-          
-          return { ...prev, current: newCurrent, speed };
-        });
-      }, 100);
-
-      const response = await emailService.generateEmails(formData);
-      
-      // Complete upload progress
-      setUploadProgress(prev => ({ ...prev, status: 'completed' }));
-      
-      // Start polling for generation progress
-      startProgressPolling();
-      
-      if (response.data && response.data.status === 'processing') {
-        // Email generation started in background
-        console.log('Email generation started in background:', response.data);
-        // Switch to appropriate tab based on the stage of generated emails
-        setActiveTab(emailStage);
-      } else {
-        throw new Error('Invalid response format from server');
-      }
-    } catch (err) {
-      console.error('Error generating emails:', err);
-      setError(
-        err.response?.data?.detail || err.response?.data?.message || 
-        'Failed to generate emails. Please check your file and try again.'
+      // Step 1: Start email generation
+      await emailService.generateEmails(
+        file,
+        selectedTemplate,
+        emailStage,
+        avoidDuplicates,
+        (event) => {
+          setUploadProgress(prev => ({
+            ...prev,
+            current: event.loaded,
+            total: event.total,
+            speed: prev.startTime ? (event.loaded / ((Date.now() - prev.startTime) / 1000)) : 0
+          }));
+        }
       );
       
-      // Mark progress as error
+      // Update upload progress to completed
+      setUploadProgress(prev => ({ ...prev, status: 'completed', current: prev.total }));
+      
+      // Step 2: Start polling for generation progress
+      setGenerationProgress(prev => ({ ...prev, status: 'processing', startTime: Date.now() }));
+      startProgressPolling();
+
+    } catch (err) {
+      const errorMessage = err.response?.data?.detail || 'An unexpected error occurred during email generation.';
+      setError(errorMessage);
+      console.error('Email generation failed:', err);
+      
+      // Update progress trackers to show error
       setUploadProgress(prev => ({ ...prev, status: 'error' }));
       setGenerationProgress(prev => ({ ...prev, status: 'error' }));
+
     } finally {
-      setLoading(false);
+      setLoading(false); // Keep this to re-enable the button if there's an error
     }
   };
 
