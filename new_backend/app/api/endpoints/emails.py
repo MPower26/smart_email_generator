@@ -8,7 +8,7 @@ import csv
 import io
 import os
 from fastapi import status
-from sqlalchemy import or_, and_
+from sqlalchemy import or_, and_, text
 
 from app.db.database import get_db
 from app.models.models import GeneratedEmail, User, EmailTemplate, SentEmailRecord, EmailGenerationProgress
@@ -275,7 +275,7 @@ async def get_generation_progress(
         # Check if the table exists first
         try:
             # Try a simple query to check if table exists
-            table_check = db.execute("SELECT COUNT(*) FROM email_generation_progress WHERE 1=0").scalar()
+            table_check = db.execute(text("SELECT COUNT(*) FROM email_generation_progress WHERE 1=0")).scalar()
             logger.info("Table email_generation_progress exists")
         except Exception as table_check_error:
             logger.error(f"Table email_generation_progress does not exist: {str(table_check_error)}")
