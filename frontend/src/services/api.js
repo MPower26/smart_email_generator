@@ -63,7 +63,7 @@ api.interceptors.response.use(
 // Service d'API pour les emails
 export const emailService = {
   // Get templates
-  getTemplates: () => api.get('/api/emails/templates'),
+  getTemplates: () => api.get('/emails/templates'),
   
   // Get templates by category
   getTemplatesByCategory: (category) => api.get(`/api/templates?category=${category}`),
@@ -101,7 +101,8 @@ export const emailService = {
   sendAllViaGmail: (stage) => api.post(`/api/emails/send_all_via_gmail/${stage}`),
   
   // Get email generation progress
-  getGenerationProgress: () => api.get('/api/emails/generation-progress'),
+  getGenerationProgress: () => api.get('/emails/generation-progress'),
+  getGenerationProgressById: (progressId) => api.get(`/emails/generation-progress/${progressId}`),
   
   // Delete email
   deleteEmail: (emailId) => api.delete(`/emails/${emailId}`),
