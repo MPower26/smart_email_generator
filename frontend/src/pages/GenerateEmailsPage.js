@@ -353,12 +353,15 @@ const GenerateEmailsPage = () => {
   const handleMarkAsSent = async (emailId) => {
     setError(null); // Clear previous errors
     try {
-      await emailService.updateEmailStatus(emailId, { status: 'outreach_sent' });
+      await emailService.sendEmail(emailId);
       setLastAction({ id: emailId, type: 'sent' }); // <-- Set action type to 'sent'
-      loadEmailsByStage(); // Reload to reflect status change
+      // Reload emails for all stages to see the new follow-up
+      loadEmailsByStage('outreach');
+      loadEmailsByStage('followup');
+      loadEmailsByStage('lastchance');
     } catch (err) {
       console.error('Error marking email as sent:', err);
-      setError('Failed to update email status.');
+      setError('Failed to send email and generate next stage.');
       setLastAction({ id: null, type: null }); // Clear highlight on error
     }
   };
@@ -367,6 +370,7 @@ const GenerateEmailsPage = () => {
   const handleUnmarkAsSent = async (emailId) => {
     setError(null); // Clear previous errors
     try {
+      // This still uses the status endpoint, which is now correctly limited
       await emailService.updateEmailStatus(emailId, { status: 'draft' });
       setLastAction({ id: emailId, type: 'unmarked' }); // <-- Set action type to 'unmarked'
       loadEmailsByStage(); // Reload to reflect status change
