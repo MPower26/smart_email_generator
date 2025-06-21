@@ -55,20 +55,10 @@ async def get_emails_by_stage(
     logger.info(f"[EMAILS] Getting emails for user {current_user.email} (ID: {current_user.id}) in stage '{stage}'")
     logger.info(f"Current user details - ID: {current_user.id}, Email: {current_user.email}")
     
-    # Get user's own emails with special logic for followup stage
     if stage == "followup":
-        # For followup stage, include emails that are either:
-        # 1. status = 'followup_due' 
-        # 2. status = 'outreach_sent' AND have followup_due_at set
         emails = db.query(GeneratedEmail).filter(
             GeneratedEmail.user_id == current_user.id,
-            or_(
-                GeneratedEmail.status == "followup_due",
-                and_(
-                    GeneratedEmail.status == "outreach_sent",
-                    GeneratedEmail.followup_due_at.isnot(None)
-                )
-            )
+            GeneratedEmail.stage == "followup"
         ).all()
     else:
         # For other stages, use the original logic but filter out sent emails from outreach
@@ -157,58 +147,43 @@ async def update_email_status(
     if new_status not in valid_statuses:
          raise HTTPException(status_code=400, detail=f"Invalid status value. Must be one of: {', '.join(valid_statuses)}")
          
+    # Set original status before any changes
+    original_status = email.status
+
+    # Update status and timestamps
     email.status = new_status
-    
-    # Set sent_at timestamp when marking as sent
-    if email.status in ["outreach_sent", "sent by friend"] and not email.sent_at:
+    if new_status.endswith('_sent'):
         email.sent_at = datetime.utcnow()
-        
-        # Set followup timestamps based on user's interval settings
-        if email.status == "outreach_sent":
-            now = datetime.utcnow()
-            followup_days = current_user.followup_interval_days or 3
-            lastchance_days = current_user.lastchance_interval_days or 6
-            
-            email.followup_due_at = now + timedelta(days=followup_days)
-            email.lastchance_due_at = now + timedelta(days=lastchance_days)
-            
-            # Automatically move to followup_due status
-            email.status = "followup_due"
-            
-            # Generate a follow-up email automatically
+
+        # If an outreach email is sent, generate a follow-up
+        if original_status == "outreach":
             try:
                 email_generator = EmailGenerator(db)
                 followup_email = email_generator.generate_followup_email(email, current_user)
                 logger.info(f"Generated follow-up email ID {followup_email.id} for original email ID {email_id}")
-            except Exception as followup_error:
-                logger.error(f"Failed to generate follow-up email: {str(followup_error)}")
-                # Don't fail the main operation if follow-up generation fails
-    
-    # Handle lastchance_due status
-    elif email.status == "lastchance_due":
-        # Generate a last chance email automatically
-        try:
-            email_generator = EmailGenerator(db)
-            lastchance_email = email_generator.generate_lastchance_email(email, current_user)
-            logger.info(f"Generated last chance email ID {lastchance_email.id} for original email ID {email_id}")
-        except Exception as lastchance_error:
-            logger.error(f"Failed to generate last chance email: {str(lastchance_error)}")
-            # Don't fail the main operation if last chance generation fails
-            
-    elif email.status == "draft": # Clear sent_at if reverting to draft
-        email.sent_at = None
-        email.followup_due_at = None
-        email.lastchance_due_at = None
+            except Exception as e:
+                logger.error(f"Failed to generate follow-up for email {email_id}: {e}")
+
+        # If a follow-up email is sent, generate a last chance email
+        elif original_status == "followup":
+            try:
+                email_generator = EmailGenerator(db)
+                last_chance_email = email_generator.generate_last_chance_email(email, current_user)
+                logger.info(f"Generated last chance email ID {last_chance_email.id} for original email ID {email_id}")
+            except Exception as e:
+                logger.error(f"Failed to generate last chance for email {email_id}: {e}")
+
+    # For manual status updates like 'not-interested'
+    else:
+        email.status = new_status
         
     db.commit()
     db.refresh(email)
-    return {
-        "id": email.id,
-        "to": email.recipient_email,
-        "subject": email.subject,
-        "status": email.status,
-        "stage": email.stage
-    }
+    
+    # After commit, the original email's status is what we set it to
+    logger.info(f"Updated email {email_id} from status '{original_status}' to '{email.status}'")
+    
+    return {"message": "Email status updated successfully", "email_id": email_id, "new_status": email.status}
 
 @router.put("/{email_id}/content", response_model=Dict[str, Any])
 async def update_email_content(
