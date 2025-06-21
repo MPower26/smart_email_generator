@@ -159,6 +159,7 @@ class EmailGenerationProgress(Base):
     generated_emails = Column(Integer, default=0)
     status = Column(String, default="processing")  # processing, completed, error
     stage = Column(String, nullable=False)  # outreach, followup, lastchance
+    error_message = Column(Text, nullable=True)  # To store error details
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
