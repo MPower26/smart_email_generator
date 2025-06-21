@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from sqlalchemy import or_
 
-from app.models.models import GeneratedEmail, User, EmailTemplate
+from app.models.models import GeneratedEmail, User, EmailTemplate, EmailGenerationProgress
 
 # Azure OpenAI Configuration
 AZURE_OPENAI_API_KEY = "65f3a3cbcc54451d9ae6b8740303c648"
@@ -79,7 +79,8 @@ class EmailGenerator:
         contact_data: Dict[str, Any],
         user: User,
         template: Optional[EmailTemplate] = None,
-        stage: str = "outreach"
+        stage: str = "outreach",
+        progress_id: Optional[int] = None
     ) -> GeneratedEmail:
         """Generate a personalized email using Azure OpenAI API"""
         
@@ -92,7 +93,7 @@ class EmailGenerator:
             ).first()
         
         # Extract information from company website
-        website_info = self.extract_website_info(contact_data.get("Website", ""))
+        website_info = self.scraper.extract_info(contact_data.get("Website", ""))
         
         # Build context for OpenAI API
         if template:
@@ -187,6 +188,15 @@ class EmailGenerator:
                 temperature=0.7,
                 max_tokens=1000
             )
+            
+            # If we get a successful response (200 OK), update the progress.
+            if progress_id:
+                progress_record = self.db.query(EmailGenerationProgress).filter(
+                    EmailGenerationProgress.id == progress_id
+                ).first()
+                if progress_record:
+                    progress_record.generated_emails += 1
+                    self.db.commit()
             
             generated_content = response.choices[0].message.content
             
