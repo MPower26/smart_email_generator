@@ -493,9 +493,8 @@ async def generate_emails_background(
                     progress_record.updated_at = datetime.utcnow()
                     db.commit()
 
-        if progress_record:
-            progress_record.status = "completed"
-            db.commit()
+        # Use the new centralized function to mark the job as complete
+        email_generator.mark_generation_complete(progress_id)
         logger.info(f"Email generation completed for user {user.id}. Generated {len(generated_emails)} emails.")
 
     except Exception as e:
