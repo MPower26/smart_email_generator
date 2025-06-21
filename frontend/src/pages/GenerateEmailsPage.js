@@ -213,51 +213,56 @@ const GenerateEmailsPage = () => {
     console.log('Profile in localStorage:', storedProfile ? JSON.parse(storedProfile) : null);
   }, [userProfile]);
 
-  // Start polling for progress updates
-  const startProgressPolling = () => {
-    stopProgressPolling(); // Ensure no other polls are running
+  const pollProgress = async () => {
+    try {
+      const response = await emailService.getGenerationProgress();
+      const progress = response.data;
 
-    pollingIntervalRef.current = setInterval(async () => {
-      try {
-        const response = await emailService.getGenerationProgress();
-        const progress = response.data;
-        
-        if (progress.status === 'processing') {
-          setGenerationProgress({
-            type: 'generation',
-            current: progress.generated_emails, // Base progress on actual emails generated
-            total: progress.total_contacts,
-            startTime: Date.now() - 2000, // Approximate start time
-            speed: progress.generated_emails / Math.max(1, (Date.now() - (Date.now() - 2000)) / 1000),
-            status: 'processing'
-          });
-        } else if (progress.status === 'completed') {
-          setGenerationProgress(prev => ({ ...prev, current: prev.total, status: 'completed' }));
-          stopProgressPolling();
-          
-          // Show success for 1.5s, then hide progress and switch tab
-          setTimeout(() => {
-            setIsGenerating(false);
-            loadEmailsByStage();
-            setActiveTab('outreach');
-          }, 1500);
-
-        } else if (progress.status === 'error' || (progress.status === 'idle' && isGenerating)) {
-          setGenerationProgress(prev => ({ ...prev, status: 'error' }));
-          setError(`Email generation failed: ${progress.error_message || 'Unknown error'}`);
-          stopProgressPolling();
-          setTimeout(() => setIsGenerating(false), 5000);
-        }
-      } catch (error) {
-        console.error('Error polling progress:', error);
-        setError(`Progress tracking error: ${error.message}`);
+      // If the component is no longer in a generating state, stop polling.
+      if (!isGenerating && pollingIntervalRef.current) {
         stopProgressPolling();
-        setIsGenerating(false);
+        return;
       }
-    }, 2000);
-  };
 
-  // Stop polling for progress updates
+      if (progress.status === 'processing') {
+        setGenerationProgress({
+          type: 'generation',
+          current: progress.generated_emails,
+          total: progress.total_contacts,
+          startTime: Date.now() - 2000,
+          speed: progress.generated_emails / Math.max(1, (Date.now() - (Date.now() - 2000)) / 1000),
+          status: 'processing'
+        });
+      } else if (progress.status === 'completed') {
+        setGenerationProgress(prev => ({ ...prev, current: prev.total, status: 'completed' }));
+        stopProgressPolling();
+        
+        setTimeout(() => {
+          setIsGenerating(false);
+          loadEmailsByStage();
+          setActiveTab('outreach');
+        }, 1500);
+
+      } else if (progress.status === 'error' || (progress.status === 'idle' && isGenerating)) {
+        setGenerationProgress(prev => ({ ...prev, status: 'error' }));
+        setError(`Email generation failed: ${progress.error_message || 'Unknown error'}`);
+        stopProgressPolling();
+        setTimeout(() => setIsGenerating(false), 5000);
+      }
+    } catch (error) {
+      console.error("Progress polling error:", error);
+      setError("Progress tracking error: Network Error");
+      stopProgressPolling();
+      setIsGenerating(false);
+    }
+  };
+  
+  const startProgressPolling = () => {
+    stopProgressPolling(); 
+    pollProgress(); // Poll immediately once
+    pollingIntervalRef.current = setInterval(pollProgress, 2000); // Then poll every 2 seconds
+  };
+  
   const stopProgressPolling = () => {
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
