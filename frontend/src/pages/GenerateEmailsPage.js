@@ -35,27 +35,10 @@ const GenerateEmailsPage = () => {
     status: 'idle'
   });
   
-  const [generationProgress, setGenerationProgress] = useState({
-    type: 'generation',
-    current: 0,
-    total: 0,
-    startTime: null,
-    speed: 0,
-    status: 'idle'
-  });
-  
-  const [sendingProgress, setSendingProgress] = useState({
-    type: 'sending',
-    current: 0,
-    total: 0,
-    startTime: null,
-    speed: 0,
-    status: 'idle'
-  });
+  const [generationProgress, setGenerationProgress] = useState(null);
+  const [currentProgressId, setCurrentProgressId] = useState(null);
 
   // Polling for progress updates
-  const [progressPolling, setProgressPolling] = useState(null);
-
   const pollingIntervalRef = useRef(null);
 
   // Track which tab's emails should be collapsed
@@ -213,9 +196,13 @@ const GenerateEmailsPage = () => {
     console.log('Profile in localStorage:', storedProfile ? JSON.parse(storedProfile) : null);
   }, [userProfile]);
 
-  const pollProgress = async () => {
+  const pollProgress = async (progressId) => {
     try {
-      const response = await emailService.getGenerationProgress();
+      if (!progressId) {
+        console.warn("pollProgress called without a progressId.");
+        return;
+      }
+      const response = await emailService.getGenerationProgressById(progressId);
       const progress = response.data;
 
       // If the component is no longer in a generating state, stop polling.
@@ -248,6 +235,9 @@ const GenerateEmailsPage = () => {
         setError(`Email generation failed: ${progress.error_message || 'Unknown error'}`);
         stopProgressPolling();
         setTimeout(() => setIsGenerating(false), 5000);
+      } else if (progress.status === 'not_found') {
+        // This is okay on the first 1-2 polls, just means the backend is setting up.
+        console.log("Progress record not found yet, will retry...");
       }
     } catch (error) {
       console.error("Progress polling error:", error);
@@ -257,10 +247,11 @@ const GenerateEmailsPage = () => {
     }
   };
   
-  const startProgressPolling = () => {
+  const startProgressPolling = (progressId) => {
     stopProgressPolling(); 
-    pollProgress(); // Poll immediately once
-    pollingIntervalRef.current = setInterval(pollProgress, 2000); // Then poll every 2 seconds
+    const poller = () => pollProgress(progressId);
+    poller(); // Poll immediately once
+    pollingIntervalRef.current = setInterval(poller, 2000); // Then poll every 2 seconds
   };
   
   const stopProgressPolling = () => {
@@ -295,7 +286,7 @@ const GenerateEmailsPage = () => {
     setSendingProgress(prev => ({ ...prev, status: 'idle', current: 0, total: 0 }));
 
     try {
-      await emailService.generateEmails(
+      const response = await emailService.generateEmails(
         file,
         selectedTemplate,
         emailStage,
@@ -312,7 +303,16 @@ const GenerateEmailsPage = () => {
       
       setUploadProgress(prev => ({ ...prev, status: 'completed', current: prev.total }));
       
-      startProgressPolling();
+      setGenerationProgress({
+        type: 'generation',
+        current: 0,
+        total: response.data.total_contacts,
+        startTime: Date.now(),
+        status: 'starting'
+      });
+      setIsGenerating(true);
+      setCurrentProgressId(response.data.progress_id); // <-- Store the specific ID
+      startProgressPolling(response.data.progress_id); // <-- Pass ID to start polling
 
     } catch (err) {
       const errorMessage = err.response?.data?.detail || 'An unexpected error occurred during email generation.';
@@ -601,7 +601,7 @@ const GenerateEmailsPage = () => {
                   <ProgressTracker {...uploadProgress} />
                 )}
                 
-                {generationProgress.status !== 'idle' && (
+                {generationProgress && (
                   <ProgressTracker {...generationProgress} />
                 )}
                 
