@@ -479,7 +479,9 @@ async def generate_emails_background(
                     logger.info(f"Skipping duplicate email: {contact_email}")
                     continue
 
-                email_obj = email_generator.generate_personalized_email(contact, user, template, stage)
+                email_obj = email_generator.generate_personalized_email(
+                    contact, user, template, stage, progress_id
+                )
                 generated_emails.append(email_obj)
                 
                 # Add to already_emailed to avoid duplicates within the same batch
@@ -490,10 +492,9 @@ async def generate_emails_background(
             
             finally:
                 processed_count += 1
-                # Update progress in the database
+                # Update processed count, but not generated count (that's handled in the generator)
                 if progress_record:
                     progress_record.processed_contacts = processed_count
-                    progress_record.generated_emails = len(generated_emails)
                     progress_record.updated_at = datetime.utcnow()
                     db.commit()
 
