@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import { Container, Row, Col, Card, Form, Button, Alert, Tabs, Tab, Badge, Spinner, OverlayTrigger, Tooltip } from 'react-bootstrap';
 import FileUpload from '../components/FileUpload';
 import EmailPreview from '../components/EmailPreview';
@@ -55,6 +55,8 @@ const GenerateEmailsPage = () => {
 
   // Polling for progress updates
   const [progressPolling, setProgressPolling] = useState(null);
+
+  const pollingIntervalRef = useRef(null);
 
   // Track which tab's emails should be collapsed
   const isTabCollapsed = (tabName) => {
@@ -213,12 +215,9 @@ const GenerateEmailsPage = () => {
 
   // Start polling for progress updates
   const startProgressPolling = () => {
-    // Clear any existing interval
-    if (progressPolling) {
-      clearInterval(progressPolling);
-    }
+    stopProgressPolling(); // Ensure no other polls are running
 
-    const interval = setInterval(async () => {
+    pollingIntervalRef.current = setInterval(async () => {
       try {
         const response = await emailService.getGenerationProgress();
         const progress = response.data;
@@ -226,35 +225,28 @@ const GenerateEmailsPage = () => {
         if (progress.status === 'processing') {
           setGenerationProgress({
             type: 'generation',
-            current: progress.processed_contacts,
+            current: progress.generated_emails, // Base progress on actual emails generated
             total: progress.total_contacts,
             startTime: Date.now() - 2000, // Approximate start time
-            speed: progress.processed_contacts / Math.max(1, (Date.now() - (Date.now() - 2000)) / 1000),
+            speed: progress.generated_emails / Math.max(1, (Date.now() - (Date.now() - 2000)) / 1000),
             status: 'processing'
           });
         } else if (progress.status === 'completed') {
-          setGenerationProgress(prev => ({
-            ...prev,
-            current: progress.total_contacts, // Show 100%
-            status: 'completed'
-          }));
+          setGenerationProgress(prev => ({ ...prev, current: prev.total, status: 'completed' }));
           stopProgressPolling();
-          loadEmailsByStage();
-          setTimeout(() => setIsGenerating(false), 2000); // Wait 2s before hiding progress
-        } else if (progress.status === 'error') {
-          setGenerationProgress(prev => ({
-            ...prev,
-            status: 'error'
-          }));
+          
+          // Show success for 1.5s, then hide progress and switch tab
+          setTimeout(() => {
+            setIsGenerating(false);
+            loadEmailsByStage();
+            setActiveTab('outreach');
+          }, 1500);
+
+        } else if (progress.status === 'error' || (progress.status === 'idle' && isGenerating)) {
+          setGenerationProgress(prev => ({ ...prev, status: 'error' }));
           setError(`Email generation failed: ${progress.error_message || 'Unknown error'}`);
           stopProgressPolling();
-          setTimeout(() => setIsGenerating(false), 5000); // Keep error visible for 5s
-        } else if (progress.status === 'idle') {
-          // If the status is idle, it means the job finished before we could poll.
-          // Assume completion and stop.
-          stopProgressPolling();
-          setIsGenerating(false);
-          loadEmailsByStage();
+          setTimeout(() => setIsGenerating(false), 5000);
         }
       } catch (error) {
         console.error('Error polling progress:', error);
@@ -262,26 +254,24 @@ const GenerateEmailsPage = () => {
         stopProgressPolling();
         setIsGenerating(false);
       }
-    }, 2000); // Poll every 2 seconds
-    
-    setProgressPolling(interval);
+    }, 2000);
   };
 
   // Stop polling for progress updates
   const stopProgressPolling = () => {
-    if (progressPolling) {
-      clearInterval(progressPolling);
-      setProgressPolling(null);
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
       console.log('Progress polling stopped.');
     }
   };
 
-  // Cleanup polling on component unmount
   useEffect(() => {
+    // This effect runs when the component unmounts
     return () => {
       stopProgressPolling();
     };
-  }, []);
+  }, []); // Empty array ensures this runs only once on mount and cleanup on unmount
 
   // Generate emails
   const handleGenerateEmails = async () => {
