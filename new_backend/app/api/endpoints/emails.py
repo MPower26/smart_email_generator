@@ -366,15 +366,15 @@ async def generate_emails(
         contacts = list(reader)
         
         # Get template if provided
-        template = None
+        template_id_to_pass = None
         if template_id:
             template = db.query(EmailTemplate).filter(
                 EmailTemplate.id == template_id,
-                EmailTemplate.user_id == current_user.id,
-                EmailTemplate.category == stage  # Filter by stage/category
+                EmailTemplate.user_id == current_user.id
             ).first()
             if not template:
                 raise HTTPException(status_code=404, detail=f"Template not found for stage '{stage}'")
+            template_id_to_pass = template.id
         
         # Get friends_with_sharing
         friends_with_sharing = [f.id for f in current_user.friends if f.combine_contacts]
@@ -400,7 +400,7 @@ async def generate_emails(
             generate_emails_background,
             contacts, 
             current_user, 
-            template, 
+            template_id_to_pass,
             stage, 
             avoid_duplicates, 
             dedupe_with_friends, 
@@ -422,7 +422,7 @@ async def generate_emails(
 async def generate_emails_background(
     contacts: List[Dict[str, Any]],
     user: User,
-    template: Optional[EmailTemplate],
+    template_id: Optional[str],
     stage: str,
     avoid_duplicates: bool,
     dedupe_with_friends: bool,
@@ -433,6 +433,10 @@ async def generate_emails_background(
     from app.db.database import SessionLocal
     
     db = SessionLocal()
+    template = None
+    if template_id:
+        template = db.query(EmailTemplate).filter(EmailTemplate.id == template_id).first()
+
     progress_record = None  # Initialize to None
     try:
         logger.info(f"Background task started for progress_id: {progress_id}")
