@@ -456,24 +456,15 @@ async def generate_emails_background(
         # Build set of already emailed addresses for this user (and optionally friends)
         if avoid_duplicates:
             logger.info("Deduplication is enabled. Building set of already emailed addresses.")
-            # Check both GeneratedEmail and SentEmailRecord tables
+            # Check GeneratedEmail table for all previous communications
             conditions = [GeneratedEmail.user_id == user.id]
             if dedupe_with_friends and friends_with_sharing:
                 conditions.append(GeneratedEmail.user_id.in_(friends_with_sharing))
             
-            # Get emails from GeneratedEmail table
             query = db.query(GeneratedEmail.recipient_email).filter(or_(*conditions))
             emails = {r[0].lower() for r in query if r[0]}
             already_emailed.update(emails)
-            
-            # Get emails from SentEmailRecord table
-            sent_conditions = [SentEmailRecord.user_id == user.id]
-            if dedupe_with_friends and friends_with_sharing:
-                sent_conditions.append(SentEmailRecord.user_id.in_(friends_with_sharing))
-            sent_query = db.query(SentEmailRecord.recipient_email).filter(or_(*sent_conditions))
-            sent_emails = {r[0].lower() for r in sent_query if r[0]}
-            already_emailed.update(sent_emails)
-            logger.info(f"Found {len(already_emailed)} unique emails for deduplication.")
+            logger.info(f"Found {len(already_emailed)} unique emails for deduplication from the generated_emails table.")
 
         total_contacts = len(contacts)
         processed_count = 0
