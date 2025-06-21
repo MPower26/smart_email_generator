@@ -434,8 +434,9 @@ async def generate_emails_background(
     from app.db.database import SessionLocal
     
     db = SessionLocal()
+    progress_record = None  # Initialize to None
     try:
-        email_generator = EmailGenerator(db)
+        logger.info(f"Background task started for progress_id: {progress_id}")
         
         # Get progress record
         progress_record = db.query(EmailGenerationProgress).filter(
@@ -443,14 +444,18 @@ async def generate_emails_background(
         ).first()
         
         if not progress_record:
-            logger.error(f"Progress record {progress_id} not found")
+            logger.error(f"Progress record {progress_id} not found. Aborting task.")
             return
+            
+        logger.info(f"Progress record {progress_id} found. Starting email generation for user {user.id}.")
+        email_generator = EmailGenerator(db)
         
         generated_emails = []
         already_emailed = set()
         
         # Build set of already emailed addresses for this user (and optionally friends)
         if avoid_duplicates:
+            logger.info("Deduplication is enabled. Building set of already emailed addresses.")
             # Check both GeneratedEmail and SentEmailRecord tables
             conditions = [GeneratedEmail.user_id == user.id]
             if dedupe_with_friends and friends_with_sharing:
@@ -458,67 +463,64 @@ async def generate_emails_background(
             
             # Get emails from GeneratedEmail table
             query = db.query(GeneratedEmail.recipient_email).filter(or_(*conditions))
-            emails = {r[0].lower() for r in query}
+            emails = {r[0].lower() for r in query if r[0]}
             already_emailed.update(emails)
             
             # Get emails from SentEmailRecord table
             sent_conditions = [SentEmailRecord.user_id == user.id]
             if dedupe_with_friends and friends_with_sharing:
                 sent_conditions.append(SentEmailRecord.user_id.in_(friends_with_sharing))
-            
             sent_query = db.query(SentEmailRecord.recipient_email).filter(or_(*sent_conditions))
-            sent_emails = {r[0].lower() for r in sent_query}
+            sent_emails = {r[0].lower() for r in sent_query if r[0]}
             already_emailed.update(sent_emails)
+            logger.info(f"Found {len(already_emailed)} unique emails for deduplication.")
 
-        for i, contact in enumerate(contacts):
+        total_contacts = len(contacts)
+        processed_count = 0
+        
+        for contact in contacts:
             try:
-                email_addr = contact.get("Email", "").lower()
-                if not email_addr:
+                contact_email = contact.get("Email")
+                if not contact_email or not contact.get("First Name"):
+                    logger.warning(f"Skipping contact due to missing email or first name: {contact}")
                     continue
-                if avoid_duplicates and email_addr in already_emailed:
+
+                if avoid_duplicates and contact_email.lower() in already_emailed:
+                    logger.info(f"Skipping duplicate email: {contact_email}")
                     continue
+
+                email_obj = email_generator.generate_single_email(contact, user, template, stage)
+                generated_emails.append(email_obj)
                 
-                # Generate email for this contact
-                email = email_generator.generate_personalized_email(
-                    contact, 
-                    user, 
-                    template, 
-                    stage
-                )
-                generated_emails.append(email)
-                if avoid_duplicates:
-                    already_emailed.add(email_addr)
-                
-                # Update progress in database every 5 contacts or for the last contact
-                if (i + 1) % 5 == 0 or i == len(contacts) - 1:
-                    progress_record.processed_contacts = i + 1
+                # Add to already_emailed to avoid duplicates within the same batch
+                already_emailed.add(contact_email.lower())
+
+            except Exception as e:
+                logger.error(f"Error processing contact {contact.get('Email', 'N/A')}: {str(e)}", exc_info=True)
+            
+            finally:
+                processed_count += 1
+                # Update progress in the database
+                if progress_record:
+                    progress_record.processed_contacts = processed_count
                     progress_record.generated_emails = len(generated_emails)
                     progress_record.updated_at = datetime.utcnow()
                     db.commit()
-                    logger.info(f"Updated progress for user {user.id}: {i + 1}/{len(contacts)} contacts processed")
-                    
-            except Exception as e:
-                logger.error(f"Error generating email for contact {i}: {str(e)}")
-                # Continue with next contact
-        
-        # Mark progress as completed
-        progress_record.status = "completed"
-        progress_record.processed_contacts = len(contacts)
-        progress_record.generated_emails = len(generated_emails)
-        progress_record.updated_at = datetime.utcnow()
-        db.commit()
-        
-        logger.info(f"Completed email generation for user {user.id}: {len(generated_emails)} emails generated")
-        
+
+        if progress_record:
+            progress_record.status = "completed"
+            db.commit()
+        logger.info(f"Email generation completed for user {user.id}. Generated {len(generated_emails)} emails.")
+
     except Exception as e:
-        logger.error(f"Error in background email generation: {str(e)}")
-        # Mark progress as error
+        logger.error(f"Critical error during email generation background task for user {user.id}: {str(e)}", exc_info=True)
         if progress_record:
             progress_record.status = "error"
-            progress_record.updated_at = datetime.utcnow()
+            progress_record.error_message = str(e)
             db.commit()
     finally:
         db.close()
+        logger.info(f"Background task finished for progress_id: {progress_id}")
 
 @router.post("/generate-lastchance/{email_id}", response_model=Dict[str, Any])
 async def generate_lastchance_email(
