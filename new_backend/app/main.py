@@ -59,15 +59,19 @@ logger.info("Background scheduler started")
 # Create FastAPI app
 app = FastAPI(title="Smart Email Generator API", redirect_slashes=False)
 
+# Define allowed origins
+origins = [
+    "https://jolly-bush-0bae83703.6.azurestaticapps.net",
+    "http://localhost:3000",  # For local development
+]
+
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://jolly-bush-0bae83703.6.azurestaticapps.net"],
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"],
-    max_age=600,  # Cache preflight requests for 10 minutes
 )
 
 # Add HTTPS redirection middleware SECOND
