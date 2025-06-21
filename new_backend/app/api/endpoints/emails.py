@@ -480,7 +480,7 @@ async def generate_emails_background(
                     logger.info(f"Skipping duplicate email: {contact_email}")
                     continue
 
-                email_obj = email_generator.generate_single_email(contact, user, template, stage)
+                email_obj = email_generator.generate_personalized_email(contact, user, template, stage)
                 generated_emails.append(email_obj)
                 
                 # Add to already_emailed to avoid duplicates within the same batch
@@ -895,3 +895,4 @@ async def send_all_via_gmail(
         "total_count": len(emails),
         "errors": errors if errors else None
     } 
+
