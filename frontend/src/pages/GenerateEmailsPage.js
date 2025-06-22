@@ -3,8 +3,10 @@ import { Container, Row, Col, Card, Form, Button, Alert, Tabs, Tab, Badge, Spinn
 import FileUpload from '../components/FileUpload';
 import EmailPreview from '../components/EmailPreview';
 import ProgressTracker from '../components/ProgressTracker';
+import GroupedEmails from '../components/GroupedEmails';
 import { emailService, templateService } from '../services/api';
 import { UserContext } from '../contexts/UserContext';
+import '../styles/GroupedEmails.css';
 
 const GenerateEmailsPage = () => {
   const { userProfile } = useContext(UserContext);
@@ -763,43 +765,7 @@ const GenerateEmailsPage = () => {
                   <p className="mb-0">No follow-up emails found. Generate emails with the "Follow-Up" stage or move outreach emails to this stage.</p>
                 </div>
               ) : (
-                <>
-                  <div className="d-flex justify-content-between align-items-center mb-3">
-                    <h5>Follow-Up Emails ({followupEmails.length})</h5>
-                    <div>
-                      <Button 
-                        variant="success" 
-                        size="sm"
-                        className="me-2"
-                        onClick={() => handleSendAll('followup')}
-                        disabled={loading || !userProfile?.gmail_access_token}
-                        title={!userProfile?.gmail_access_token ? "Connect Gmail first" : "Send all follow-up emails"}
-                      >
-                        {loading ? (
-                          <>
-                            <Spinner animation="border" size="sm" className="me-1" />
-                            Sending...
-                          </>
-                        ) : (
-                          <>
-                            <i className="bi bi-send-fill me-1"></i>
-                            Send All
-                          </>
-                        )}
-                      </Button>
-                    <Button 
-                      variant="outline-secondary" 
-                      size="sm"
-                      onClick={() => handleExportStage(followupEmails, 'followup')}
-                    >
-                      Export Follow-Up Emails
-                    </Button>
-                    </div>
-                  </div>
-                  <div className="email-list">
-                    {followupEmailComponents}
-                  </div>
-                </>
+                <GroupedEmails stage="followup" />
               )}
             </Card.Body>
           </Card>
@@ -819,43 +785,7 @@ const GenerateEmailsPage = () => {
                   <p className="mb-0">No last chance emails found. Generate emails with the "Last Chance" stage or move follow-up emails to this stage.</p>
                 </div>
               ) : (
-                <>
-                  <div className="d-flex justify-content-between align-items-center mb-3">
-                    <h5>Last Chance Emails ({lastChanceEmails.length})</h5>
-                    <div>
-                      <Button 
-                        variant="success" 
-                        size="sm"
-                        className="me-2"
-                        onClick={() => handleSendAll('lastChance')}
-                        disabled={loading || !userProfile?.gmail_access_token}
-                        title={!userProfile?.gmail_access_token ? "Connect Gmail first" : "Send all last chance emails"}
-                      >
-                        {loading ? (
-                          <>
-                            <Spinner animation="border" size="sm" className="me-1" />
-                            Sending...
-                          </>
-                        ) : (
-                          <>
-                            <i className="bi bi-send-fill me-1"></i>
-                            Send All
-                          </>
-                        )}
-                      </Button>
-                    <Button 
-                      variant="outline-secondary" 
-                      size="sm"
-                      onClick={() => handleExportStage(lastChanceEmails, 'lastChance')}
-                    >
-                      Export Last Chance Emails
-                    </Button>
-                    </div>
-                  </div>
-                  <div className="email-list">
-                    {lastChanceEmailComponents}
-                  </div>
-                </>
+                <GroupedEmails stage="lastchance" />
               )}
             </Card.Body>
           </Card>
