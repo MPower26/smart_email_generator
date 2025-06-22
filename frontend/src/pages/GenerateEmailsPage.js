@@ -50,6 +50,79 @@ const GenerateEmailsPage = () => {
   // Polling for progress updates
   const pollingIntervalRef = useRef(null);
 
+  // Memoize the sorted and mapped email components to prevent re-sorting on every render
+  const outreachEmailComponents = useMemo(() => 
+    [...outreachEmails]
+      .sort((a, b) => {
+        const statusOrder = { 'outreach_sent': 0, 'draft': 1, 'sent by friend': 2 };
+        const statusA = statusOrder[a.status] || 3;
+        const statusB = statusOrder[b.status] || 3;
+        return statusA - statusB;
+      })
+      .map((email, index) => (
+        <div key={index} className="mb-2">
+          <EmailPreview 
+            email={email} 
+            onSend={handleMarkAsSent}
+            onUnmarkSent={handleUnmarkAsSent}
+            onDelete={handleDeleteEmail}
+            isCollapsed={isTabCollapsed('outreach')}
+            isSentHighlight={lastAction.type === 'sent' && lastAction.id === email.id}
+            isUnmarkedHighlight={lastAction.type === 'unmarked' && lastAction.id === email.id}
+          />
+        </div>
+      )), 
+    [outreachEmails, activeTab, lastAction]
+  );
+
+  const followupEmailComponents = useMemo(() =>
+    [...followupEmails]
+      .sort((a, b) => {
+        const statusOrder = { 'outreach_sent': 0, 'draft': 1, 'sent by friend': 2 };
+        const statusA = statusOrder[a.status] || 3;
+        const statusB = statusOrder[b.status] || 3;
+        return statusA - statusB;
+      })
+      .map((email, index) => (
+        <div key={index} className="mb-2">
+          <EmailPreview 
+            email={email} 
+            onSend={handleMarkAsSent}
+            onUnmarkSent={handleUnmarkAsSent}
+            onDelete={handleDeleteEmail}
+            isCollapsed={isTabCollapsed('followup')}
+            isSentHighlight={lastAction.type === 'sent' && lastAction.id === email.id}
+            isUnmarkedHighlight={lastAction.type === 'unmarked' && lastAction.id === email.id}
+          />
+        </div>
+      )),
+    [followupEmails, activeTab, lastAction]
+  );
+
+  const lastChanceEmailComponents = useMemo(() =>
+    [...lastChanceEmails]
+      .sort((a, b) => {
+        const statusOrder = { 'outreach_sent': 0, 'draft': 1, 'sent by friend': 2 };
+        const statusA = statusOrder[a.status] || 3;
+        const statusB = statusOrder[b.status] || 3;
+        return statusA - statusB;
+      })
+      .map((email, index) => (
+        <div key={index} className="mb-2">
+          <EmailPreview 
+            email={email} 
+            onSend={handleMarkAsSent}
+            onUnmarkSent={handleUnmarkAsSent}
+            onDelete={handleDeleteEmail}
+            isCollapsed={isTabCollapsed('lastChance')}
+            isSentHighlight={lastAction.type === 'sent' && lastAction.id === email.id}
+            isUnmarkedHighlight={lastAction.type === 'unmarked' && lastAction.id === email.id}
+          />
+        </div>
+      )),
+    [lastChanceEmails, activeTab, lastAction]
+  );
+
   // Track which tab's emails should be collapsed
   const isTabCollapsed = (tabName) => {
     // Return true if this is not the active tab, meaning emails should be collapsed
@@ -668,30 +741,7 @@ const GenerateEmailsPage = () => {
                     </div>
                   </div>
                   <div className="email-list">
-                    {useMemo(() => 
-                      [...outreachEmails]
-                        .sort((a, b) => {
-                          // First sort by status
-                          const statusOrder = { 'outreach_sent': 0, 'draft': 1, 'sent by friend': 2 };
-                          const statusA = statusOrder[a.status] || 3;
-                          const statusB = statusOrder[b.status] || 3;
-                          return statusA - statusB;
-                        })
-                        .map((email, index) => (
-                          <div key={index} className="mb-2">
-                            <EmailPreview 
-                              email={email} 
-                              onSend={handleMarkAsSent}
-                              onUnmarkSent={handleUnmarkAsSent}
-                              onDelete={handleDeleteEmail}
-                              isCollapsed={isTabCollapsed('outreach')}
-                              isSentHighlight={lastAction.type === 'sent' && lastAction.id === email.id}
-                              isUnmarkedHighlight={lastAction.type === 'unmarked' && lastAction.id === email.id}
-                            />
-                          </div>
-                        )), 
-                      [outreachEmails, activeTab, lastAction]
-                    )}
+                    {outreachEmailComponents}
                   </div>
                 </>
               )}
@@ -747,30 +797,7 @@ const GenerateEmailsPage = () => {
                     </div>
                   </div>
                   <div className="email-list">
-                    {useMemo(() => 
-                      [...followupEmails]
-                        .sort((a, b) => {
-                          // First sort by status
-                          const statusOrder = { 'outreach_sent': 0, 'draft': 1, 'sent by friend': 2 };
-                          const statusA = statusOrder[a.status] || 3;
-                          const statusB = statusOrder[b.status] || 3;
-                          return statusA - statusB;
-                        })
-                        .map((email, index) => (
-                          <div key={index} className="mb-2">
-                            <EmailPreview 
-                              email={email} 
-                              onSend={handleMarkAsSent}
-                              onUnmarkSent={handleUnmarkAsSent}
-                              onDelete={handleDeleteEmail}
-                              isCollapsed={isTabCollapsed('followup')}
-                              isSentHighlight={lastAction.type === 'sent' && lastAction.id === email.id}
-                              isUnmarkedHighlight={lastAction.type === 'unmarked' && lastAction.id === email.id}
-                            />
-                          </div>
-                        )), 
-                      [followupEmails, activeTab, lastAction]
-                    )}
+                    {followupEmailComponents}
                   </div>
                 </>
               )}
@@ -826,30 +853,7 @@ const GenerateEmailsPage = () => {
                     </div>
                   </div>
                   <div className="email-list">
-                    {useMemo(() => 
-                      [...lastChanceEmails]
-                        .sort((a, b) => {
-                          // First sort by status
-                          const statusOrder = { 'outreach_sent': 0, 'draft': 1, 'sent by friend': 2 };
-                          const statusA = statusOrder[a.status] || 3;
-                          const statusB = statusOrder[b.status] || 3;
-                          return statusA - statusB;
-                        })
-                        .map((email, index) => (
-                          <div key={index} className="mb-2">
-                            <EmailPreview 
-                              email={email} 
-                              onSend={handleMarkAsSent}
-                              onUnmarkSent={handleUnmarkAsSent}
-                              onDelete={handleDeleteEmail}
-                              isCollapsed={isTabCollapsed('lastChance')}
-                              isSentHighlight={lastAction.type === 'sent' && lastAction.id === email.id}
-                              isUnmarkedHighlight={lastAction.type === 'unmarked' && lastAction.id === email.id}
-                            />
-                          </div>
-                        )), 
-                      [lastChanceEmails, activeTab, lastAction]
-                    )}
+                    {lastChanceEmailComponents}
                   </div>
                 </>
               )}
