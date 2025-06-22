@@ -80,6 +80,9 @@ export const emailService = {
   // Send all emails in a specific group
   sendAllByGroup: (stage, groupId) => api.post(`/api/emails/send_all_by_group/${stage}/${groupId}`),
   
+  // Re-generate all emails in a group
+  regenerateGroupEmails: (groupId, prompt) => api.post(`/api/emails/regenerate_group/${groupId}`, { prompt }),
+  
   // Generate emails
   generateEmails: (file, templateId, stage, avoidDuplicates, onUploadProgress) => {
     const formData = new FormData();
@@ -176,3 +179,4 @@ export const friendService = {
 };
 
 export default api;
+
