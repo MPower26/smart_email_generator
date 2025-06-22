@@ -74,10 +74,11 @@ const GenerateEmailsPage = () => {
       const outreachSentEmails = outreachData.filter(email => email.status === 'outreach_sent' && email.followup_due_at);
       setOutreachEmails(outreachData.filter(email => email.status !== 'outreach_sent'));
         
-      // Process followup emails
+      // Process followup emails - This was the source of the duplication.
+      // The `followupRes` already contains all correct followup emails,
+      // including those that moved from the outreach stage.
       const followupData = followupRes.data || [];
-      const combinedFollowupEmails = [...followupData, ...outreachSentEmails];
-        setFollowupEmails(combinedFollowupEmails);
+      setFollowupEmails(followupData);
 
       // Process last chance emails
       setLastChanceEmails(lastChanceRes.data || []);
@@ -205,7 +206,7 @@ const GenerateEmailsPage = () => {
   const handleAddTemplate = () => {
     window.open('https://jolly-bush-0bae83703.6.azurestaticapps.net/templates', '_blank');
   };
-  
+
   const pollProgress = async (progressId) => {
     try {
       if (!progressId) {
@@ -391,7 +392,7 @@ const GenerateEmailsPage = () => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
-  
+
   // Handle send all emails in a stage
   const handleSendAll = async (stage) => {
     if (!userProfile?.gmail_access_token) {
