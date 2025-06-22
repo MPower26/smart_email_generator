@@ -193,7 +193,7 @@ async def send_email(
     elif original_stage == "followup":
         try:
             email_generator = EmailGenerator(db)
-            last_chance_email = email_generator.generate_last_chance_email(email, current_user)
+            last_chance_email = email_generator.generate_lastchance_email(email, current_user)
             logger.info(f"Generated last chance email ID {last_chance_email.id} for original email ID {email_id}")
         except Exception as e:
             logger.error(f"Failed to generate last chance for email {email_id}: {e}")
