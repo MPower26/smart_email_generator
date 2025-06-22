@@ -158,3 +158,65 @@
     gap: 5px;
   }
 }
+
+/* Styling for the new individual email rows */
+.email-item-container {
+  border: 1px solid #dee2e6; /* Light grey border */
+  border-radius: 0.375rem; /* Rounded corners like Bootstrap cards */
+  margin-bottom: 0.5rem; /* Space between emails */
+  background-color: #fff; /* White background */
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075); /* Subtle shadow */
+  overflow: hidden; /* Ensures child elements respect the rounded corners */
+}
+
+.email-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  background-color: #f8f9fa; /* Light background for the header */
+  border-bottom: 1px solid #dee2e6;
+}
+
+.email-item-header:hover {
+  background-color: #e9ecef; /* Slightly darker on hover */
+}
+
+.email-to {
+  font-weight: 600;
+  color: #0d6efd; /* Primary blue color */
+}
+
+.email-item-actions-preview {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.email-item-body {
+  padding: 1rem;
+  border-top: 1px solid #dee2e6; /* Separator line */
+}
+
+.email-content {
+  color: #000000 !important; /* Make email content text black */
+  margin-bottom: 1rem;
+}
+
+.email-content * {
+    color: #000000 !important; /* Force all child elements to be black */
+}
+
+.email-item-actions {
+  display: flex;
+  gap: 0.5rem; /* Space out the action buttons */
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e9ecef; /* Separator above actions */
+}
+
+.more-emails {
+    text-align: center;
+    padding: 0.5rem;
+} 
