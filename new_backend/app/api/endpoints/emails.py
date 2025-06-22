@@ -62,19 +62,23 @@ async def get_emails_by_stage(
     # Build base query
     query = db.query(GeneratedEmail).filter(GeneratedEmail.user_id == current_user.id)
     
-    # Add stage filter
     if group_id:
         query = query.filter(GeneratedEmail.group_id == group_id)
     
-    # Correcting the indentation and logic block
-    if stage == 'followup':
-        query = query.filter(GeneratedEmail.status.in_(["draft", "followup_due", "followup_sent"]))
-    elif stage == 'lastchance':
-        query = query.filter(GeneratedEmail.status.in_(["draft", "lastchance_due", "lastchance_sent"]))
-    
-    # Always filter by stage, regardless of the status filter applied above
+    # Always filter by the overall stage first
     query = query.filter(GeneratedEmail.stage == stage)
 
+    # Then, apply stage-specific STATUS filters
+    if stage == 'followup':
+        # For followup, we only want to see emails that are due or still in draft
+        query = query.filter(GeneratedEmail.status.in_(["draft", "followup_due"]))
+    elif stage == 'outreach':
+        # For outreach, we only care about drafts and pending
+        query = query.filter(GeneratedEmail.status.in_(["draft", "outreach_pending"]))
+    elif stage == 'lastchance':
+        # For last chance, we only want to see emails that are due or in draft
+        query = query.filter(GeneratedEmail.status.in_(["draft", "lastchance_due"]))
+    
     emails = query.all()
     
     logger.info(f"[EMAILS] Found {len(emails)} emails for user {current_user.email} (ID: {current_user.id}) in stage '{stage}'" + (f" with group_id '{group_id}'" if group_id else ""))
