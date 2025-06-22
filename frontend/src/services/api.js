@@ -71,6 +71,15 @@ export const emailService = {
   // Get emails by stage (consolidated method) - NO trailing slash to match backend
   getEmailsByStage: (stage) => api.get(`/api/emails/by-stage/${stage}`),
   
+  // Get emails by stage and group_id
+  getEmailsByStageAndGroup: (stage, groupId) => api.get(`/api/emails/by-stage/${stage}?group_id=${groupId}`),
+  
+  // Get emails grouped by group_id for followup and lastchance stages
+  getEmailsByStageGrouped: (stage) => api.get(`/api/emails/by-stage/${stage}/groups`),
+  
+  // Send all emails in a specific group
+  sendAllByGroup: (stage, groupId) => api.post(`/api/emails/send_all_by_group/${stage}/${groupId}`),
+  
   // Generate emails
   generateEmails: (file, templateId, stage, avoidDuplicates, onUploadProgress) => {
     const formData = new FormData();
