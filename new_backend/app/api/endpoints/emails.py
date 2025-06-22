@@ -13,9 +13,9 @@ from sqlalchemy import or_, and_, text
 
 from app.db.database import get_db
 from app.models.models import GeneratedEmail, User, EmailTemplate, EmailGenerationProgress
-from app.api.auth import get_current_user
+from app.api.auth import get_current_user, get_user_from_db
 from app.services.email_generator import EmailGenerator
-from app.services.email_service import send_verification_email, EMAIL_CONFIG, send_email_via_gmail, get_user_from_db
+from app.services.email_service import send_verification_email, EMAIL_CONFIG, send_email_via_gmail
 from app.services.gmail_service import send_gmail_email
 from app.websocket_manager import manager
 from app.schemas.email import EmailSchema, EmailUpdate, GroupedEmailResponse, EmailGroup
