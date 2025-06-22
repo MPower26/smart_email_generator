@@ -2,6 +2,12 @@ import logging
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email, To, Content
 from ..config.settings import EMAIL_CONFIG
+from app.services.gmail_service import send_gmail_email, GmailTokenError
+from fastapi import HTTPException
+from datetime import datetime
+from sqlalchemy.orm import Session
+from ..models.user import User
+from ..models.generated_email import GeneratedEmail
 
 logger = logging.getLogger(__name__)
 
@@ -59,3 +65,33 @@ async def send_verification_email(recipient_email: str, code: str):
         error_msg = f"Failed to send verification email: {str(e)}"
         logger.error(error_msg)
         raise EmailServiceError(error_msg) from e 
+
+def send_email_via_gmail(db: Session, user: User, email: GeneratedEmail):
+    """Sends a single generated email using the user's Gmail account."""
+    try:
+        # The actual sending logic using the Gmail service
+        gmail_response = send_gmail_email(
+            user=user,
+            to_email=email.recipient_email,
+            subject=email.subject,
+            body=email.content
+        )
+        
+        # If sending is successful, update the email's status in our DB
+        email.status = f"{email.stage}_sent"
+        email.sent_at = datetime.utcnow()
+        db.commit()
+        
+        return {"message": "Email sent successfully via Gmail", "gmail_response": gmail_response}
+        
+    except GmailTokenError as e:
+        # This is the specific error for an expired/invalid token
+        logger.error(f"Gmail token error for user {user.email}: {e}")
+        raise HTTPException(
+            status_code=401, 
+            detail="Gmail token is invalid or expired. Please reconnect your account in settings."
+        )
+    except Exception as e:
+        # Catch any other sending errors
+        logger.error(f"Failed to send email {email.id} for user {user.email} via Gmail: {e}")
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}") 
