@@ -136,6 +136,10 @@ const GroupedEmails = ({ stage }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [visibleCounts, setVisibleCounts] = useState({});
+  const [showRegenerateModal, setShowRegenerateModal] = useState(false);
+  const [currentGroup, setCurrentGroup] = useState(null);
+  const [regeneratePrompt, setRegeneratePrompt] = useState('');
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
   useEffect(() => {
     loadGroupedEmails();
@@ -177,6 +181,33 @@ const GroupedEmails = ({ stage }) => {
     } catch (err) {
       console.error('Error sending all emails in group:', err);
       setError('Failed to send emails in group');
+    }
+  };
+
+  const handleOpenRegenerateModal = (group) => {
+    setCurrentGroup(group);
+    setShowRegenerateModal(true);
+  };
+
+  const handleCloseRegenerateModal = () => {
+    setShowRegenerateModal(false);
+    setCurrentGroup(null);
+    setRegeneratePrompt('');
+    setIsRegenerating(false);
+  };
+
+  const handleRegenerateGroup = async () => {
+    if (!currentGroup) return;
+    setIsRegenerating(true);
+    try {
+      await emailService.regenerateGroup(currentGroup.group_id, regeneratePrompt);
+      await loadGroupedEmails(); // Reload to show new content
+      handleCloseRegenerateModal();
+    } catch (err) {
+      console.error('Error regenerating group:', err);
+      setError('Failed to regenerate group. Please check the backend service.');
+    } finally {
+      setIsRegenerating(false);
     }
   };
 
@@ -231,46 +262,81 @@ const GroupedEmails = ({ stage }) => {
   if (groups.length === 0) return <div>No grouped emails found for {stage} stage.</div>;
 
   return (
-    <div className="grouped-emails">
-      <h3>Grouped Emails - {stage.charAt(0).toUpperCase() + stage.slice(1)}</h3>
-      
-      {groups.map((group) => (
-        <div key={group.group_id} className="email-group">
-          <div className="group-header">
-            <h4>Batch: {group.group_id}</h4>
-            <div className="group-stats">
-              <span>Total: {group.email_count}</span>
-              <span>Due: {group.status_counts?.followup_due || group.status_counts?.lastchance_due || 0}</span>
-              <span>Sent: {group.status_counts?.followup_sent || group.status_counts?.lastchance_sent || 0}</span>
-            </div>
-            <CountdownTimer dueDate={group.earliest_due_date} />
-          </div>
-          
-          <div className="group-actions">
-            <button 
-              onClick={() => handleSendAllInGroup(group.group_id)}
-              disabled={!(group.status_counts?.followup_due || group.status_counts?.lastchance_due)}
-              className="send-all-btn"
-            >
-              Send All in Group ({group.status_counts?.followup_due || group.status_counts?.lastchance_due || 0})
-            </button>
-          </div>
-          
-          <div className="emails-list">
-            {group.emails.slice(0, visibleCounts[group.group_id] || 15).map((email) => (
-                <EmailRow key={email.id} email={email} onUpdate={loadGroupedEmails} />
-            ))}
-            {(group.emails.length > (visibleCounts[group.group_id] || 15)) && (
-              <div className="more-emails">
-                <Button variant="link" onClick={() => handleShowMore(group.group_id)}>
-                    See more... ({group.emails.length - (visibleCounts[group.group_id] || 15)} remaining)
-                </Button>
+    <>
+      <div className="grouped-emails">
+        <h3>Grouped Emails - {stage.charAt(0).toUpperCase() + stage.slice(1)}</h3>
+        
+        {groups.map((group) => (
+          <div key={group.group_id} className="email-group">
+            <div className="group-header">
+              <h4>Batch: {group.group_id}</h4>
+              <div className="group-stats">
+                <span>Total: {group.email_count}</span>
+                <span>Due: {group.status_counts?.followup_due || group.status_counts?.lastchance_due || 0}</span>
+                <span>Sent: {group.status_counts?.followup_sent || group.status_counts?.lastchance_sent || 0}</span>
               </div>
-            )}
+              <CountdownTimer dueDate={group.earliest_due_date} />
+              <Button 
+                variant="outline-secondary" 
+                size="sm" 
+                className="ms-2"
+                onClick={() => handleOpenRegenerateModal(group)}>
+                <i className="bi bi-arrow-clockwise"></i> Regenerate
+              </Button>
+            </div>
+            
+            <div className="group-actions">
+              <button 
+                onClick={() => handleSendAllInGroup(group.group_id)}
+                disabled={!(group.status_counts?.followup_due || group.status_counts?.lastchance_due)}
+                className="send-all-btn"
+              >
+                Send All in Group ({group.status_counts?.followup_due || group.status_counts?.lastchance_due || 0})
+              </button>
+            </div>
+            
+            <div className="emails-list">
+              {group.emails.slice(0, visibleCounts[group.group_id] || 15).map((email) => (
+                  <EmailRow key={email.id} email={email} onUpdate={loadGroupedEmails} />
+              ))}
+              {(group.emails.length > (visibleCounts[group.group_id] || 15)) && (
+                <div className="more-emails">
+                  <Button variant="link" onClick={() => handleShowMore(group.group_id)}>
+                      See more... ({group.emails.length - (visibleCounts[group.group_id] || 15)} remaining)
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+      <Modal show={showRegenerateModal} onHide={handleCloseRegenerateModal}>
+          <Modal.Header closeButton>
+              <Modal.Title>Regenerate Batch: {currentGroup?.group_id}</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+              <p>Enter a new prompt or context for the AI. This will be used to regenerate the subject and body for all emails in this batch.</p>
+              <Form.Group>
+                  <Form.Label>New AI Prompt (Optional)</Form.Label>
+                  <Form.Control
+                      as="textarea"
+                      rows={4}
+                      value={regeneratePrompt}
+                      onChange={(e) => setRegeneratePrompt(e.target.value)}
+                      placeholder="e.g., Mention our new partnership with ExampleCorp and focus on cost savings."
+                  />
+              </Form.Group>
+          </Modal.Body>
+          <Modal.Footer>
+              <Button variant="secondary" onClick={handleCloseRegenerateModal}>
+                  Cancel
+              </Button>
+              <Button variant="primary" onClick={handleRegenerateGroup} disabled={isRegenerating}>
+                  {isRegenerating ? <Spinner as="span" animation="border" size="sm" /> : 'Regenerate Now'}
+              </Button>
+          </Modal.Footer>
+      </Modal>
+    </>
   );
 };
 
