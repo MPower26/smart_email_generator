@@ -3,7 +3,7 @@
 
 param(
     [string]$FunctionAppName = "smart-email-functions",
-    [string]$ResourceGroup = "smart-email-rg",
+    [string]$ResourceGroup = "emailapp-rg",
     [string]$Location = "West Europe"
 )
 
