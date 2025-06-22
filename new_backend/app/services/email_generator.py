@@ -1,18 +1,23 @@
+import logging
+import os
 from typing import Dict, Any, Optional, List
 import json
 import requests
 from urllib.parse import urlparse
 from openai import AzureOpenAI
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from sqlalchemy import or_
 
 from app.models.models import GeneratedEmail, User, EmailTemplate, EmailGenerationProgress
 
-# Azure OpenAI Configuration
-AZURE_OPENAI_API_KEY = "65f3a3cbcc54451d9ae6b8740303c648"
-AZURE_OPENAI_ENDPOINT = "https://francecentral.api.cognitive.microsoft.com/"
-AZURE_DEPLOYMENT_NAME = "Avocat"
+# --- Environment Variable Configuration ---
+AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
+AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
+AZURE_DEPLOYMENT_NAME = os.getenv("AZURE_DEPLOYMENT_NAME", "Avocat")
+
+# --- Initialize Logger ---
+logger = logging.getLogger(__name__)
 
 class WebScraper:
     """Class for extracting information from company websites."""
@@ -49,6 +54,8 @@ class WebScraper:
 class EmailGenerator:
     def __init__(self, db: Session):
         self.db = db
+        if not all([AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT]):
+            raise ValueError("Azure OpenAI credentials are not configured in environment variables.")
         self.client = AzureOpenAI(
             api_key=AZURE_OPENAI_API_KEY,
             api_version="2023-12-01-preview",
@@ -202,9 +209,14 @@ class EmailGenerator:
             
             # Extract subject from first line of content and remove "Subject: " prefix if present
             content_lines = generated_content.split('\n')
-            subject = content_lines[0].strip()
-            if subject.lower().startswith("subject: "):
-                subject = subject[9:].strip()
+            subject = ""
+            # Robustly find the subject line
+            for line in content_lines:
+                if line.lower().strip().startswith("subject:"):
+                    subject = line.strip()[8:].strip()
+                    break
+            if not subject:
+                subject = content_lines[0].strip() # Fallback to first line
             
             # Find the "Best regards" line and remove everything after it
             content = []
@@ -216,8 +228,8 @@ class EmailGenerator:
             # Join the content and add the correct signature
             content = '\n'.join(content).strip()
             
-            # Remove any markdown formatting
-            content = content.replace("**", "")
+            # Remove any markdown formatting (more robustly)
+            content = content.replace("**", "").replace("_", "").replace("*", "")
             
             # Replace placeholders with user information if available
             content = content.replace("[Your Name]", user.full_name if user.full_name else "[Your Name]")
@@ -238,16 +250,15 @@ class EmailGenerator:
             content = '\n'.join(new_content).strip()
             
             # Add consistent signature format
-            signature = f"""
-Best regards,
+            signature = f"""Best regards,
 {user.full_name if user.full_name else "[Your Name]"}
 {user.position if user.position else "[Your Position]"}
 {user.company_name if user.company_name else "[Your Company]"}"""
             
-            content = f"{content}\n\n{signature}"
+            content = f"{content}\n\n{signature.strip()}"
             
             # Calculate follow-up dates based on stage
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             follow_up_date = None
             final_follow_up_date = None
             
@@ -273,9 +284,9 @@ Best regards,
                 status="outreach_pending",
                 stage=stage,
                 follow_up_status="none",
-                follow_up_date=follow_up_date,
-                final_follow_up_date=final_follow_up_date,
-                created_at=now,
+                # This field is now the single source of truth for the next action due date
+                follow_up_date=datetime.now(timezone.utc) + timedelta(days=user.followup_interval_days or 3),
+                created_at=datetime.now(timezone.utc),
                 # Set legacy fields for backward compatibility
                 to=contact_data.get("Email", ""),
                 body=content
@@ -305,24 +316,15 @@ Best regards,
         
         # Build set of already emailed addresses for this user (and optionally friends)
         if avoid_duplicates:
-            # Check both GeneratedEmail and SentEmailRecord tables
+            # Check GeneratedEmail table for all previous communications
             conditions = [GeneratedEmail.user_id == user.id]
             if dedupe_with_friends and friends_ids:
                 conditions.append(GeneratedEmail.user_id.in_(friends_ids))
             
             # Get emails from GeneratedEmail table
             query = self.db.query(GeneratedEmail.recipient_email).filter(or_(*conditions))
-            emails = {r[0].lower() for r in query}
+            emails = {r[0].lower() for r in query if r[0]}
             already_emailed.update(emails)
-            
-            # Get emails from SentEmailRecord table
-            sent_conditions = [SentEmailRecord.user_id == user.id]
-            if dedupe_with_friends and friends_ids:
-                sent_conditions.append(SentEmailRecord.user_id.in_(friends_ids))
-            
-            sent_query = self.db.query(SentEmailRecord.recipient_email).filter(or_(*sent_conditions))
-            sent_emails = {r[0].lower() for r in sent_query}
-            already_emailed.update(sent_emails)
 
         for i, contact in enumerate(csv_data):
             email_addr = contact.get("Email", "").lower()
@@ -356,7 +358,11 @@ Best regards,
                 EmailTemplate.category == "followup",
                 EmailTemplate.is_default == True
             ).first()
-        
+
+        # --- Stricter Template Logic ---
+        if not template:
+            raise ValueError("Cannot generate follow-up: No default follow-up template found.")
+
         # Extract information from the original email
         recipient_name = original_email.recipient_name
         recipient_company = original_email.recipient_company
@@ -487,7 +493,7 @@ Best regards,
                 raise Exception(f"Failed to generate follow-up email: {str(e)}")
         
         # Get user's interval settings for scheduling
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         followup_days = user.followup_interval_days or 3
         
         # Create a new email object for the follow-up
@@ -501,7 +507,8 @@ Best regards,
             template_id=template.id if template else None,
             status="followup_due",  # Set status to 'followup_due'
             stage="followup",
-            follow_up_date=now + timedelta(days=followup_days), # Set the due date
+            # Use the single source of truth for due dates
+            follow_up_date=now + timedelta(days=followup_days),
             created_at=now,
             # Set legacy fields for backward compatibility
             to=recipient_email,
@@ -529,7 +536,11 @@ Best regards,
                 EmailTemplate.category == "lastchance",
                 EmailTemplate.is_default == True
             ).first()
-        
+
+        # --- Stricter Template Logic ---
+        if not template:
+            raise ValueError("Cannot generate last chance: No default last chance template found.")
+            
         # Extract information from the original email
         recipient_name = original_email.recipient_name
         recipient_company = original_email.recipient_company
@@ -660,7 +671,7 @@ Best regards,
                 raise Exception(f"Failed to generate last chance email: {str(e)}")
         
         # Get user's interval settings for scheduling
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         lastchance_days = user.lastchance_interval_days or 6
 
         # Create the last chance email
@@ -674,7 +685,8 @@ Best regards,
             template_id=template.id if template else None,
             status="lastchance_due", # Set status to 'lastchance_due'
             stage="lastchance",
-            final_follow_up_date=now + timedelta(days=lastchance_days), # Set due date
+            # Use the single source of truth for due dates
+            follow_up_date=now + timedelta(days=lastchance_days),
             created_at=now,
             # Set legacy fields for backward compatibility
             to=recipient_email,
@@ -703,4 +715,3 @@ Best regards,
                 self.db.commit()
         except Exception as e:
             logger.error(f"Error marking generation as complete for progress_id {progress_id}: {e}")
-
