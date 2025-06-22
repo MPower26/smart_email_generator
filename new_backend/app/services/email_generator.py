@@ -360,6 +360,17 @@ class EmailGenerator:
     ) -> GeneratedEmail:
         """Generate a personalized follow-up email"""
         
+        # Check if a follow-up already exists for this recipient
+        existing_followup = self.db.query(GeneratedEmail).filter(
+            GeneratedEmail.recipient_email == original_email.recipient_email,
+            GeneratedEmail.stage == "followup",
+            GeneratedEmail.user_id == user.id
+        ).first()
+        
+        if existing_followup:
+            logger.warning(f"Follow-up already exists for {original_email.recipient_email}, skipping generation")
+            return existing_followup
+        
         # If no template provided, try to get the default template for followup category
         if not template:
             template = self.db.query(EmailTemplate).filter(
@@ -538,6 +549,17 @@ Best regards,
         template: Optional[EmailTemplate] = None
     ) -> GeneratedEmail:
         """Generate a last chance email based on an original email"""
+        
+        # Check if a lastchance already exists for this recipient
+        existing_lastchance = self.db.query(GeneratedEmail).filter(
+            GeneratedEmail.recipient_email == original_email.recipient_email,
+            GeneratedEmail.stage == "lastchance",
+            GeneratedEmail.user_id == user.id
+        ).first()
+        
+        if existing_lastchance:
+            logger.warning(f"Lastchance already exists for {original_email.recipient_email}, skipping generation")
+            return existing_lastchance
         
         # If no template provided, try to get the default template for lastchance category
         if not template:
