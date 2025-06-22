@@ -35,6 +35,15 @@ const GenerateEmailsPage = () => {
     status: 'idle'
   });
   
+  const [sendingProgress, setSendingProgress] = useState({
+    type: 'sending',
+    current: 0,
+    total: 0,
+    startTime: null,
+    speed: 0,
+    status: 'idle'
+  });
+
   const [generationProgress, setGenerationProgress] = useState(null);
   const [currentProgressId, setCurrentProgressId] = useState(null);
 
@@ -110,55 +119,31 @@ const GenerateEmailsPage = () => {
   const loadEmailsByStage = async () => {
     setLoadingEmails(true);
     try {
-      console.log('Loading emails by stage...');
-      
-      // Get the user profile for authentication
-      const userEmail = userProfile?.email;
-      console.log('Current user email for auth:', userEmail);
-      
-      if (!userEmail) {
-        console.error('No user email available for authentication');
+      if (!userProfile?.email) {
         setError('You must be logged in to view emails');
+        setLoadingEmails(false);
         return;
       }
       
-      let outreachSentEmails = []; // Store outreach_sent emails to add to Follow-Up
-      
-      // Fetch outreach emails and filter out outreach_sent (they belong in Follow-Up)
-      try {
-        const response = await emailService.getEmailsByStage('outreach');
-        console.log('Outreach data:', response.data);
-        // Filter out outreach_sent emails - they belong in Follow-Up
-        const filteredOutreachEmails = response.data.filter(email => email.status !== 'outreach_sent');
-        setOutreachEmails(filteredOutreachEmails);
-        
-        // Store outreach_sent emails to add to Follow-Up
-        outreachSentEmails = response.data.filter(email => email.status === 'outreach_sent' && email.followup_due_at);
-      } catch (err) {
-        console.error('Error fetching outreach emails:', err);
-      }
-      
-      // Fetch follow-up emails and combine with outreach_sent emails
-      try {
-        const response = await emailService.getEmailsByStage('followup');
-        console.log('Follow-up data:', response.data);
-        console.log('Outreach_sent emails to add:', outreachSentEmails);
-        
-        // Combine followup emails with outreach_sent emails that have followup_due_at
-        const combinedFollowupEmails = [...response.data, ...outreachSentEmails];
-        setFollowupEmails(combinedFollowupEmails);
-      } catch (err) {
-        console.error('Error fetching follow-up emails:', err);
-      }
-      
-      // Fetch last chance emails
-      try {
-        const response = await emailService.getEmailsByStage('lastchance');
-        console.log('Last chance data:', response.data);
-        setLastChanceEmails(response.data);
-      } catch (err) {
-        console.error('Error fetching last chance emails:', err);
-      }
+      // Fetch all stages in parallel for better performance
+      const [outreachRes, followupRes, lastChanceRes] = await Promise.all([
+        emailService.getEmailsByStage('outreach'),
+        emailService.getEmailsByStage('followup'),
+        emailService.getEmailsByStage('lastchance')
+      ]);
+
+      // Process outreach emails
+      const outreachData = outreachRes.data || [];
+      const outreachSentEmails = outreachData.filter(email => email.status === 'outreach_sent' && email.followup_due_at);
+      setOutreachEmails(outreachData.filter(email => email.status !== 'outreach_sent'));
+
+      // Process followup emails
+      const followupData = followupRes.data || [];
+      const combinedFollowupEmails = [...followupData, ...outreachSentEmails];
+      setFollowupEmails(combinedFollowupEmails);
+
+      // Process last chance emails
+      setLastChanceEmails(lastChanceRes.data || []);
       
     } catch (err) {
       console.error('General error loading emails:', err);
@@ -361,9 +346,7 @@ const GenerateEmailsPage = () => {
       await emailService.sendEmail(emailId);
       setLastAction({ id: emailId, type: 'sent' }); // <-- Set action type to 'sent'
       // Reload emails for all stages to see the new follow-up
-      loadEmailsByStage('outreach');
-      loadEmailsByStage('followup');
-      loadEmailsByStage('lastchance');
+      loadEmailsByStage();
     } catch (err) {
       console.error('Error marking email as sent:', err);
       setError('Failed to send email and generate next stage.');
@@ -811,7 +794,7 @@ const GenerateEmailsPage = () => {
                         variant="success" 
                         size="sm"
                         className="me-2"
-                        onClick={() => handleSendAll('lastchance')}
+                        onClick={() => handleSendAll('lastChance')}
                         disabled={loading || !userProfile?.gmail_access_token}
                         title={!userProfile?.gmail_access_token ? "Connect Gmail first" : "Send all last chance emails"}
                       >
@@ -830,7 +813,7 @@ const GenerateEmailsPage = () => {
                     <Button 
                       variant="outline-secondary" 
                       size="sm"
-                      onClick={() => handleExportStage(lastChanceEmails, 'lastchance')}
+                      onClick={() => handleExportStage(lastChanceEmails, 'lastChance')}
                     >
                       Export Last Chance Emails
                     </Button>
