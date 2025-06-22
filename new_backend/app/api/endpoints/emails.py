@@ -7,6 +7,7 @@ import json
 import csv
 import io
 import os
+import uuid
 from fastapi import status
 from sqlalchemy import or_, and_, text
 
@@ -374,6 +375,10 @@ async def generate_emails(
         friends_with_sharing = [f.id for f in current_user.friends if f.combine_contacts]
         dedupe_with_friends = len(friends_with_sharing) > 0
 
+        # Generate group_id for this batch
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        group_id = f"batch-{timestamp}-{str(uuid.uuid4())[:8]}"
+
         # Create progress record in database
         progress_record = EmailGenerationProgress(
             user_id=current_user.id,
@@ -381,13 +386,14 @@ async def generate_emails(
             processed_contacts=0,
             generated_emails=0,
             status="processing",
-            stage=stage
+            stage=stage,
+            group_id=group_id
         )
         db.add(progress_record)
         db.commit()
         db.refresh(progress_record)
         
-        logger.info(f"Started email generation for user {current_user.id}: {len(contacts)} contacts")
+        logger.info(f"Started email generation for user {current_user.id}: {len(contacts)} contacts with group_id {group_id}")
         
         # Start background task for email generation using FastAPI's system
         background_tasks.add_task(
@@ -399,7 +405,8 @@ async def generate_emails(
             avoid_duplicates, 
             dedupe_with_friends, 
             friends_with_sharing,
-            progress_record.id
+            progress_record.id,
+            group_id
         )
         
         return {
@@ -407,7 +414,7 @@ async def generate_emails(
             "total_contacts": len(contacts),
             "progress_id": progress_record.id,
             "status": "processing",
-            "group_id": None  # Will be set in background task
+            "group_id": group_id
         }
         
     except Exception as e:
@@ -453,7 +460,8 @@ async def generate_emails_background(
     avoid_duplicates: bool,
     dedupe_with_friends: bool,
     friends_with_sharing: List[int],
-    progress_id: int
+    progress_id: int,
+    group_id: str
 ):
     """Background task to generate emails"""
     from app.db.database import SessionLocal
@@ -476,14 +484,6 @@ async def generate_emails_background(
         if not progress_record:
             logger.error(f"Progress record {progress_id} not found. Aborting task.")
             return
-        
-        # Generate group_id for this batch
-        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        group_id = f"batch-{timestamp}-{str(uuid.uuid4())[:8]}"
-        
-        # Update progress record with group_id
-        progress_record.group_id = group_id
-        db.commit()
         
         logger.info(f"Progress record {progress_id} found. Starting email generation for user {user.id} with group_id {group_id}.")
         email_generator = EmailGenerator(db)
@@ -1018,14 +1018,8 @@ async def send_all_by_group(
             email.status = f"{stage}_sent"
             email.sent_at = datetime.utcnow()
             
-            # Generate next stage email if needed
-            if stage == "followup":
-                try:
-                    email_generator = EmailGenerator(db)
-                    last_chance_email = email_generator.generate_lastchance_email(email, current_user)
-                    logger.info(f"Generated last chance email ID {last_chance_email.id} for original email ID {email.id}")
-                except Exception as e:
-                    logger.error(f"Failed to generate last chance for email {email.id}: {e}")
+            # Note: Follow-up generation is handled in the single send endpoint
+            # We don't need to generate follow-ups here to avoid duplicates
             
             sent_count += 1
             
