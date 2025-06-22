@@ -8,6 +8,33 @@ import { emailService, templateService } from '../services/api';
 import { UserContext } from '../contexts/UserContext';
 import '../styles/GroupedEmails.css';
 
+const PreRequisiteError = ({ error, onClear }) => {
+    if (!error) return null;
+
+    const hasProfileError = error.includes("profile");
+    const hasTemplateError = error.includes("template");
+
+    return (
+        <Alert variant="warning" onClose={onClear} dismissible className="mt-3">
+            <Alert.Heading>Action Required</Alert.Heading>
+            <p>{error}</p>
+            <hr />
+            <div className="d-flex justify-content-end">
+                {hasProfileError && (
+                    <Button as="a" href="/settings" variant="outline-primary" className="me-2">
+                        Go to Settings
+                    </Button>
+                )}
+                {hasTemplateError && (
+                    <Button as="a" href="/templates" variant="outline-primary">
+                        Go to Templates
+                    </Button>
+                )}
+            </div>
+        </Alert>
+    );
+};
+
 const GenerateEmailsPage = () => {
   const { userProfile } = useContext(UserContext);
   const [file, setFile] = useState(null);
@@ -15,6 +42,7 @@ const GenerateEmailsPage = () => {
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [preRequisiteError, setPreRequisiteError] = useState('');
   const [activeTab, setActiveTab] = useState('generation');
   const [emailStage, setEmailStage] = useState('outreach');
   
@@ -319,6 +347,7 @@ const GenerateEmailsPage = () => {
 
     setLoading(true);
     setError('');
+    setPreRequisiteError(''); // Clear previous prerequisite errors
     setIsGenerating(true); // Immediately show the progress view
     
     // Reset progress trackers
@@ -356,9 +385,15 @@ const GenerateEmailsPage = () => {
       startProgressPolling(response.data.progress_id); // <-- Pass ID to start polling
 
     } catch (err) {
-      const errorMessage = err.response?.data?.detail || 'An unexpected error occurred during email generation.';
-      setError(errorMessage);
-      console.error('Email generation failed:', err);
+      // Handle the new prerequisite error
+      if (err.response && err.response.status === 412) {
+          setPreRequisiteError(err.response.data.detail);
+          setIsGenerating(false); // Stop the loading state
+      } else {
+          const errorMessage = err.response?.data?.detail || 'An unexpected error occurred during email generation.';
+          setError(errorMessage);
+          console.error('Email generation failed:', err);
+      }
       
       setUploadProgress(prev => ({ ...prev, status: 'error' }));
       setGenerationProgress(prev => ({ ...prev, status: 'error' }));
@@ -396,59 +431,28 @@ const GenerateEmailsPage = () => {
   };
 
   // Handle send all emails in a stage
-  const handleSendAll = async (stage) => {
-    if (!userProfile?.gmail_access_token) {
-      setError('Gmail not connected. Please connect your Gmail account in Settings first.');
-      return;
-    }
-
-    const stageEmails = stage === 'outreach' ? outreachEmails : 
-                       stage === 'followup' ? followupEmails : 
-                       lastChanceEmails;
-    
-    const unsentEmails = stageEmails.filter(email => 
-      email.status === 'draft' || email.status === 'outreach_pending' || email.status === 'followup_due'
-    );
-
-    if (unsentEmails.length === 0) {
-      setError(`No emails to send for ${stage} stage.`);
-      return;
-    }
-
-    if (!window.confirm(`Are you sure you want to send all ${unsentEmails.length} emails in the ${stage} stage? This will send them via Gmail and queue follow-up emails.`)) {
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    // Sending progress is now handled by WebSocket updates
+  const handleSendAll = async () => {
+    setError(''); // Clear previous errors
+    setSendingProgress(prev => ({ ...prev, status: 'sending' }));
 
     try {
-      const response = await emailService.sendAllViaGmail(stage);
-      
-      if (response.data.success) {
-        setError(`Successfully sent ${response.data.sent_count} emails. ${response.data.failed_count > 0 ? `${response.data.failed_count} failed.` : ''}`);
-        
-        // Reload emails to reflect the changes
-        await loadEmailsByStage();
-        
-        // Show success message
-        setTimeout(() => setError(''), 5000);
-      } else {
-        throw new Error(response.data.message || 'Failed to send emails');
-      }
+      const response = await emailService.sendAll(emailStage);
+      setSendingProgress(prev => ({ ...prev, status: 'complete', message: response.data.message }));
+      await fetchEmailsForStage(emailStage); // Refresh the list
     } catch (err) {
-      console.error('Error sending all emails:', err);
-      setError(
-        err.response?.data?.detail || err.response?.data?.message || 
-        'Failed to send emails. Please try again.'
-      );
-      
-      // Mark progress as error
+      console.error(`Failed to send all emails for stage ${emailStage}:`, err);
+      let errorMessage = 'An unexpected error occurred while sending emails.';
+      if (err.response && (err.response.status === 401 || err.response.data?.detail?.includes("token"))) {
+        errorMessage = (
+          <span>
+            Your Gmail connection has expired. Please <a href="/settings">reconnect your account</a> to send emails.
+          </span>
+        );
+      } else if (err.response?.data?.detail) {
+        errorMessage = err.response.data.detail;
+      }
+      setError(errorMessage);
       setSendingProgress(prev => ({ ...prev, status: 'error' }));
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -655,6 +659,7 @@ const GenerateEmailsPage = () => {
                 />
                 </Form.Group>
 
+                <PreRequisiteError error={preRequisiteError} onClear={() => setPreRequisiteError('')} />
                 {error && <Alert variant="danger">{error}</Alert>}
 
                 {/* Progress Trackers */}
@@ -720,7 +725,7 @@ const GenerateEmailsPage = () => {
                         variant="success" 
                         size="sm"
                         className="me-2"
-                        onClick={() => handleSendAll('outreach')}
+                        onClick={handleSendAll}
                         disabled={loading || !userProfile?.gmail_access_token}
                         title={!userProfile?.gmail_access_token ? "Connect Gmail first" : "Send all outreach emails"}
                       >
