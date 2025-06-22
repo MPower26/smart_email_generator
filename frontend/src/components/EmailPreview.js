@@ -75,11 +75,9 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
     status: 'idle'
   });
 
-  // This effect will collapse emails when tab changes
+  // This effect will collapse or expand the body based on the parent tab's state
   useEffect(() => {
-    if (isCollapsed) {
-      setShowBody(false);
-    }
+    setShowBody(!isCollapsed);
   }, [isCollapsed]);
 
   // Reset copy status after 2 seconds
@@ -175,9 +173,10 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
       status: 'processing'
     });
 
+    let progressInterval = null;
     try {
       // Simulate progress (since we can't track actual Gmail API progress)
-      const progressInterval = setInterval(() => {
+      progressInterval = setInterval(() => {
         setSendingProgress(prev => ({
           ...prev,
           current: Math.min(prev.current + 0.2, 1)
@@ -218,6 +217,10 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
       // Mark progress as error
       setSendingProgress(prev => ({ ...prev, status: 'error' }));
     } finally {
+      // Always clear the interval and reset the progress state
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
       setIsSending(false);
       
       // Reset progress after a delay
