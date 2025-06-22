@@ -382,6 +382,31 @@ async def generate_emails(
 ):
     """Generate emails based on Apollo contacts export"""
     logger.info(f"Generate request for user {current_user.email}")
+
+    # --- Pre-generation validation ---
+    # 1. Check user profile completion
+    if not all([current_user.full_name, current_user.position, current_user.company_name]):
+        raise HTTPException(
+            status_code=412,  # Precondition Failed
+            detail="User profile is incomplete. Please fill in your full name, position, and company name in settings."
+        )
+
+    # 2. Check for at least one template in each category
+    required_categories = {"outreach", "followup", "lastchance"}
+    existing_templates = db.query(EmailTemplate.category).filter(
+        EmailTemplate.user_id == current_user.id,
+        EmailTemplate.category.in_(required_categories)
+    ).distinct().all()
+    
+    existing_categories = {category[0] for category in existing_templates}
+    missing_categories = required_categories - existing_categories
+
+    if missing_categories:
+        raise HTTPException(
+            status_code=412,  # Precondition Failed
+            detail=f"Missing templates for the following categories: {', '.join(sorted(list(missing_categories)))}. Please create at least one template for each category."
+        )
+    # --- End of validation ---
     
     try:
         # Read and parse the CSV file
