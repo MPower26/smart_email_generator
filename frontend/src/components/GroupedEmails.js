@@ -6,8 +6,8 @@ import { Card, Button, Badge, Collapse, Alert, Spinner, Form, Modal } from 'reac
 const EmailRow = ({ email, onUpdate }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editedSubject, setEditedSubject] = useState(email.subject);
-  const [editedContent, setEditedContent] = useState(email.body);
+  const [editedSubject, setEditedSubject] = useState(email.subject || '');
+  const [editedContent, setEditedContent] = useState(email.body || '');
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSending, setIsSending] = useState(false);
