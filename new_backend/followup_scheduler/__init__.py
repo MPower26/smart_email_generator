@@ -9,10 +9,14 @@ from sendgrid.helpers.mail import Mail
 from sqlalchemy import create_engine, and_
 from sqlalchemy.orm import sessionmaker
 
-# This is a relative import from the perspective of where the function is run.
-# You may need to adjust this path depending on your final deployment structure.
-# For local testing, you might need to add the project root to the PYTHONPATH.
-from ..app.models.models import User, GeneratedEmail
+# Import models - adjust path as needed for Azure Functions deployment
+try:
+    from app.models.models import User, GeneratedEmail
+except ImportError:
+    # Fallback for Azure Functions deployment
+    import sys
+    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+    from app.models.models import User, GeneratedEmail
 
 logger = logging.getLogger(__name__)
 
@@ -20,16 +24,16 @@ logger = logging.getLogger(__name__)
 DATABASE_URL = os.getenv("DATABASE_URL")
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
 SENDGRID_FROM_EMAIL = os.getenv("SENDGRID_FROM_EMAIL", "noreply@smartemailgenerator.com")
-APP_URL = os.getenv("APP_URL", "https://app.smartemailgenerator.com")
+APP_URL = os.getenv("APP_URL", "https://jolly-bush-0bae83703.6.azurestaticapps.net")
 
 # Set up SQLAlchemy Engine and Session
 try:
     engine = create_engine(DATABASE_URL, pool_pre_ping=True)
     SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
-except ImportError:
+except Exception as e:
     engine = None
     SessionLocal = None
-    logger.error("SQLAlchemy could not be imported. The function will not be able to connect to the database.")
+    logger.error(f"Failed to create database engine: {e}")
 
 def send_digest_email(to_email: str, subject: str, html_content: str) -> bool:
     """Sends a single email via SendGrid."""
@@ -68,25 +72,23 @@ def main(timer: func.TimerRequest) -> None:
         users = session.query(User).filter(User.is_active == True).all()
 
         for user in users:
-            # Query for due "follow-up" emails.
-            # This matches the logic in email_generator.py where new follow-ups are created.
+            # Query for due "followup" emails using the correct field name
             count_followup = session.query(GeneratedEmail).filter(
                 and_(
                     GeneratedEmail.user_id == user.id,
                     GeneratedEmail.stage == "followup",
                     GeneratedEmail.status == "followup_due",
-                    GeneratedEmail.follow_up_date <= now
+                    GeneratedEmail.followup_due_at <= now
                 )
             ).count()
 
-            # Query for due "last-chance" emails.
-            # This also uses the unified 'follow_up_date' field.
+            # Query for due "lastchance" emails using the correct field name
             count_lastchance = session.query(GeneratedEmail).filter(
                 and_(
                     GeneratedEmail.user_id == user.id,
                     GeneratedEmail.stage == "lastchance",
                     GeneratedEmail.status == "lastchance_due",
-                    GeneratedEmail.follow_up_date <= now
+                    GeneratedEmail.lastchance_due_at <= now
                 )
             ).count()
 
