@@ -21,9 +21,9 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 # These settings must be configured in your Azure Function App's "Configuration" section.
-DATABASE_URL = os.getenv("DATABASE_URL")
+DATABASE_URL = os.getenv("DB_HOST")
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
-SENDGRID_FROM_EMAIL = os.getenv("SENDGRID_FROM_EMAIL", "noreply@smartemailgenerator.com")
+SENDGRID_FROM_EMAIL = os.getenv("SENDER_EMAIL", "noreply@smartemailgenerator.com")
 APP_URL = os.getenv("APP_URL", "https://jolly-bush-0bae83703.6.azurestaticapps.net")
 
 # Set up SQLAlchemy Engine and Session
@@ -104,7 +104,7 @@ def main(timer: func.TimerRequest) -> None:
                 <p>
                   <a href="{APP_URL}">Click here to go to your dashboard</a> to review and send them.
                 </p>
-                <p>— The Smart Email Generator Team</p>
+                <p>Tom</p>
                 """
                 send_digest_email(user.email, subject, html_body)
 
