@@ -516,12 +516,13 @@ Best regards,
             template_id=template.id if template else None,
             status="followup_due",  # Set status to 'followup_due'
             stage="followup",
-            # Use the single source of truth for due dates
-            follow_up_date=now + timedelta(days=followup_days),
+            # Use the correct field names for due dates
+            followup_due_at=now + timedelta(days=followup_days),
             created_at=now,
             # Set legacy fields for backward compatibility
             to=recipient_email,
-            body=content
+            body=content,
+            group_id=original_email.group_id  # Inherit group_id from original email
         )
         
         self.db.add(followup_email)
@@ -694,12 +695,13 @@ Best regards,
             template_id=template.id if template else None,
             status="lastchance_due", # Set status to 'lastchance_due'
             stage="lastchance",
-            # Use the single source of truth for due dates
-            follow_up_date=now + timedelta(days=lastchance_days),
+            # Use the correct field names for due dates
+            lastchance_due_at=now + timedelta(days=lastchance_days),
             created_at=now,
             # Set legacy fields for backward compatibility
             to=recipient_email,
-            body=content
+            body=content,
+            group_id=original_email.group_id  # Inherit group_id from original email
         )
         
         self.db.add(lastchance_email)
