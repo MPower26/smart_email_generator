@@ -63,7 +63,7 @@ api.interceptors.response.use(
 // Service d'API pour les emails
 export const emailService = {
   // Get templates
-  getTemplates: () => api.get('/emails/templates'),
+  getTemplates: () => api.get('/api/emails/templates'),
   
   // Get templates by category
   getTemplatesByCategory: (category) => api.get(`/api/templates?category=${category}`),
@@ -92,7 +92,7 @@ export const emailService = {
   },
   
   // Update email status (mark as sent, etc.)
-  updateEmailStatus: (emailId, data) => api.put(`/emails/${emailId}/status`, data),
+  updateEmailStatus: (emailId, data) => api.put(`/api/emails/${emailId}/status`, data),
   
   // Update email content (for editing)
   updateEmailContent: (emailId, data) => api.put(`/api/emails/${emailId}/content`, data),
@@ -101,13 +101,13 @@ export const emailService = {
   sendAllViaGmail: (stage) => api.post(`/api/emails/send_all_via_gmail/${stage}`),
   
   // Get email generation progress
-  getGenerationProgress: () => api.get('/emails/generation-progress'),
-  getGenerationProgressById: (progressId) => api.get(`/emails/generation-progress/${progressId}`),
+  getGenerationProgress: () => api.get('/api/emails/generation-progress'),
+  getGenerationProgressById: (progressId) => api.get(`/api/emails/generation-progress/${progressId}`),
   
   // Delete email
-  deleteEmail: (emailId) => api.delete(`/emails/${emailId}`),
+  deleteEmail: (emailId) => api.delete(`/api/emails/${emailId}`),
 
-  sendEmail: (emailId) => api.post(`/emails/send/${emailId}`),
+  sendEmail: (emailId) => api.post(`/api/emails/send/${emailId}`),
 };
 
 // Template API - Fixed to match backend routes exactly
