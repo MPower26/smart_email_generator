@@ -1,6 +1,10 @@
 import requests
 import base64
 
+class GmailTokenError(Exception):
+    """Custom exception for Gmail token-related errors."""
+    pass
+
 def send_gmail_email(user, to_email, subject, body):
     """
     Sends an email using the user's Gmail account via the Gmail API.
@@ -29,8 +33,14 @@ def send_gmail_email(user, to_email, subject, body):
     }
     data = {"raw": raw}
     resp = requests.post(url, headers=headers, json=data)
+    
+    # Specific check for token errors
+    if resp.status_code == 401:
+        raise GmailTokenError("Gmail token is expired or invalid. Please reconnect your account.")
+        
     if resp.status_code not in [200, 202]:
-        raise Exception(f"Gmail sending failed: {resp.text}")
+        raise Exception(f"Gmail sending failed with status {resp.status_code}: {resp.text}")
+        
     return resp.json()
 
 def check_reply(user, generated_email):
