@@ -8,6 +8,7 @@ from openai import AzureOpenAI
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import or_
+import uuid
 
 from app.models.models import GeneratedEmail, User, EmailTemplate, EmailGenerationProgress
 
@@ -87,7 +88,8 @@ class EmailGenerator:
         user: User,
         template: Optional[EmailTemplate] = None,
         stage: str = "outreach",
-        progress_id: Optional[int] = None
+        progress_id: Optional[int] = None,
+        group_id: Optional[str] = None
     ) -> GeneratedEmail:
         """Generate a personalized email using Azure OpenAI API"""
         
@@ -289,7 +291,8 @@ class EmailGenerator:
                 created_at=datetime.now(timezone.utc),
                 # Set legacy fields for backward compatibility
                 to=contact_data.get("Email", ""),
-                body=content
+                body=content,
+                group_id=group_id
             )
             
             self.db.add(email)
@@ -309,8 +312,14 @@ class EmailGenerator:
         stage: str = "outreach",
         avoid_duplicates: bool = False,
         dedupe_with_friends: bool = False,
-        friends_ids: Optional[List[int]] = None
+        friends_ids: Optional[List[int]] = None,
+        group_id: Optional[str] = None
     ) -> List[GeneratedEmail]:
+        # Generate group_id if not provided
+        if not group_id:
+            timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+            group_id = f"batch-{timestamp}-{str(uuid.uuid4())[:8]}"
+        
         generated_emails = []
         already_emailed = set()
         
@@ -333,7 +342,7 @@ class EmailGenerator:
             if avoid_duplicates and email_addr in already_emailed:
                 continue
             try:
-                email = self.generate_personalized_email(contact, user, template, stage)
+                email = self.generate_personalized_email(contact, user, template, stage, None, group_id)
                 generated_emails.append(email)
                 if avoid_duplicates:
                     already_emailed.add(email_addr)
