@@ -21,10 +21,29 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 # These settings must be configured in your Azure Function App's "Configuration" section.
-DATABASE_URL = os.getenv("DB_HOST")
+# Database configuration - using individual variables like the main app
+DB_HOST = os.getenv("DB_HOST")
+DB_NAME = os.getenv("DB_NAME")
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_DRIVER = os.getenv("DB_DRIVER", "ODBC Driver 18 for SQL Server")
+DB_TRUST_SERVER_CERTIFICATE = os.getenv("DB_TRUST_SERVER_CERTIFICATE", "yes")
+DB_ENCRYPT = os.getenv("DB_ENCRYPT", "yes")
+DB_TIMEOUT = os.getenv("DB_TIMEOUT", "30")
+
+# Email configuration
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
-SENDGRID_FROM_EMAIL = os.getenv("SENDER_EMAIL", "noreply@smartemailgenerator.com")
+SENDGRID_FROM_EMAIL = os.getenv("tom@wesiagency.com")
 APP_URL = os.getenv("APP_URL", "https://jolly-bush-0bae83703.6.azurestaticapps.net")
+
+# Construct the database URL like the main application
+DATABASE_URL = (
+    f"mssql+pyodbc://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:1433/{DB_NAME}"
+    f"?driver={DB_DRIVER}"
+    f"&TrustServerCertificate={DB_TRUST_SERVER_CERTIFICATE}"
+    f"&Encrypt={DB_ENCRYPT}"
+    f"&Connection+Timeout={DB_TIMEOUT}"
+)
 
 # Set up SQLAlchemy Engine and Session
 try:
