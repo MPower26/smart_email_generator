@@ -61,10 +61,15 @@ async def get_emails_by_stage(
     query = db.query(GeneratedEmail).filter(GeneratedEmail.user_id == current_user.id)
     
     # Add stage filter
-    if stage == "followup":
-        query = query.filter(GeneratedEmail.stage == "followup")
-    elif stage == "outreach":
-        # For outreach stage, only show emails that haven't been sent yet
+    if group_id:
+        query = query.filter(GeneratedEmail.group_id == group_id)
+    
+    # This logic was causing an indentation error. It's now fixed.
+    if stage == 'followup':
+        # For the followup stage, we also want to see emails that are 'due'
+        query = query.filter(GeneratedEmail.status.in_(["draft", "followup_due"]))
+    elif stage == 'outreach':
+        # For outreach, we only care about drafts and pending
         query = query.filter(
             GeneratedEmail.stage == stage,
             GeneratedEmail.status.in_(["draft", "outreach_pending"])
@@ -72,11 +77,7 @@ async def get_emails_by_stage(
     else:
         # For other stages (like lastchance), use the original logic
         query = query.filter(GeneratedEmail.stage == stage)
-    
-    # Add group_id filter if provided
-    if group_id:
-        query = query.filter(GeneratedEmail.group_id == group_id)
-    
+
     emails = query.all()
     
     logger.info(f"[EMAILS] Found {len(emails)} emails for user {current_user.email} (ID: {current_user.id}) in stage '{stage}'" + (f" with group_id '{group_id}'" if group_id else ""))
@@ -484,7 +485,7 @@ async def generate_emails_background(
         if not progress_record:
             logger.error(f"Progress record {progress_id} not found. Aborting task.")
             return
-        
+            
         logger.info(f"Progress record {progress_id} found. Starting email generation for user {user.id} with group_id {group_id}.")
         email_generator = EmailGenerator(db)
         
@@ -1026,9 +1027,9 @@ async def send_all_by_group(
         except Exception as e:
             logger.error(f"Failed to send email {email.id}: {e}")
             failed_count += 1
-    
-    db.commit()
-    
+            
+            db.commit()
+            
     logger.info(f"[EMAILS] Sent {sent_count} emails in group '{group_id}' for user {current_user.email} in stage '{stage}'")
     
     return {
@@ -1037,4 +1038,4 @@ async def send_all_by_group(
         "sent_count": sent_count,
         "failed_count": failed_count,
         "total_count": len(emails)
-    }
+    } 
