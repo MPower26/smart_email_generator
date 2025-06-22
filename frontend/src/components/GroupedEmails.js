@@ -216,14 +216,23 @@ const GroupedEmails = ({ stage }) => {
   };
 
   const handleSendAllInGroup = async (groupId) => {
+    // Reset error before trying
+    setError(null); 
     try {
-      const response = await emailService.sendAllByGroup(stage, groupId);
-      console.log('Sent all emails in group:', response);
+      await emailService.sendAllByGroup(stage, groupId);
       // Reload the groups to update the status
       await loadGroupedEmails();
     } catch (err) {
       console.error('Error sending all emails in group:', err);
-      setError('Failed to send emails in group');
+      if (err.response && (err.response.status === 401 || err.response.data?.detail?.includes("token"))) {
+        setError(
+          <span>
+            Your Gmail connection has expired. Please <a href="/settings">reconnect your account</a> to send emails.
+          </span>
+        );
+      } else {
+        setError('Failed to send emails in group. Please try again.');
+      }
     }
   };
 
