@@ -71,17 +71,19 @@ const GenerateEmailsPage = () => {
 
       // Process outreach emails
       const outreachData = outreachRes.data || [];
-      const outreachSentEmails = outreachData.filter(email => email.status === 'outreach_sent' && email.followup_due_at);
       setOutreachEmails(outreachData.filter(email => email.status !== 'outreach_sent'));
         
-      // Process followup emails - This was the source of the duplication.
-      // The `followupRes` already contains all correct followup emails,
-      // including those that moved from the outreach stage.
+      // Process followup emails
       const followupData = followupRes.data || [];
-      setFollowupEmails(followupData);
+      // Filter out emails that have been sent and now belong in the last chance stage
+      const followupSentEmails = followupData.filter(email => email.status === 'followup_sent');
+      setFollowupEmails(followupData.filter(email => email.status !== 'followup_sent'));
 
       // Process last chance emails
-      setLastChanceEmails(lastChanceRes.data || []);
+      const lastChanceData = lastChanceRes.data || [];
+      // Combine existing last chance emails with the ones that just moved from followup
+      const combinedLastChanceEmails = [...lastChanceData, ...followupSentEmails];
+      setLastChanceEmails(combinedLastChanceEmails);
       
     } catch (err) {
       console.error('General error loading emails:', err);
