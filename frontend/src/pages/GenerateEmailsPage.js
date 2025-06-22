@@ -438,7 +438,7 @@ const GenerateEmailsPage = () => {
     try {
       const response = await emailService.sendAll(emailStage);
       setSendingProgress(prev => ({ ...prev, status: 'complete', message: response.data.message }));
-      await fetchEmailsForStage(emailStage); // Refresh the list
+      await loadEmailsByStage(); // Refresh the list
     } catch (err) {
       console.error(`Failed to send all emails for stage ${emailStage}:`, err);
       let errorMessage = 'An unexpected error occurred while sending emails.';
