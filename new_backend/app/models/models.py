@@ -126,6 +126,7 @@ class GeneratedEmail(Base):
     sent_at = Column(DateTime(timezone=True), nullable=True)
     to = Column(String(255), nullable=True)  # Legacy field
     body = Column(Text, nullable=True)  # Legacy field
+    group_id = Column(String(255), nullable=True, index=True)  # For grouping emails by campaign/batch
 
     # Relationships
     user = relationship("User", back_populates="generated_emails", foreign_keys=[user_id])
@@ -150,10 +151,10 @@ class EmailGenerationProgress(Base):
     error_message = Column(Text, nullable=True)  # To store error details
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    group_id = Column(String(255), nullable=True, index=True)  # For grouping emails by campaign/batch
     
     # Relationship
     user = relationship("User", back_populates="generation_progress")
     
     def __repr__(self):
         return f"<EmailGenerationProgress(id={self.id}, user_id={self.user_id}, status={self.status})>"
-
