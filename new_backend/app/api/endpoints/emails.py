@@ -1,5 +1,5 @@
 from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Body, UploadFile, File, Form, Response
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Body, UploadFile, File, Form, Response, Query
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 import logging
@@ -10,14 +10,17 @@ import os
 import uuid
 from fastapi import status
 from sqlalchemy import or_, and_, text
+import pandas as pd
 
 from app.db.database import get_db
 from app.models.models import GeneratedEmail, User, EmailTemplate, EmailGenerationProgress
 from app.api.auth import get_current_user
 from app.services.email_generator import EmailGenerator
-from app.services.email_service import send_verification_email, EMAIL_CONFIG
+from app.services.email_service import send_verification_email, EMAIL_CONFIG, send_email_via_gmail, get_user_from_db
 from app.services.gmail_service import send_gmail_email
 from app.websocket_manager import manager
+from app.schemas.email import EmailSchema, EmailUpdate, GroupedEmailResponse, EmailGroup
+from pydantic import BaseModel
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -64,19 +67,14 @@ async def get_emails_by_stage(
     if group_id:
         query = query.filter(GeneratedEmail.group_id == group_id)
     
-    # This logic was causing an indentation error. It's now fixed.
+    # Correcting the indentation and logic block
     if stage == 'followup':
-        # For the followup stage, we also want to see emails that are 'due'
-        query = query.filter(GeneratedEmail.status.in_(["draft", "followup_due"]))
-    elif stage == 'outreach':
-        # For outreach, we only care about drafts and pending
-        query = query.filter(
-            GeneratedEmail.stage == stage,
-            GeneratedEmail.status.in_(["draft", "outreach_pending"])
-        )
-    else:
-        # For other stages (like lastchance), use the original logic
-        query = query.filter(GeneratedEmail.stage == stage)
+        query = query.filter(GeneratedEmail.status.in_(["draft", "followup_due", "followup_sent"]))
+    elif stage == 'lastchance':
+        query = query.filter(GeneratedEmail.status.in_(["draft", "lastchance_due", "lastchance_sent"]))
+    
+    # Always filter by stage, regardless of the status filter applied above
+    query = query.filter(GeneratedEmail.stage == stage)
 
     emails = query.all()
     
@@ -904,7 +902,7 @@ async def send_all_via_gmail(
         "errors": errors if errors else None
     }
 
-@router.get("/by-stage/{stage}/groups", response_model=Dict[str, Any])
+@router.get("/by-stage/{stage}/groups", response_model=GroupedEmailResponse)
 async def get_emails_by_stage_grouped(
     stage: str,
     current_user: User = Depends(get_current_user),
@@ -1039,3 +1037,47 @@ async def send_all_by_group(
         "failed_count": failed_count,
         "total_count": len(emails)
     } 
+
+class RegeneratePrompt(BaseModel):
+    prompt: str
+
+@router.post("/regenerate_group/{group_id}", status_code=200)
+async def regenerate_group_emails(
+    group_id: str,
+    payload: RegeneratePrompt,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_user_from_db)
+):
+    """
+    Re-generates the content for all emails in a specific group based on a new prompt.
+    """
+    emails_in_group = db.query(GeneratedEmail).filter(
+        GeneratedEmail.group_id == group_id,
+        GeneratedEmail.user_id == user.id
+    ).all()
+
+    if not emails_in_group:
+        raise HTTPException(status_code=404, detail="No emails found for the given group ID.")
+
+    email_generator = EmailGenerator(db)
+    
+    regenerated_count = 0
+    errors = []
+
+    for email in emails_in_group:
+        try:
+            await email_generator.regenerate_email_content(email, user, payload.prompt)
+            regenerated_count += 1
+        except Exception as e:
+            errors.append({"email_id": email.id, "error": str(e)})
+            
+    if errors:
+        # Even if some fail, we return 200 but include error details
+        return {
+            "message": f"Partially completed re-generation for group {group_id}.",
+            "regenerated_count": regenerated_count,
+            "failed_count": len(errors),
+            "errors": errors
+        }
+        
+    return {"message": f"Successfully re-generated {regenerated_count} emails in group {group_id}."} 
