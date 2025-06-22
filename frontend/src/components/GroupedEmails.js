@@ -11,6 +11,7 @@ const EmailRow = ({ email, onUpdate }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [sendError, setSendError] = useState(null);
 
   const handleToggleExpand = () => setIsExpanded(!isExpanded);
   const handleShowEditModal = () => setShowEditModal(true);
@@ -49,11 +50,23 @@ const EmailRow = ({ email, onUpdate }) => {
 
   const handleSend = async () => {
     setIsSending(true);
+    setSendError(null); // Clear previous errors
     try {
         await emailService.sendEmail(email.id);
         onUpdate();
     } catch (error) {
         console.error('Failed to send email:', error);
+        if (error.response && error.response.status === 401) {
+            // Specific error for expired token
+            setSendError(
+                <span>
+                    Gmail token is invalid. Please <a href="/settings">reconnect your account here</a>.
+                </span>
+            );
+        } else {
+            // Generic error
+            setSendError('Failed to send email. Please try again.');
+        }
     } finally {
         setIsSending(false);
     }
@@ -73,6 +86,7 @@ const EmailRow = ({ email, onUpdate }) => {
         </div>
         <Collapse in={isExpanded}>
           <div className="email-item-body">
+            {sendError && <Alert variant="danger">{sendError}</Alert>}
             <div className="email-content">
               <strong>Subject:</strong> {email.subject}
               <hr />
