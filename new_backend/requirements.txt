@@ -30,8 +30,7 @@ beautifulsoup4==4.12.2
 # Email services
 sendgrid==6.11.0
 
-# Scheduling
-apscheduler==3.10.4
+# Date utilities
 python-dateutil==2.8.2
 
 # Gmail OAuth
@@ -42,6 +41,7 @@ google-api-python-client==2.125.0
 # WebSocket support (compatible with uvicorn 0.24.0)
 websockets>=11.0.3,<12.0
 wsproto>=1.2.0
+
 
 
 
