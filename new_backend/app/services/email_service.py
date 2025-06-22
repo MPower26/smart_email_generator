@@ -6,8 +6,7 @@ from app.services.gmail_service import send_gmail_email, GmailTokenError
 from fastapi import HTTPException
 from datetime import datetime
 from sqlalchemy.orm import Session
-from ..models.user import User
-from ..models.generated_email import GeneratedEmail
+from ..models.models import User, GeneratedEmail
 
 logger = logging.getLogger(__name__)
 
