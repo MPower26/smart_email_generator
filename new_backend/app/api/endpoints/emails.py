@@ -791,7 +791,6 @@ async def send_all_via_gmail(
     sent_count = 0
     failed_count = 0
     errors = []
-    emails_to_delete = []  # Track emails to delete after they are processed
     email_generator = EmailGenerator(db)
 
     # Send initial progress update
@@ -842,8 +841,6 @@ async def send_all_via_gmail(
                 email.sent_at = datetime.utcnow()
                 # This is the final email, no new email is generated.
 
-            # Mark the processed email for deletion
-            emails_to_delete.append(email)
             sent_count += 1
             
             # Send progress update
@@ -870,9 +867,6 @@ async def send_all_via_gmail(
                 "recipient": email.recipient_email
             })
     
-    # Commit status changes for sent emails
-    db.commit()
-    
     # Send completion progress update
     await manager.send_progress(str(current_user.id), {
         "type": "sending_complete",
@@ -882,34 +876,12 @@ async def send_all_via_gmail(
         "stage": stage
     })
     
-    # Create sent records and delete the old emails
-    if emails_to_delete:
-        try:
-            email_ids_to_delete = []
-            for sent_email in emails_to_delete:
-                # Create a record of the sent email for duplicate detection
-                sent_record = SentEmailRecord(
-                    user_id=current_user.id,
-                    recipient_email=sent_email.recipient_email,
-                    sent_at=sent_email.sent_at or datetime.utcnow(),
-                    stage=sent_email.stage
-                )
-                db.add(sent_record)
-                email_ids_to_delete.append(sent_email.id)
-            
-            db.commit() # Commit the new sent records
-            
-            # Delete the original emails
-            db.query(GeneratedEmail).filter(
-                GeneratedEmail.id.in_(email_ids_to_delete)
-            ).delete(synchronize_session=False)
-            
-            db.commit()
-            logger.info(f"Deleted {len(email_ids_to_delete)} emails from stage '{stage}' after sending and recording")
-            
-        except Exception as delete_error:
-            logger.error(f"Error during post-send cleanup for stage '{stage}': {str(delete_error)}")
-            # Don't fail the operation if deletion fails; the main task is done.
+    # Commit status changes for sent emails
+    db.commit()
+    
+    # Update email statuses to indicate they've been sent
+    # We no longer delete emails or create SentEmailRecord entries
+    # The emails remain in the database with updated status for tracking
     
     return {
         "success": True,
@@ -919,3 +891,4 @@ async def send_all_via_gmail(
         "total_count": len(emails),
         "errors": errors if errors else None
     } 
+
