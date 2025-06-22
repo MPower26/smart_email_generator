@@ -50,78 +50,94 @@ const GenerateEmailsPage = () => {
   // Polling for progress updates
   const pollingIntervalRef = useRef(null);
 
-  // Memoize the sorted and mapped email components to prevent re-sorting on every render
-  const outreachEmailComponents = useMemo(() => 
-    [...outreachEmails]
-      .sort((a, b) => {
-        const statusOrder = { 'outreach_sent': 0, 'draft': 1, 'sent by friend': 2 };
-        const statusA = statusOrder[a.status] || 3;
-        const statusB = statusOrder[b.status] || 3;
-        return statusA - statusB;
-      })
-      .map((email, index) => (
-        <div key={index} className="mb-2">
-          <EmailPreview 
-            email={email} 
-            onSend={handleMarkAsSent}
-            onUnmarkSent={handleUnmarkAsSent}
-            onDelete={handleDeleteEmail}
-            isCollapsed={isTabCollapsed('outreach')}
-            isSentHighlight={lastAction.type === 'sent' && lastAction.id === email.id}
-            isUnmarkedHighlight={lastAction.type === 'unmarked' && lastAction.id === email.id}
-          />
-        </div>
-      )), 
-    [outreachEmails, activeTab, lastAction]
-  );
+  // Load emails by stage - moved before functions that reference it
+  const loadEmailsByStage = async () => {
+    setLoadingEmails(true);
+    try {
+      if (!userProfile?.email) {
+        setError('You must be logged in to view emails');
+        setLoadingEmails(false);
+        return;
+      }
+      
+      // Fetch all stages in parallel for better performance
+      const [outreachRes, followupRes, lastChanceRes] = await Promise.all([
+        emailService.getEmailsByStage('outreach'),
+        emailService.getEmailsByStage('followup'),
+        emailService.getEmailsByStage('lastchance')
+      ]);
 
-  const followupEmailComponents = useMemo(() =>
-    [...followupEmails]
-      .sort((a, b) => {
-        const statusOrder = { 'outreach_sent': 0, 'draft': 1, 'sent by friend': 2 };
-        const statusA = statusOrder[a.status] || 3;
-        const statusB = statusOrder[b.status] || 3;
-        return statusA - statusB;
-      })
-      .map((email, index) => (
-        <div key={index} className="mb-2">
-          <EmailPreview 
-            email={email} 
-            onSend={handleMarkAsSent}
-            onUnmarkSent={handleUnmarkAsSent}
-            onDelete={handleDeleteEmail}
-            isCollapsed={isTabCollapsed('followup')}
-            isSentHighlight={lastAction.type === 'sent' && lastAction.id === email.id}
-            isUnmarkedHighlight={lastAction.type === 'unmarked' && lastAction.id === email.id}
-          />
-        </div>
-      )),
-    [followupEmails, activeTab, lastAction]
-  );
+      // Process outreach emails
+      const outreachData = outreachRes.data || [];
+      const outreachSentEmails = outreachData.filter(email => email.status === 'outreach_sent' && email.followup_due_at);
+      setOutreachEmails(outreachData.filter(email => email.status !== 'outreach_sent'));
+        
+      // Process followup emails
+      const followupData = followupRes.data || [];
+      const combinedFollowupEmails = [...followupData, ...outreachSentEmails];
+        setFollowupEmails(combinedFollowupEmails);
 
-  const lastChanceEmailComponents = useMemo(() =>
-    [...lastChanceEmails]
-      .sort((a, b) => {
-        const statusOrder = { 'outreach_sent': 0, 'draft': 1, 'sent by friend': 2 };
-        const statusA = statusOrder[a.status] || 3;
-        const statusB = statusOrder[b.status] || 3;
-        return statusA - statusB;
-      })
-      .map((email, index) => (
-        <div key={index} className="mb-2">
-          <EmailPreview 
-            email={email} 
-            onSend={handleMarkAsSent}
-            onUnmarkSent={handleUnmarkAsSent}
-            onDelete={handleDeleteEmail}
-            isCollapsed={isTabCollapsed('lastChance')}
-            isSentHighlight={lastAction.type === 'sent' && lastAction.id === email.id}
-            isUnmarkedHighlight={lastAction.type === 'unmarked' && lastAction.id === email.id}
-          />
-        </div>
-      )),
-    [lastChanceEmails, activeTab, lastAction]
-  );
+      // Process last chance emails
+      setLastChanceEmails(lastChanceRes.data || []);
+      
+    } catch (err) {
+      console.error('General error loading emails:', err);
+      setError('Failed to load emails. Please try again.');
+    } finally {
+      setLoadingEmails(false);
+    }
+  };
+
+  // Define functions before useMemo hooks to avoid hoisting issues
+  const handleMarkAsSent = async (emailId) => {
+    setError(null); // Clear previous errors
+    try {
+      await emailService.sendEmail(emailId);
+      setLastAction({ id: emailId, type: 'sent' }); // <-- Set action type to 'sent'
+      // Reload emails for all stages to see the new follow-up
+      loadEmailsByStage();
+    } catch (err) {
+      console.error('Error marking email as sent:', err);
+      setError('Failed to send email and generate next stage.');
+      setLastAction({ id: null, type: null }); // Clear highlight on error
+    }
+  };
+
+  // Unmark an email as sent (sets status back to draft)
+  const handleUnmarkAsSent = async (emailId) => {
+    setError(null); // Clear previous errors
+    try {
+      // This still uses the status endpoint, which is now correctly limited
+      await emailService.updateEmailStatus(emailId, { status: 'draft' });
+      setLastAction({ id: emailId, type: 'unmarked' }); // <-- Set action type to 'unmarked'
+      loadEmailsByStage(); // Reload to reflect status change
+    } catch (err) {
+      console.error('Error unmarking email:', err);
+      setError('Failed to unmark email.');
+      setLastAction({ id: null, type: null }); // Clear highlight on error
+    }
+  };
+
+  // Delete an email
+  const handleDeleteEmail = async (emailId) => {
+    console.log(`[GenerateEmailsPage] handleDeleteEmail called for ID: ${emailId}`); // <-- Log entry
+    setError(null); // Clear previous errors
+    // Remove this line for now, error handling in child handles it
+    // setLastAction({ id: null, type: null }); 
+    try {
+      console.log(`[GenerateEmailsPage] Calling emailService.deleteEmail for ID: ${emailId}`);
+      await emailService.deleteEmail(emailId);
+      console.log(`[GenerateEmailsPage] deleteEmail service call finished for ID: ${emailId}`);
+      loadEmailsByStage(); // Reload to reflect deletion
+    } catch (err) {
+      console.error('[GenerateEmailsPage] Error deleting email:', err);
+      const errorDetail = err.response?.data?.detail || err.message || 'An unknown error occurred';
+      setError(`Failed to delete email: ${errorDetail}`);
+      // Re-throw so the preview component can handle its loading state
+      console.log('[GenerateEmailsPage] Re-throwing error after delete failure.');
+      throw new Error(`Failed to delete email: ${errorDetail}`); 
+    }
+  };
 
   // Track which tab's emails should be collapsed
   const isTabCollapsed = (tabName) => {
@@ -188,72 +204,6 @@ const GenerateEmailsPage = () => {
     window.open('https://jolly-bush-0bae83703.6.azurestaticapps.net/templates', '_blank');
   };
   
-  // Load emails by stage
-  const loadEmailsByStage = async () => {
-    setLoadingEmails(true);
-    try {
-      if (!userProfile?.email) {
-        setError('You must be logged in to view emails');
-        setLoadingEmails(false);
-        return;
-      }
-      
-      // Fetch all stages in parallel for better performance
-      const [outreachRes, followupRes, lastChanceRes] = await Promise.all([
-        emailService.getEmailsByStage('outreach'),
-        emailService.getEmailsByStage('followup'),
-        emailService.getEmailsByStage('lastchance')
-      ]);
-
-      // Process outreach emails
-      const outreachData = outreachRes.data || [];
-      const outreachSentEmails = outreachData.filter(email => email.status === 'outreach_sent' && email.followup_due_at);
-      setOutreachEmails(outreachData.filter(email => email.status !== 'outreach_sent'));
-
-      // Process followup emails
-      const followupData = followupRes.data || [];
-      const combinedFollowupEmails = [...followupData, ...outreachSentEmails];
-      setFollowupEmails(combinedFollowupEmails);
-
-      // Process last chance emails
-      setLastChanceEmails(lastChanceRes.data || []);
-      
-    } catch (err) {
-      console.error('General error loading emails:', err);
-      setError('Failed to load emails. Please try again.');
-    } finally {
-      setLoadingEmails(false);
-    }
-  };
-
-  // Load data when component mounts or user profile changes
-  useEffect(() => {
-    // Check for ongoing generation when the page loads
-    const checkInitialProgress = async () => {
-      try {
-        const response = await emailService.getGenerationProgress();
-        if (response.data?.status === 'processing') {
-          setIsGenerating(true);
-          startProgressPolling();
-        }
-      } catch (error) {
-        console.error("Failed to check initial progress", error);
-      }
-    };
-
-    loadTemplates();
-    loadEmailsByStage();
-    checkInitialProgress();
-  }, [userProfile]);
-
-  // Debug user profile
-  useEffect(() => {
-    console.log('Current user profile:', userProfile);
-    // Check localStorage for debugging
-    const storedProfile = localStorage.getItem('userProfile');
-    console.log('Profile in localStorage:', storedProfile ? JSON.parse(storedProfile) : null);
-  }, [userProfile]);
-
   const pollProgress = async (progressId) => {
     try {
       if (!progressId) {
@@ -326,6 +276,34 @@ const GenerateEmailsPage = () => {
       stopProgressPolling();
     };
   }, []); // Empty array ensures this runs only once on mount and cleanup on unmount
+
+  // Load data when component mounts or user profile changes
+  useEffect(() => {
+    // Check for ongoing generation when the page loads
+    const checkInitialProgress = async () => {
+      try {
+        const response = await emailService.getGenerationProgress();
+        if (response.data?.status === 'processing') {
+          setIsGenerating(true);
+          startProgressPolling();
+        }
+      } catch (error) {
+        console.error("Failed to check initial progress", error);
+      }
+    };
+
+    loadTemplates();
+    loadEmailsByStage();
+    checkInitialProgress();
+  }, [userProfile]);
+
+  // Debug user profile
+  useEffect(() => {
+    console.log('Current user profile:', userProfile);
+    // Check localStorage for debugging
+    const storedProfile = localStorage.getItem('userProfile');
+    console.log('Profile in localStorage:', storedProfile ? JSON.parse(storedProfile) : null);
+  }, [userProfile]);
 
   // Generate emails
   const handleGenerateEmails = async () => {
@@ -412,57 +390,6 @@ const GenerateEmailsPage = () => {
     URL.revokeObjectURL(url);
   };
   
-  // Mark an email as sent (updates status in DB only)
-  const handleMarkAsSent = async (emailId) => {
-    setError(null); // Clear previous errors
-    try {
-      await emailService.sendEmail(emailId);
-      setLastAction({ id: emailId, type: 'sent' }); // <-- Set action type to 'sent'
-      // Reload emails for all stages to see the new follow-up
-      loadEmailsByStage();
-    } catch (err) {
-      console.error('Error marking email as sent:', err);
-      setError('Failed to send email and generate next stage.');
-      setLastAction({ id: null, type: null }); // Clear highlight on error
-    }
-  };
-
-  // Unmark an email as sent (sets status back to draft)
-  const handleUnmarkAsSent = async (emailId) => {
-    setError(null); // Clear previous errors
-    try {
-      // This still uses the status endpoint, which is now correctly limited
-      await emailService.updateEmailStatus(emailId, { status: 'draft' });
-      setLastAction({ id: emailId, type: 'unmarked' }); // <-- Set action type to 'unmarked'
-      loadEmailsByStage(); // Reload to reflect status change
-    } catch (err) {
-      console.error('Error unmarking email:', err);
-      setError('Failed to unmark email.');
-      setLastAction({ id: null, type: null }); // Clear highlight on error
-    }
-  };
-
-  // Delete an email
-  const handleDeleteEmail = async (emailId) => {
-    console.log(`[GenerateEmailsPage] handleDeleteEmail called for ID: ${emailId}`); // <-- Log entry
-    setError(null); // Clear previous errors
-    // Remove this line for now, error handling in child handles it
-    // setLastAction({ id: null, type: null }); 
-    try {
-      console.log(`[GenerateEmailsPage] Calling emailService.deleteEmail for ID: ${emailId}`);
-      await emailService.deleteEmail(emailId);
-      console.log(`[GenerateEmailsPage] deleteEmail service call finished for ID: ${emailId}`);
-      loadEmailsByStage(); // Reload to reflect deletion
-    } catch (err) {
-      console.error('[GenerateEmailsPage] Error deleting email:', err);
-      const errorDetail = err.response?.data?.detail || err.message || 'An unknown error occurred';
-      setError(`Failed to delete email: ${errorDetail}`);
-      // Re-throw so the preview component can handle its loading state
-      console.log('[GenerateEmailsPage] Re-throwing error after delete failure.');
-      throw new Error(`Failed to delete email: ${errorDetail}`); 
-    }
-  };
-
   // Handle send all emails in a stage
   const handleSendAll = async (stage) => {
     if (!userProfile?.gmail_access_token) {
@@ -521,6 +448,79 @@ const GenerateEmailsPage = () => {
   };
 
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // Memoize the sorted and mapped email components to prevent re-sorting on every render
+  const outreachEmailComponents = useMemo(() => 
+    [...outreachEmails]
+      .sort((a, b) => {
+        const statusOrder = { 'outreach_sent': 0, 'draft': 1, 'sent by friend': 2 };
+        const statusA = statusOrder[a.status] || 3;
+        const statusB = statusOrder[b.status] || 3;
+        return statusA - statusB;
+      })
+      .map((email, index) => (
+        <div key={index} className="mb-2">
+          <EmailPreview 
+            email={email} 
+            onSend={handleMarkAsSent}
+            onUnmarkSent={handleUnmarkAsSent}
+            onDelete={handleDeleteEmail}
+            isCollapsed={isTabCollapsed('outreach')}
+            isSentHighlight={lastAction.type === 'sent' && lastAction.id === email.id}
+            isUnmarkedHighlight={lastAction.type === 'unmarked' && lastAction.id === email.id}
+          />
+        </div>
+      )), 
+    [outreachEmails, activeTab, lastAction]
+  );
+
+  const followupEmailComponents = useMemo(() =>
+    [...followupEmails]
+      .sort((a, b) => {
+        const statusOrder = { 'outreach_sent': 0, 'draft': 1, 'sent by friend': 2 };
+        const statusA = statusOrder[a.status] || 3;
+        const statusB = statusOrder[b.status] || 3;
+        return statusA - statusB;
+      })
+      .map((email, index) => (
+        <div key={index} className="mb-2">
+          <EmailPreview 
+            email={email} 
+            onSend={handleMarkAsSent}
+            onUnmarkSent={handleUnmarkAsSent}
+            onDelete={handleDeleteEmail}
+            isCollapsed={isTabCollapsed('followup')}
+            isSentHighlight={lastAction.type === 'sent' && lastAction.id === email.id}
+            isUnmarkedHighlight={lastAction.type === 'unmarked' && lastAction.id === email.id}
+          />
+        </div>
+      )),
+    [followupEmails, activeTab, lastAction]
+  );
+
+  const lastChanceEmailComponents = useMemo(() =>
+    [...lastChanceEmails]
+      .sort((a, b) => {
+        const statusOrder = { 'outreach_sent': 0, 'draft': 1, 'sent by friend': 2 };
+        const statusA = statusOrder[a.status] || 3;
+        const statusB = statusOrder[b.status] || 3;
+        return statusA - statusB;
+      })
+      .map((email, index) => (
+        <div key={index} className="mb-2">
+          <EmailPreview 
+            email={email} 
+            onSend={handleMarkAsSent}
+            onUnmarkSent={handleUnmarkAsSent}
+            onDelete={handleDeleteEmail}
+            isCollapsed={isTabCollapsed('lastChance')}
+            isSentHighlight={lastAction.type === 'sent' && lastAction.id === email.id}
+            isUnmarkedHighlight={lastAction.type === 'unmarked' && lastAction.id === email.id}
+          />
+        </div>
+      )),
+    [lastChanceEmails, activeTab, lastAction]
+  );
 
   return (
     <Container className="templates-page">
