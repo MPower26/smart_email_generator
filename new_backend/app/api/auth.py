@@ -67,6 +67,10 @@ async def get_current_user(
     
     return user
 
+def get_user_from_db(user: User = Depends(get_current_user)):
+    """Simple dependency to get the user object from the get_current_user dependency."""
+    return user
+
 @router.post("/request-code", response_model=VerificationResponse)
 async def request_verification_code(request: VerificationRequest, db: Session = Depends(get_db)):
     try:
