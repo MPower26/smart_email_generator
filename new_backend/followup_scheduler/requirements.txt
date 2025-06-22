@@ -1,0 +1,7 @@
+# This file specifies the dependencies for the Azure Function.
+# It should be deployed alongside the function code.
+
+azure-functions
+sqlalchemy
+psycopg2-binary
+sendgrid 
