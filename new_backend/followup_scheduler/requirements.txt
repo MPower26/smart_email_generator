@@ -1,7 +1,5 @@
-# This file specifies the dependencies for the Azure Function.
-# It should be deployed alongside the function code.
-
-azure-functions
-sqlalchemy
-psycopg2-binary
-sendgrid 
+azure-functions==1.17.0
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
+sendgrid==6.11.0
+python-dateutil==2.8.2 
