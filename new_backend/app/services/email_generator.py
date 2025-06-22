@@ -748,3 +748,64 @@ Best regards,
                 self.db.commit()
         except Exception as e:
             logger.error(f"Error marking generation as complete for progress_id {progress_id}: {e}")
+
+    async def regenerate_email_content(self, email: GeneratedEmail, user: User, custom_prompt: str) -> GeneratedEmail:
+        """Re-generates the subject and content of an existing email using a new prompt."""
+        
+        # Build the prompt for re-generation
+        prompt = f"""
+        You are an expert email writer. Your task is to rewrite an email based on a new instruction or prompt.
+        
+        New Instruction/Prompt: "{custom_prompt}"
+
+        Original Email Information:
+        Recipient Name: {email.recipient_name}
+        Recipient Company: {email.recipient_company}
+        Stage: {email.stage}
+
+        Sender Information:
+        Name: {user.full_name or "[Your Name]"}
+        Position: {user.position or "[Your Position]"}
+        Company: {user.company_name or "[Your Company]"}
+
+        Please generate a new subject and body for the email based *only* on the new instruction.
+        - The output should start with "Subject: [new subject]".
+        - Do not include any other explanations or text before or after the email content.
+        - Ensure the full signature is present at the end.
+        """
+
+        try:
+            response = self.client.chat.completions.create(
+                model=AZURE_DEPLOYMENT_NAME,
+                messages=[
+                    {"role": "system", "content": "You are an email re-writing assistant. Follow the user's prompt precisely. Start your response with 'Subject:' and nothing else."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=1000
+            )
+            
+            generated_content = response.choices[0].message.content
+            
+            # Extract subject and content
+            content_lines = generated_content.split('\n')
+            new_subject = "Re: " + email.subject  # Default subject if extraction fails
+            new_body = generated_content
+
+            if content_lines and content_lines[0].lower().strip().startswith("subject:"):
+                new_subject = content_lines[0].strip()[8:].strip()
+                new_body = '\n'.join(content_lines[1:]).strip()
+
+            # Update the email object without changing other fields
+            email.subject = new_subject
+            email.body = new_body
+            email.content = new_body # Ensure content field is also updated
+            
+            self.db.commit()
+            self.db.refresh(email)
+            
+            return email
+
+        except Exception as e:
+            logger.error(f"Error re-generating email for ID {email.id}: {e}")
+            raise Exception(f"Failed to re-generate email: {str(e)}")
