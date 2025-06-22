@@ -48,35 +48,37 @@ async def clear_cache(
 @router.get("/by-stage/{stage}", response_model=List[Dict[str, Any]])
 async def get_emails_by_stage(
     stage: str,
+    group_id: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get emails for the current user filtered by stage"""
-    logger.info(f"[EMAILS] Getting emails for user {current_user.email} (ID: {current_user.id}) in stage '{stage}'")
+    """Get emails for the current user filtered by stage and optionally by group_id"""
+    logger.info(f"[EMAILS] Getting emails for user {current_user.email} (ID: {current_user.id}) in stage '{stage}'" + (f" with group_id '{group_id}'" if group_id else ""))
     logger.info(f"Current user details - ID: {current_user.id}, Email: {current_user.email}")
     
-    if stage == "followup":
-        emails = db.query(GeneratedEmail).filter(
-            GeneratedEmail.user_id == current_user.id,
-            GeneratedEmail.stage == "followup"
-        ).all()
-    else:
-        # For other stages, use the original logic but filter out sent emails from outreach
-        if stage == "outreach":
-            # For outreach stage, only show emails that haven't been sent yet
-            emails = db.query(GeneratedEmail).filter(
-                GeneratedEmail.user_id == current_user.id,
-                GeneratedEmail.stage == stage,
-                GeneratedEmail.status.in_(["draft", "outreach_pending"])
-            ).all()
-        else:
-            # For other stages (like lastchance), use the original logic
-            emails = db.query(GeneratedEmail).filter(
-                GeneratedEmail.user_id == current_user.id,
-                GeneratedEmail.stage == stage
-            ).all()
+    # Build base query
+    query = db.query(GeneratedEmail).filter(GeneratedEmail.user_id == current_user.id)
     
-    logger.info(f"[EMAILS] Found {len(emails)} emails for user {current_user.email} (ID: {current_user.id}) in stage '{stage}'")
+    # Add stage filter
+    if stage == "followup":
+        query = query.filter(GeneratedEmail.stage == "followup")
+    elif stage == "outreach":
+        # For outreach stage, only show emails that haven't been sent yet
+        query = query.filter(
+            GeneratedEmail.stage == stage,
+            GeneratedEmail.status.in_(["draft", "outreach_pending"])
+        )
+    else:
+        # For other stages (like lastchance), use the original logic
+        query = query.filter(GeneratedEmail.stage == stage)
+    
+    # Add group_id filter if provided
+    if group_id:
+        query = query.filter(GeneratedEmail.group_id == group_id)
+    
+    emails = query.all()
+    
+    logger.info(f"[EMAILS] Found {len(emails)} emails for user {current_user.email} (ID: {current_user.id}) in stage '{stage}'" + (f" with group_id '{group_id}'" if group_id else ""))
     
     # Get friends who have sharing enabled
     friends_with_sharing = []
@@ -114,6 +116,7 @@ async def get_emails_by_stage(
             "body": email.content,
             "status": email.status,
             "stage": email.stage,
+            "group_id": email.group_id,
             "shared_by": shared_by,
             "followup_due_at": email.followup_due_at.isoformat() if email.followup_due_at else None,
             "lastchance_due_at": email.lastchance_due_at.isoformat() if email.lastchance_due_at else None
@@ -403,7 +406,8 @@ async def generate_emails(
             "message": "Email generation started",
             "total_contacts": len(contacts),
             "progress_id": progress_record.id,
-            "status": "processing"
+            "status": "processing",
+            "group_id": None  # Will be set in background task
         }
         
     except Exception as e:
@@ -434,7 +438,8 @@ async def get_generation_progress_by_id(
             "total_contacts": progress.total_contacts,
             "processed_contacts": progress.processed_contacts,
             "generated_emails": progress.generated_emails,
-            "percentage": round(percentage, 1)
+            "percentage": round(percentage, 1),
+            "group_id": progress.group_id
         }
     except Exception as e:
         logger.error(f"Error in get_generation_progress_by_id for progress_id {progress_id}: {str(e)}")
@@ -452,6 +457,7 @@ async def generate_emails_background(
 ):
     """Background task to generate emails"""
     from app.db.database import SessionLocal
+    import uuid
     
     db = SessionLocal()
     template = None
@@ -470,8 +476,16 @@ async def generate_emails_background(
         if not progress_record:
             logger.error(f"Progress record {progress_id} not found. Aborting task.")
             return
-            
-        logger.info(f"Progress record {progress_id} found. Starting email generation for user {user.id}.")
+        
+        # Generate group_id for this batch
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        group_id = f"batch-{timestamp}-{str(uuid.uuid4())[:8]}"
+        
+        # Update progress record with group_id
+        progress_record.group_id = group_id
+        db.commit()
+        
+        logger.info(f"Progress record {progress_id} found. Starting email generation for user {user.id} with group_id {group_id}.")
         email_generator = EmailGenerator(db)
         
         generated_emails = []
@@ -505,7 +519,7 @@ async def generate_emails_background(
                     continue
 
                 email_obj = email_generator.generate_personalized_email(
-                    contact, user, template, stage, progress_id
+                    contact, user, template, stage, progress_id, group_id
                 )
                 generated_emails.append(email_obj)
                 
@@ -525,7 +539,7 @@ async def generate_emails_background(
 
         # Use the new centralized function to mark the job as complete
         email_generator.mark_generation_complete(progress_id)
-        logger.info(f"Email generation completed for user {user.id}. Generated {len(generated_emails)} emails.")
+        logger.info(f"Email generation completed for user {user.id}. Generated {len(generated_emails)} emails with group_id {group_id}.")
 
     except Exception as e:
         logger.error(f"Critical error during email generation background task for user {user.id}: {str(e)}", exc_info=True)
@@ -533,9 +547,6 @@ async def generate_emails_background(
             progress_record.status = "error"
             progress_record.error_message = str(e)
             db.commit()
-    finally:
-        db.close()
-        logger.info(f"Background task finished for progress_id: {progress_id}")
 
 @router.post("/generate-lastchance/{email_id}", response_model=Dict[str, Any])
 async def generate_lastchance_email(
@@ -890,5 +901,146 @@ async def send_all_via_gmail(
         "failed_count": failed_count,
         "total_count": len(emails),
         "errors": errors if errors else None
-    } 
+    }
 
+@router.get("/by-stage/{stage}/groups", response_model=Dict[str, Any])
+async def get_emails_by_stage_grouped(
+    stage: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get emails for the current user grouped by group_id for followup and lastchance stages"""
+    if stage not in ["followup", "lastchance"]:
+        raise HTTPException(status_code=400, detail="Grouping is only available for followup and lastchance stages")
+    
+    logger.info(f"[EMAILS] Getting grouped emails for user {current_user.email} (ID: {current_user.id}) in stage '{stage}'")
+    
+    # Get all emails for the stage
+    emails = db.query(GeneratedEmail).filter(
+        GeneratedEmail.user_id == current_user.id,
+        GeneratedEmail.stage == stage
+    ).all()
+    
+    # Group emails by group_id
+    grouped_emails = {}
+    for email in emails:
+        group_id = email.group_id or "ungrouped"
+        if group_id not in grouped_emails:
+            grouped_emails[group_id] = []
+        
+        email_dict = {
+            "id": email.id,
+            "to": email.recipient_email,
+            "subject": email.subject,
+            "body": email.content,
+            "status": email.status,
+            "stage": email.stage,
+            "group_id": email.group_id,
+            "followup_due_at": email.followup_due_at.isoformat() if email.followup_due_at else None,
+            "lastchance_due_at": email.lastchance_due_at.isoformat() if email.lastchance_due_at else None
+        }
+        grouped_emails[group_id].append(email_dict)
+    
+    # Create response with group metadata
+    result = {
+        "stage": stage,
+        "groups": []
+    }
+    
+    for group_id, emails_in_group in grouped_emails.items():
+        # Count emails by status
+        status_counts = {}
+        for email in emails_in_group:
+            status = email["status"]
+            status_counts[status] = status_counts.get(status, 0) + 1
+        
+        # Get the earliest due date for the group
+        due_dates = []
+        for email in emails_in_group:
+            if stage == "followup" and email["followup_due_at"]:
+                due_dates.append(email["followup_due_at"])
+            elif stage == "lastchance" and email["lastchance_due_at"]:
+                due_dates.append(email["lastchance_due_at"])
+        
+        earliest_due = min(due_dates) if due_dates else None
+        
+        group_info = {
+            "group_id": group_id,
+            "email_count": len(emails_in_group),
+            "status_counts": status_counts,
+            "earliest_due_date": earliest_due,
+            "emails": emails_in_group
+        }
+        result["groups"].append(group_info)
+    
+    # Sort groups by earliest due date
+    result["groups"].sort(key=lambda x: x["earliest_due_date"] or "9999-12-31")
+    
+    logger.info(f"[EMAILS] Found {len(result['groups'])} groups with {len(emails)} total emails for user {current_user.email} in stage '{stage}'")
+    return result 
+
+@router.post("/send_all_by_group/{stage}/{group_id}")
+async def send_all_by_group(
+    stage: str,
+    group_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Send all emails in a specific group for followup and lastchance stages"""
+    if stage not in ["followup", "lastchance"]:
+        raise HTTPException(status_code=400, detail="Group sending is only available for followup and lastchance stages")
+    
+    logger.info(f"[EMAILS] Sending all emails in group '{group_id}' for user {current_user.email} in stage '{stage}'")
+    
+    # Get all emails in the group for the specified stage
+    emails = db.query(GeneratedEmail).filter(
+        GeneratedEmail.user_id == current_user.id,
+        GeneratedEmail.stage == stage,
+        GeneratedEmail.group_id == group_id,
+        GeneratedEmail.status.in_(["followup_due", "lastchance_due"])
+    ).all()
+    
+    if not emails:
+        return {
+            "success": True,
+            "message": f"No emails found in group '{group_id}' for stage '{stage}'",
+            "sent_count": 0,
+            "failed_count": 0,
+            "total_count": 0
+        }
+    
+    sent_count = 0
+    failed_count = 0
+    
+    for email in emails:
+        try:
+            # Mark email as sent
+            email.status = f"{stage}_sent"
+            email.sent_at = datetime.utcnow()
+            
+            # Generate next stage email if needed
+            if stage == "followup":
+                try:
+                    email_generator = EmailGenerator(db)
+                    last_chance_email = email_generator.generate_lastchance_email(email, current_user)
+                    logger.info(f"Generated last chance email ID {last_chance_email.id} for original email ID {email.id}")
+                except Exception as e:
+                    logger.error(f"Failed to generate last chance for email {email.id}: {e}")
+            
+            sent_count += 1
+            
+        except Exception as e:
+            logger.error(f"Failed to send email {email.id}: {e}")
+            failed_count += 1
+    
+    db.commit()
+    
+    logger.info(f"[EMAILS] Sent {sent_count} emails in group '{group_id}' for user {current_user.email} in stage '{stage}'")
+    
+    return {
+        "success": True,
+        "message": f"Sent {sent_count} emails in group '{group_id}'",
+        "sent_count": sent_count,
+        "failed_count": failed_count,
+        "total_count": len(emails)
+    }
