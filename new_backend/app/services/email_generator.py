@@ -347,7 +347,7 @@ Best regards,
         user: User,
         template: Optional[EmailTemplate] = None
     ) -> GeneratedEmail:
-        """Generate a follow-up email based on an original email"""
+        """Generate a personalized follow-up email"""
         
         # If no template provided, try to get the default template for followup category
         if not template:
@@ -486,8 +486,11 @@ Best regards,
             except Exception as e:
                 raise Exception(f"Failed to generate follow-up email: {str(e)}")
         
-        # Create and save the follow-up email
+        # Get user's interval settings for scheduling
         now = datetime.utcnow()
+        followup_days = user.followup_interval_days or 3
+        
+        # Create a new email object for the follow-up
         followup_email = GeneratedEmail(
             recipient_email=recipient_email,
             recipient_name=recipient_name,
@@ -496,11 +499,9 @@ Best regards,
             content=content,
             user_id=user.id,
             template_id=template.id if template else None,
-            status="draft",  # Start as draft so user can review
+            status="followup_due",  # Set status to 'followup_due'
             stage="followup",
-            follow_up_status="none",
-            follow_up_date=None,  # Will be set when sent
-            final_follow_up_date=None,
+            follow_up_date=now + timedelta(days=followup_days), # Set the due date
             created_at=now,
             # Set legacy fields for backward compatibility
             to=recipient_email,
@@ -511,7 +512,7 @@ Best regards,
         self.db.commit()
         self.db.refresh(followup_email)
         
-        return followup_email 
+        return followup_email
 
     def generate_lastchance_email(
         self,
@@ -658,8 +659,11 @@ Best regards,
             except Exception as e:
                 raise Exception(f"Failed to generate last chance email: {str(e)}")
         
-        # Create and save the last chance email
+        # Get user's interval settings for scheduling
         now = datetime.utcnow()
+        lastchance_days = user.lastchance_interval_days or 6
+
+        # Create the last chance email
         lastchance_email = GeneratedEmail(
             recipient_email=recipient_email,
             recipient_name=recipient_name,
@@ -668,11 +672,9 @@ Best regards,
             content=content,
             user_id=user.id,
             template_id=template.id if template else None,
-            status="draft",  # Start as draft so user can review
+            status="lastchance_due", # Set status to 'lastchance_due'
             stage="lastchance",
-            follow_up_status="none",
-            follow_up_date=None,  # Will be set when sent
-            final_follow_up_date=None,
+            final_follow_up_date=now + timedelta(days=lastchance_days), # Set due date
             created_at=now,
             # Set legacy fields for backward compatibility
             to=recipient_email,
@@ -683,7 +685,7 @@ Best regards,
         self.db.commit()
         self.db.refresh(lastchance_email)
         
-        return lastchance_email 
+        return lastchance_email
 
     def mark_generation_complete(self, progress_id: int):
         """
@@ -701,3 +703,4 @@ Best regards,
                 self.db.commit()
         except Exception as e:
             logger.error(f"Error marking generation as complete for progress_id {progress_id}: {e}")
+
