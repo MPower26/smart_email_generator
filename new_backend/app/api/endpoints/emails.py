@@ -18,11 +18,39 @@ from app.services.email_generator import EmailGenerator
 from app.services.email_service import send_verification_email, EMAIL_CONFIG, send_email_via_gmail
 from app.services.gmail_service import send_gmail_email
 from app.websocket_manager import manager
-from app.schemas.email import EmailSchema, EmailUpdate, GroupedEmailResponse, EmailGroup
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# Define Pydantic schemas directly in this file to avoid import errors
+class EmailSchema(BaseModel):
+    id: int
+    to: EmailStr
+    subject: str
+    body: str
+    status: str
+    stage: str
+    group_id: Optional[str] = None
+    shared_by: Optional[str] = None
+    followup_due_at: Optional[datetime] = None
+    lastchance_due_at: Optional[datetime] = None
+
+    class Config:
+        orm_mode = True
+
+class EmailGroup(BaseModel):
+    group_id: str
+    email_count: int
+    earliest_due_date: Optional[datetime] = None
+    status_counts: Dict[str, int]
+    emails: List[EmailSchema]
+
+class GroupedEmailResponse(BaseModel):
+    groups: List[EmailGroup]
+
+class RegeneratePrompt(BaseModel):
+    prompt: str
 
 @router.get("/cache")
 async def get_cache_info(
@@ -1040,9 +1068,6 @@ async def send_all_by_group(
         "failed_count": failed_count,
         "total_count": len(emails)
     } 
-
-class RegeneratePrompt(BaseModel):
-    prompt: str
 
 @router.post("/regenerate_group/{group_id}", status_code=200)
 async def regenerate_group_emails(
