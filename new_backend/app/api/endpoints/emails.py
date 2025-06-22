@@ -10,7 +10,6 @@ import os
 import uuid
 from fastapi import status
 from sqlalchemy import or_, and_, text
-import pandas as pd
 
 from app.db.database import get_db
 from app.models.models import GeneratedEmail, User, EmailTemplate, EmailGenerationProgress
