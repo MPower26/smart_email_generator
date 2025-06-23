@@ -34,7 +34,7 @@ DB_TIMEOUT = os.getenv("DB_TIMEOUT", "30")
 # Email configuration
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
 SENDGRID_FROM_EMAIL = os.getenv("tom@wesiagency.com")
-APP_URL = os.getenv("APP_URL", "https://jolly-bush-0bae83703.6.azurestaticapps.net")
+APP_URL = os.getenv("FRONTEND_URL", "https://jolly-bush-0bae83703.6.azurestaticapps.net")
 
 # Construct the database URL like the main application
 DATABASE_URL = (
