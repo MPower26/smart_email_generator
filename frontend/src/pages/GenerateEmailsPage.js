@@ -7,6 +7,7 @@ import GroupedEmails from '../components/GroupedEmails';
 import { emailService, templateService } from '../services/api';
 import { UserContext } from '../contexts/UserContext';
 import '../styles/GroupedEmails.css';
+import websocketService from '../services/websocket';
 
 const PreRequisiteError = ({ error, onClear }) => {
     if (!error) return null;
@@ -391,9 +392,9 @@ const GenerateEmailsPage = () => {
           setPreRequisiteError(err.response.data.detail);
           setIsGenerating(false); // Stop the loading state
       } else {
-          const errorMessage = err.response?.data?.detail || 'An unexpected error occurred during email generation.';
-          setError(errorMessage);
-          console.error('Email generation failed:', err);
+      const errorMessage = err.response?.data?.detail || 'An unexpected error occurred during email generation.';
+      setError(errorMessage);
+      console.error('Email generation failed:', err);
       }
       
       setUploadProgress(prev => ({ ...prev, status: 'error' }));
@@ -534,6 +535,25 @@ const GenerateEmailsPage = () => {
       )),
     [lastChanceEmails, activeTab, lastAction]
   );
+
+  useEffect(() => {
+    websocketService.onProgress((data) => {
+      if (data.type === 'sending_error') {
+        setError(
+          data.error?.includes('Gmail token')
+            ? (
+              <span>
+                Your Gmail connection has expired. Please <a href="/settings">reconnect your account</a> to send emails.
+              </span>
+            )
+            : data.error
+        );
+      }
+      // ... handle other types as needed ...
+    });
+    // Cleanup on unmount
+    return () => websocketService.onProgress(null);
+  }, []);
 
   return (
     <Container className="templates-page">
