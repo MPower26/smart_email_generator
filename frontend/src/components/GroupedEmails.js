@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { emailService } from '../services/api.js';
 import { Card, Button, Badge, Collapse, Alert, Spinner, Form, Modal } from 'react-bootstrap';
+import websocketService from '../services/websocket';
 
 // This new component will handle the display and actions for a single email
 const EmailRow = ({ email, onUpdate }) => {
@@ -159,6 +160,25 @@ const GroupedEmails = ({ stage }) => {
   useEffect(() => {
     loadGroupedEmails();
   }, [stage]);
+
+  useEffect(() => {
+    websocketService.onProgress((data) => {
+      if (data.type === 'sending_error') {
+        setError(
+          data.error?.includes('Gmail token')
+            ? (
+              <span>
+                Your Gmail connection has expired. Please <a href="/settings">reconnect your account</a> to send emails.
+              </span>
+            )
+            : data.error
+        );
+      }
+      // ... handle other types as needed ...
+    });
+    // Cleanup on unmount
+    return () => websocketService.onProgress(null);
+  }, []);
 
   const loadGroupedEmails = async () => {
     try {
