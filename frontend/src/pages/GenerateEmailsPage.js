@@ -441,7 +441,8 @@ const GenerateEmailsPage = () => {
     try {
       const response = await emailService.sendAllViaGmail(emailStage);
       setSendingProgress(prev => ({ ...prev, status: 'complete', message: response.data.message }));
-      await loadEmailsByStage(); // Refresh the list
+      await loadEmailsByStage();
+      setFollowupEmails(prev => prev.filter(email => !['followup_sent', 'lastchance_sent', 'completed'].includes(email.status)));
     } catch (err) {
       console.error(`Failed to send all emails for stage ${emailStage}:`, err);
       let errorMessage = 'An unexpected error occurred while sending emails.';
