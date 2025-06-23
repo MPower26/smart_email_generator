@@ -251,29 +251,6 @@ class EmailGenerator:
             
             content = '\n'.join(new_content).strip()
             
-            # Add consistent signature format
-            signature = f"""Best regards,
-{user.full_name if user.full_name else "[Your Name]"}
-{user.position if user.position else "[Your Position]"}
-{user.company_name if user.company_name else "[Your Company]"}"""
-            
-            content = f"{content}\n\n{signature.strip()}"
-            
-            # Calculate follow-up dates based on stage
-            now = datetime.now(timezone.utc)
-            follow_up_date = None
-            final_follow_up_date = None
-            
-            if stage == "outreach":
-                follow_up_date = now + timedelta(days=3)  # First follow-up after 3 days
-                final_follow_up_date = now + timedelta(days=7)  # Final follow-up after 7 days
-            elif stage == "followup":
-                follow_up_date = now + timedelta(days=2)  # Quick follow-up
-                final_follow_up_date = now + timedelta(days=4)  # Final follow-up
-            elif stage == "lastchance":
-                follow_up_date = now + timedelta(days=1)  # Quick final follow-up
-                final_follow_up_date = now + timedelta(days=2)  # Very final follow-up
-            
             # Create and save the generated email
             email = GeneratedEmail(
                 recipient_email=contact_data.get("Email", ""),
@@ -500,15 +477,6 @@ Best regards,
                 
                 content = '\n'.join(new_content).strip()
                 
-                # Add consistent signature format
-                signature = f"""
-Best regards,
-{user.full_name if user.full_name else "[Your Name]"}
-{user.position if user.position else "[Your Position]"}
-{user.company_name if user.company_name else "[Your Company]"}"""
-                
-                content = f"{content}\n\n{signature}"
-                
             except Exception as e:
                 raise Exception(f"Failed to generate follow-up email: {str(e)}")
         
@@ -689,15 +657,6 @@ Best regards,
                     new_content.append(line)
                 
                 content = '\n'.join(new_content).strip()
-                
-                # Add consistent signature format
-                signature = f"""
-Best regards,
-{user.full_name if user.full_name else "[Your Name]"}
-{user.position if user.position else "[Your Position]"}
-{user.company_name if user.company_name else "[Your Company]"}"""
-                
-                content = f"{content}\n\n{signature}"
                 
             except Exception as e:
                 raise Exception(f"Failed to generate last chance email: {str(e)}")
