@@ -42,6 +42,11 @@ google-api-python-client==2.125.0
 websockets>=11.0.3,<12.0
 wsproto>=1.2.0
 
+# Azure Blob Storage for signature image uploads
+azure-storage-blob==12.19.0
+
+
+
 
 
 
