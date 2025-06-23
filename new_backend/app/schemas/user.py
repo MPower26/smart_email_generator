@@ -6,6 +6,7 @@ class UserBase(BaseModel):
     position: str | None = None
     company_name: str | None = None
     company_description: str | None = None
+    email_signature: str | None = None
 
 class UserCreate(UserBase):
     password: str
@@ -15,6 +16,7 @@ class UserUpdate(BaseModel):
     position: str | None = None
     company_name: str | None = None
     company_description: str | None = None
+    email_signature: str | None = None
 
 class User(UserBase):
     id: int
