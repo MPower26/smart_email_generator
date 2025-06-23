@@ -26,6 +26,9 @@ def send_gmail_email(user, to_email, subject, body):
     if not access_token:
         raise Exception("Gmail not connected")
     
+    # Convert newlines to <br> for HTML formatting
+    body = body.replace('\n', '<br>')
+    
     # Append signature if present
     signature = user.email_signature or ""
     if signature:
@@ -102,4 +105,3 @@ def check_reply(user, generated_email):
         if from_email and recipient_email.lower() in from_email:
             return True
     return False
-
