@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Container, Card, Form, Button, Alert, Modal, Tabs, Tab, Accordion, Badge, OverlayTrigger, Tooltip } from 'react-bootstrap';
-import { templateService } from '../services/api';
+import { templateService, userService } from '../services/api';
+import { UserContext } from '../contexts/UserContext';
 
 const TemplatesPage = () => {
+  const { userProfile, updateUserProfile } = useContext(UserContext);
   const [templatesByCategory, setTemplatesByCategory] = useState({
     outreach: [],
     followup: [],
@@ -11,6 +13,15 @@ const TemplatesPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  
+  // Signature state
+  const [signatureData, setSignatureData] = useState({
+    email_signature: '',
+    signature_image: null
+  });
+  const [signatureLoading, setSignatureLoading] = useState(false);
+  const [signatureError, setSignatureError] = useState('');
+  const [signatureSuccess, setSignatureSuccess] = useState('');
   
   // Modal state
   const [showModal, setShowModal] = useState(false);
@@ -37,7 +48,23 @@ const TemplatesPage = () => {
   // Charger les templates au chargement de la page
   useEffect(() => {
     loadTemplates();
+    loadSignature();
   }, []);
+
+  // Load user signature
+  const loadSignature = () => {
+    if (userProfile) {
+      setSignatureData({
+        email_signature: userProfile.email_signature || '',
+        signature_image: null
+      });
+    }
+  };
+
+  // Update signature data when userProfile changes
+  useEffect(() => {
+    loadSignature();
+  }, [userProfile]);
 
   // Fonction pour charger les templates
   const loadTemplates = async () => {
@@ -196,6 +223,88 @@ const TemplatesPage = () => {
     }
   };
 
+  // Handle signature input changes
+  const handleSignatureChange = (e) => {
+    const { name, value } = e.target;
+    setSignatureData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // Handle signature image upload
+  const handleSignatureImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSignatureData(prev => ({
+        ...prev,
+        signature_image: file
+      }));
+    }
+  };
+
+  // Save signature
+  const handleSaveSignature = async (e) => {
+    e.preventDefault();
+    setSignatureLoading(true);
+    setSignatureError('');
+    setSignatureSuccess('');
+    
+    try {
+      // First upload image if provided
+      let imageUrl = null;
+      if (signatureData.signature_image) {
+        const uploadResponse = await userService.uploadSignatureImage(signatureData.signature_image);
+        imageUrl = uploadResponse.data.image_url;
+      }
+      
+      // Update signature
+      const updateData = {
+        email_signature: signatureData.email_signature
+      };
+      
+      if (imageUrl) {
+        updateData.signature_image_url = imageUrl;
+      }
+      
+      await userService.updateSignature(updateData);
+      setSignatureSuccess('Signature updated successfully!');
+      
+      // Refresh user profile
+      await updateUserProfile(updateData);
+      
+      // Clear the file input
+      setSignatureData(prev => ({
+        ...prev,
+        signature_image: null
+      }));
+      
+    } catch (err) {
+      setSignatureError(err.response?.data?.detail || 'Failed to update signature. Please try again.');
+      console.error('Error updating signature:', err);
+    } finally {
+      setSignatureLoading(false);
+    }
+  };
+
+  // Preview signature with image
+  const getSignaturePreview = () => {
+    let preview = signatureData.email_signature;
+    
+    // Replace placeholders
+    Object.entries(placeholderData).forEach(([key, value]) => {
+      const regex = new RegExp(`\\[${key}\\]`, 'gi');
+      preview = preview.replace(regex, value);
+    });
+    
+    // Add image if exists
+    if (userProfile?.signature_image_url) {
+      preview += `\n\n<img src="${userProfile.signature_image_url}" alt="Signature" style="max-width: 300px; height: auto;" />`;
+    }
+    
+    return preview;
+  };
+
   // Render template card
   const renderTemplateCard = (template) => (
     <Card key={template.id} className="mb-3">
@@ -312,6 +421,129 @@ const TemplatesPage = () => {
             </Accordion.Body>
           </Accordion.Item>
         ))}
+      </Accordion>
+      
+      {/* Email Signature Section */}
+      <Accordion className="mt-4">
+        <Accordion.Item eventKey="signature">
+          <Accordion.Header>
+            <div className="d-flex justify-content-between align-items-center w-100 me-3">
+              <span>Email Signature</span>
+              <Badge bg="info">Auto-appended to all emails</Badge>
+            </div>
+          </Accordion.Header>
+          <Accordion.Body>
+            <p className="text-muted mb-3">
+              Your email signature will be automatically added to all outgoing emails. 
+              You can include text and upload a banner image.
+            </p>
+            
+            {signatureError && <Alert variant="danger">{signatureError}</Alert>}
+            {signatureSuccess && <Alert variant="success" onClose={() => setSignatureSuccess('')} dismissible>{signatureSuccess}</Alert>}
+            
+            <Form onSubmit={handleSaveSignature}>
+              <Form.Group className="mb-3">
+                <Form.Label>Signature Text</Form.Label>
+                <Form.Control
+                  as="textarea"
+                  name="email_signature"
+                  value={signatureData.email_signature}
+                  onChange={handleSignatureChange}
+                  rows={4}
+                  placeholder="Best regards,
+[Your Name]
+[Your Position]
+[Your Company]
+
+Your signature text here..."
+                />
+                <Form.Text className="text-muted">
+                  Available placeholders: [Your Name], [Your Position], [Your Company]
+                  <OverlayTrigger
+                    placement="top"
+                    overlay={
+                      <Tooltip id="signature-placeholders-tooltip">
+                        <strong>Signature Placeholders:</strong><br/>
+                        Use these placeholders in your signature and they'll be automatically replaced with your actual information.<br/><br/>
+                        • [Your Name] - Your full name<br/>
+                        • [Your Position] - Your job title<br/>
+                        • [Your Company] - Your company name
+                      </Tooltip>
+                    }
+                  >
+                    <i className="bi bi-info-circle ms-2" style={{ cursor: 'help' }}></i>
+                  </OverlayTrigger>
+                </Form.Text>
+              </Form.Group>
+              
+              <Form.Group className="mb-3">
+                <Form.Label>Banner Image (Optional)</Form.Label>
+                <Form.Control
+                  type="file"
+                  accept="image/*"
+                  onChange={handleSignatureImageUpload}
+                  className="mb-2"
+                />
+                <Form.Text className="text-muted">
+                  Upload a banner image (JPG, PNG, GIF) that will be displayed below your signature text. 
+                  Recommended size: 300px wide or less.
+                </Form.Text>
+                {signatureData.signature_image && (
+                  <div className="mt-2">
+                    <small className="text-success">
+                      ✓ {signatureData.signature_image.name} selected
+                    </small>
+                  </div>
+                )}
+                {userProfile?.signature_image_url && !signatureData.signature_image && (
+                  <div className="mt-2">
+                    <small className="text-info">
+                      Current image: <img src={userProfile.signature_image_url} alt="Current signature" style={{ maxWidth: '100px', height: 'auto' }} />
+                    </small>
+                  </div>
+                )}
+              </Form.Group>
+              
+              <div className="d-flex gap-2">
+                <Button 
+                  type="submit" 
+                  variant="primary"
+                  disabled={signatureLoading}
+                >
+                  {signatureLoading ? 'Saving...' : 'Save Signature'}
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="outline-secondary"
+                  onClick={() => {
+                    setSignatureData({
+                      email_signature: userProfile?.email_signature || '',
+                      signature_image: null
+                    });
+                    setSignatureError('');
+                    setSignatureSuccess('');
+                  }}
+                >
+                  Reset
+                </Button>
+              </div>
+            </Form>
+            
+            {/* Signature Preview */}
+            {signatureData.email_signature && (
+              <Card className="mt-4">
+                <Card.Header>
+                  <h6 className="mb-0">Signature Preview</h6>
+                </Card.Header>
+                <Card.Body>
+                  <div style={{ whiteSpace: 'pre-wrap' }}>
+                    {getSignaturePreview()}
+                  </div>
+                </Card.Body>
+              </Card>
+            )}
+          </Accordion.Body>
+        </Accordion.Item>
       </Accordion>
       
       {/* Modal pour créer/éditer un template */}
