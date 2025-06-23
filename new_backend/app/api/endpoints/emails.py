@@ -1047,6 +1047,10 @@ async def send_all_by_group(
     
     logger.info(f"[EMAILS] Sending all emails in group '{group_id}' for user {current_user.email} in stage '{stage}'")
     
+    # Check if user has Gmail connected
+    if not current_user.gmail_access_token:
+        raise HTTPException(status_code=400, detail="Gmail not connected. Please connect your Gmail account first.")
+    
     # Get all emails in the group for the specified stage
     emails = db.query(GeneratedEmail).filter(
         GeneratedEmail.user_id == current_user.id,
@@ -1066,23 +1070,35 @@ async def send_all_by_group(
     
     sent_count = 0
     failed_count = 0
+    errors = []
     
     for email in emails:
         try:
+            # Actually send the email via Gmail
+            send_gmail_email(current_user, email.recipient_email, email.subject, email.content)
+            
             # Mark email as sent
             email.status = f"{stage}_sent"
             email.sent_at = datetime.utcnow()
             
-            # Note: Follow-up generation is handled in the single send endpoint
-            # We don't need to generate follow-ups here to avoid duplicates
+            # Generate next stage email if needed
+            if stage == "followup":
+                try:
+                    email_generator = EmailGenerator(db)
+                    email_generator.generate_lastchance_email(email, current_user)
+                    logger.info(f"Generated last chance email for original email ID {email.id}")
+                except Exception as followup_error:
+                    logger.error(f"Failed to generate last chance email: {str(followup_error)}")
             
             sent_count += 1
             
         except Exception as e:
             logger.error(f"Failed to send email {email.id}: {e}")
             failed_count += 1
-            
-            db.commit()
+            errors.append(f"Email to {email.recipient_email}: {str(e)}")
+    
+    # Commit all changes
+    db.commit()
             
     logger.info(f"[EMAILS] Sent {sent_count} emails in group '{group_id}' for user {current_user.email} in stage '{stage}'")
     
@@ -1091,8 +1107,9 @@ async def send_all_by_group(
         "message": f"Sent {sent_count} emails in group '{group_id}'",
         "sent_count": sent_count,
         "failed_count": failed_count,
-        "total_count": len(emails)
-    } 
+        "total_count": len(emails),
+        "errors": errors if errors else None
+    }
 
 @router.post("/regenerate_group/{group_id}", status_code=200)
 async def regenerate_group_emails(
