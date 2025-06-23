@@ -33,18 +33,21 @@ def send_gmail_email(user, to_email, subject, body):
     print("User signature image URL:", getattr(user, 'signature_image_url', None))
     
     # Append signature if present
-    signature = user.email_signature or ""
-    if signature:
-        # Replace placeholders in signature
-        signature = signature.replace("[Your Name]", user.full_name or "[Your Name]")
-        signature = signature.replace("[Your Position]", user.position or "[Your Position]")
-        signature = signature.replace("[Your Company]", user.company_name or "[Your Company]")
-        
-        # Add signature image if present
-        if hasattr(user, 'signature_image_url') and user.signature_image_url:
-            signature += f'<br><br><img src="{user.signature_image_url}" alt="Signature" style="max-width: 300px; height: auto;" />'
-        
-        body = f"{body}<br><br>{signature}"
+    signature_lines = []
+    if user.email_signature:
+        # Replace placeholders and split lines for block formatting
+        sig = user.email_signature
+        sig = sig.replace("[Your Name]", user.full_name or "[Your Name]")
+        sig = sig.replace("[Your Position]", user.position or "[Your Position]")
+        sig = sig.replace("[Your Company]", user.company_name or "[Your Company]")
+        # Split by lines and join with <br>
+        sig_block = '<br>'.join([line.strip() for line in sig.splitlines() if line.strip()])
+        signature_lines.append(sig_block)
+    if hasattr(user, 'signature_image_url') and user.signature_image_url:
+        signature_lines.append(f'<br><img src="{user.signature_image_url}" alt="Signature" style="max-width: 300px; height: auto;" />')
+    signature_block = '<br>'.join(signature_lines)
+    if signature_block:
+        body = f"{body}<br><br>{signature_block}"
     
     # Debug: print final email body
     print("Final email body:", body)
