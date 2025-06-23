@@ -1,7 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
-from fastapi.staticfiles import StaticFiles
 import logging
 from sqlalchemy.orm import Session
 import json
@@ -28,14 +27,9 @@ logger = logging.getLogger(__name__)
 # Create FastAPI app
 app = FastAPI(title="Smart Email Generator API", redirect_slashes=False)
 
-# Mount static files for uploaded images (if directory exists)
-# Note: In Azure App Service, we'll need to use Azure Blob Storage for file uploads
-# For now, we'll handle this in the upload endpoint
-try:
-    app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-except Exception as e:
-    print(f"Warning: Could not mount uploads directory: {e}")
-    print("File uploads will use Azure Blob Storage instead")
+# Note: Azure App Service has a read-only file system
+# File uploads should use cloud storage (Azure Blob Storage) instead of local storage
+# For now, we'll handle this gracefully and provide alternative solutions
 
 # Define allowed origins
 origins = [
