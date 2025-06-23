@@ -53,6 +53,9 @@ class User(Base):
     followup_interval_days = Column(Integer, default=3)
     lastchance_interval_days = Column(Integer, default=6)
     
+    # Email signature (HTML format for banners)
+    email_signature = Column(Text, nullable=True)
+    
     # Friend relationships
     friends = relationship(
         "User",
