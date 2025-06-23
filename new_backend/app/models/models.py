@@ -55,6 +55,7 @@ class User(Base):
     
     # Email signature (HTML format for banners)
     email_signature = Column(Text, nullable=True)
+    signature_image_url = Column(String(500), nullable=True)  # URL to uploaded signature image
     
     # Friend relationships
     friends = relationship(
