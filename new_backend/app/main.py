@@ -32,8 +32,9 @@ app = FastAPI(title="Smart Email Generator API", redirect_slashes=False)
 # For now, we'll handle this gracefully and provide alternative solutions
 
 # Define allowed origins
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://jolly-bush-0bae83703.6.azurestaticapps.net")
 origins = [
-    "https://jolly-bush-0bae83703.6.azurestaticapps.net",
+    FRONTEND_URL,
     "http://localhost:3000",  # For local development
 ]
 
@@ -210,6 +211,10 @@ async def cors_test(request: Request):
         "method": request.method
     }
 
+@app.options("/cors-test")
+async def cors_test_options():
+    """Handle OPTIONS request for CORS test"""
+    return {"message": "CORS preflight successful"} 
 @app.options("/cors-test")
 async def cors_test_options():
     """Handle OPTIONS request for CORS test"""
