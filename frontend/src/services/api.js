@@ -182,4 +182,27 @@ export const friendService = {
   },
 };
 
+// User profile API service
+export const userService = {
+  // Get current user profile
+  getProfile: () => api.get('/api/users/me'),
+  
+  // Update user profile
+  updateProfile: (profileData) => api.put('/api/users/settings', profileData),
+  
+  // Update email signature
+  updateSignature: (signatureData) => api.put('/api/users/signature', signatureData),
+  
+  // Upload signature image
+  uploadSignatureImage: (file) => {
+    const formData = new FormData();
+    formData.append('signature_image', file);
+    return api.post('/api/users/signature/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+};
+
 export default api;
