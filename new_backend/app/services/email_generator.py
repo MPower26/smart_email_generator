@@ -151,6 +151,8 @@ class EmailGenerator:
             6. If a company description is provided, use it to explain how your company's offerings align with the recipient's needs
             7. Do not use any markdown formatting (like ** or *) in the email content
             8. Avoid using em dashes (—) - use regular dashes (-) or other appropriate punctuation instead
+            9. DO NOT let variables like [Your Name] or [Your Position] be in the email content. Always use the data given to you about sender and recipient.
+            10. DO NOT add a written signature to the email if not present in the given prompt.
             """
         else:
             # Use hardcoded prompt as fallback
