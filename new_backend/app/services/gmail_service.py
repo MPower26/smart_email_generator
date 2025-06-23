@@ -8,6 +8,7 @@ class GmailTokenError(Exception):
 def send_gmail_email(user, to_email, subject, body):
     """
     Sends an email using the user's Gmail account via the Gmail API.
+    Appends the user's HTML signature if present and sends as HTML.
 
     Args:
         user: User object with .gmail_access_token and .email attributes
@@ -24,7 +25,14 @@ def send_gmail_email(user, to_email, subject, body):
     access_token = user.gmail_access_token
     if not access_token:
         raise Exception("Gmail not connected")
-    message = f"From: {user.email}\r\nTo: {to_email}\r\nSubject: {subject}\r\n\r\n{body}"
+    
+    # Append signature if present
+    signature = user.email_signature or ""
+    if signature:
+        body = f"{body}<br><br>{signature}"
+    
+    # Build MIME message for HTML
+    message = f"From: {user.email}\r\nTo: {to_email}\r\nSubject: {subject}\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n{body}"
     raw = base64.urlsafe_b64encode(message.encode("utf-8")).decode("utf-8")
     url = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
     headers = {
@@ -85,3 +93,4 @@ def check_reply(user, generated_email):
         if from_email and recipient_email.lower() in from_email:
             return True
     return False
+
