@@ -436,7 +436,7 @@ const GenerateEmailsPage = () => {
     setSendingProgress(prev => ({ ...prev, status: 'sending' }));
 
     try {
-      const response = await emailService.sendAll(emailStage);
+      const response = await emailService.sendAllViaGmail(emailStage);
       setSendingProgress(prev => ({ ...prev, status: 'complete', message: response.data.message }));
       await loadEmailsByStage(); // Refresh the list
     } catch (err) {
