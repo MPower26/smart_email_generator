@@ -154,6 +154,7 @@ const GroupedEmails = ({ stage }) => {
   const [currentGroupForRegen, setCurrentGroupForRegen] = useState(null);
   const [regeneratePrompt, setRegeneratePrompt] = useState('');
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [sendingGroups, setSendingGroups] = useState(new Set());
 
   useEffect(() => {
     loadGroupedEmails();
@@ -217,7 +218,10 @@ const GroupedEmails = ({ stage }) => {
 
   const handleSendAllInGroup = async (groupId) => {
     // Reset error before trying
-    setError(null); 
+    setError(null);
+    // Add group to sending set to prevent duplicate clicks
+    setSendingGroups(prev => new Set(prev).add(groupId));
+    
     try {
       await emailService.sendAllByGroup(stage, groupId);
       // Reload the groups to update the status
@@ -233,6 +237,13 @@ const GroupedEmails = ({ stage }) => {
       } else {
         setError('Failed to send emails in group. Please try again.');
       }
+    } finally {
+      // Remove group from sending set
+      setSendingGroups(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(groupId);
+        return newSet;
+      });
     }
   };
 
@@ -308,10 +319,17 @@ const GroupedEmails = ({ stage }) => {
           <div className="group-actions">
             <button 
               onClick={() => handleSendAllInGroup(group.group_id)}
-              disabled={!(group.status_counts?.followup_due || group.status_counts?.lastchance_due)}
+              disabled={!(group.status_counts?.followup_due || group.status_counts?.lastchance_due) || sendingGroups.has(group.group_id)}
               className="send-all-btn"
             >
-              Send All in Group ({group.status_counts?.followup_due || group.status_counts?.lastchance_due || 0})
+              {sendingGroups.has(group.group_id) ? (
+                <>
+                  <Spinner animation="border" size="sm" className="me-1" />
+                  Sending...
+                </>
+              ) : (
+                `Send All in Group (${group.status_counts?.followup_due || group.status_counts?.lastchance_due || 0})`
+              )}
             </button>
           </div>
           
