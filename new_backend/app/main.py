@@ -28,11 +28,14 @@ logger = logging.getLogger(__name__)
 # Create FastAPI app
 app = FastAPI(title="Smart Email Generator API", redirect_slashes=False)
 
-# Create uploads directory if it doesn't exist
-os.makedirs("uploads/signatures", exist_ok=True)
-
-# Mount static files for uploaded images
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# Mount static files for uploaded images (if directory exists)
+# Note: In Azure App Service, we'll need to use Azure Blob Storage for file uploads
+# For now, we'll handle this in the upload endpoint
+try:
+    app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+except Exception as e:
+    print(f"Warning: Could not mount uploads directory: {e}")
+    print("File uploads will use Azure Blob Storage instead")
 
 # Define allowed origins
 origins = [
