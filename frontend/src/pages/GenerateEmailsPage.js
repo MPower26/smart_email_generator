@@ -236,7 +236,8 @@ const GenerateEmailsPage = () => {
 
   // Handle add template button click
   const handleAddTemplate = () => {
-    window.open('https://jolly-bush-0bae83703.6.azurestaticapps.net/templates', '_blank');
+    const templateUrl = process.env.REACT_APP_FRONTEND_TEMPLATE_URL || 'https://jolly-bush-0bae83703.6.azurestaticapps.net/templates';
+    window.open(templateUrl, '_blank');
   };
 
   const pollProgress = async (progressId) => {
@@ -431,7 +432,7 @@ const GenerateEmailsPage = () => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
-
+  
   // Handle send all emails in a stage
   const handleSendAll = async () => {
     setError(''); // Clear previous errors
@@ -540,7 +541,7 @@ const GenerateEmailsPage = () => {
   useEffect(() => {
     websocketService.onProgress((data) => {
       if (data.type === 'sending_error') {
-        setError(
+      setError(
           data.error?.includes('Gmail token')
             ? (
               <span>
