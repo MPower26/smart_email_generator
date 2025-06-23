@@ -45,6 +45,7 @@ const GenerateEmailsPage = () => {
   const [preRequisiteError, setPreRequisiteError] = useState('');
   const [activeTab, setActiveTab] = useState('generation');
   const [emailStage, setEmailStage] = useState('outreach');
+  const [isSending, setIsSending] = useState(false);
   
   // Stage-specific email arrays
   const [outreachEmails, setOutreachEmails] = useState([]);
@@ -433,6 +434,7 @@ const GenerateEmailsPage = () => {
   // Handle send all emails in a stage
   const handleSendAll = async () => {
     setError(''); // Clear previous errors
+    setIsSending(true);
     setSendingProgress(prev => ({ ...prev, status: 'sending' }));
 
     try {
@@ -453,6 +455,8 @@ const GenerateEmailsPage = () => {
       }
       setError(errorMessage);
       setSendingProgress(prev => ({ ...prev, status: 'error' }));
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -726,10 +730,10 @@ const GenerateEmailsPage = () => {
                         size="sm"
                         className="me-2"
                         onClick={handleSendAll}
-                        disabled={loading || !userProfile?.gmail_access_token}
+                        disabled={isSending || !userProfile?.gmail_access_token}
                         title={!userProfile?.gmail_access_token ? "Connect Gmail first" : "Send all outreach emails"}
                       >
-                        {loading ? (
+                        {isSending ? (
                           <>
                             <Spinner animation="border" size="sm" className="me-1" />
                             Sending...
