@@ -3,12 +3,14 @@ from sqlalchemy.orm import Session
 from typing import Dict
 import os
 import uuid
+import logging
 from datetime import datetime
 from ..db.database import get_db
 from ..models.models import User
 from ..schemas.user import UserUpdate
 from ..middleware.auth import get_current_user
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.get("/me")
@@ -69,6 +71,7 @@ async def update_user_signature(
     db: Session = Depends(get_db)
 ):
     """Update the user's email signature"""
+    logger.info(f"Updating signature for user: {current_user.email}")
     try:
         # Update signature fields
         if 'email_signature' in signature_data:
@@ -80,6 +83,7 @@ async def update_user_signature(
         db.commit()
         db.refresh(current_user)
         
+        logger.info(f"Signature updated successfully for user: {current_user.email}")
         return {
             "message": "Signature updated successfully",
             "signature": {
@@ -88,6 +92,7 @@ async def update_user_signature(
             }
         }
     except Exception as e:
+        logger.error(f"Error updating signature for user {current_user.email}: {str(e)}")
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -98,6 +103,7 @@ async def upload_signature_image(
     db: Session = Depends(get_db)
 ):
     """Upload a signature image for the user"""
+    logger.info(f"Uploading signature image for user: {current_user.email}")
     try:
         # Validate file type
         if not signature_image.content_type.startswith('image/'):
@@ -128,6 +134,7 @@ async def upload_signature_image(
         current_user.signature_image_url = image_url
         db.commit()
         
+        logger.info(f"Signature image uploaded successfully for user: {current_user.email}")
         return {
             "message": "Image uploaded successfully",
             "image_url": image_url
@@ -135,5 +142,5 @@ async def upload_signature_image(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Error uploading signature image for user {current_user.email}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to upload image: {str(e)}") 
-
