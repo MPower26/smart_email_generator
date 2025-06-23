@@ -83,6 +83,10 @@ export const emailService = {
   // Re-generate all emails in a group
   regenerateGroupEmails: (groupId, prompt) => api.post(`/api/emails/regenerate_group/${groupId}`, { prompt }),
   
+  // Cache management
+  getCacheInfo: () => api.get('/api/emails/cache'),
+  clearCache: () => api.delete('/api/emails/cache'),
+  
   // Generate emails
   generateEmails: (file, templateId, stage, avoidDuplicates, onUploadProgress) => {
     const formData = new FormData();
@@ -179,4 +183,3 @@ export const friendService = {
 };
 
 export default api;
-
