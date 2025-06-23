@@ -29,6 +29,15 @@ def send_gmail_email(user, to_email, subject, body):
     # Append signature if present
     signature = user.email_signature or ""
     if signature:
+        # Replace placeholders in signature
+        signature = signature.replace("[Your Name]", user.full_name or "[Your Name]")
+        signature = signature.replace("[Your Position]", user.position or "[Your Position]")
+        signature = signature.replace("[Your Company]", user.company_name or "[Your Company]")
+        
+        # Add signature image if present
+        if hasattr(user, 'signature_image_url') and user.signature_image_url:
+            signature += f'<br><br><img src="{user.signature_image_url}" alt="Signature" style="max-width: 300px; height: auto;" />'
+        
         body = f"{body}<br><br>{signature}"
     
     # Build MIME message for HTML
