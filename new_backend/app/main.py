@@ -1,12 +1,14 @@
 from fastapi import FastAPI, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
+from fastapi.staticfiles import StaticFiles
 import logging
 from sqlalchemy.orm import Session
 import json
 from typing import Dict, List
 import asyncio
 from datetime import datetime
+import os
 
 from app.api.endpoints import emails, friends, auth_gmail, user_settings, templates
 from app.api import auth
@@ -25,6 +27,12 @@ logger = logging.getLogger(__name__)
 
 # Create FastAPI app
 app = FastAPI(title="Smart Email Generator API", redirect_slashes=False)
+
+# Create uploads directory if it doesn't exist
+os.makedirs("uploads/signatures", exist_ok=True)
+
+# Mount static files for uploaded images
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Define allowed origins
 origins = [
