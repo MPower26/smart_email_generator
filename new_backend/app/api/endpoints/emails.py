@@ -826,6 +826,9 @@ async def send_all_via_gmail(
     """Send all emails in a specific stage via Gmail"""
     logger.info(f"Send all emails request for stage '{stage}' by user {current_user.email}")
 
+    # Always re-fetch the user to get the latest signature_image_url
+    user = db.query(User).filter_by(id=current_user.id).first()
+
     if stage not in ["outreach", "followup", "lastchance"]:
         raise HTTPException(status_code=400, detail="Invalid stage. Must be one of: outreach, followup, lastchance")
 
@@ -869,8 +872,8 @@ async def send_all_via_gmail(
     
     for i, email in enumerate(emails):
         try:
-            # Send via Gmail
-            send_gmail_email(current_user, email.recipient_email, email.subject, email.content)
+            # Send via Gmail (use the freshly fetched user)
+            send_gmail_email(user, email.recipient_email, email.subject, email.content)
             
             # --- STAGE-SPECIFIC LOGIC ---
             if stage == "outreach":
@@ -1047,10 +1050,9 @@ async def send_all_by_group(
     
     logger.info(f"[EMAILS] Sending all emails in group '{group_id}' for user {current_user.email} in stage '{stage}'")
     
-    # Check if user has Gmail connected
-    if not current_user.gmail_access_token:
-        raise HTTPException(status_code=400, detail="Gmail not connected. Please connect your Gmail account first.")
-    
+    # Always re-fetch the user to get the latest signature_image_url
+    user = db.query(User).filter_by(id=current_user.id).first()
+
     # Get all emails in the group for the specified stage
     emails = db.query(GeneratedEmail).filter(
         GeneratedEmail.user_id == current_user.id,
@@ -1074,8 +1076,8 @@ async def send_all_by_group(
     
     for email in emails:
         try:
-            # Actually send the email via Gmail
-            send_gmail_email(current_user, email.recipient_email, email.subject, email.content)
+            # Actually send the email via Gmail (use the freshly fetched user)
+            send_gmail_email(user, email.recipient_email, email.subject, email.content)
             
             # Mark email as sent
             email.status = f"{stage}_sent"
