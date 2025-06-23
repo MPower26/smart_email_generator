@@ -29,6 +29,9 @@ def send_gmail_email(user, to_email, subject, body):
     # Convert newlines to <br> for HTML formatting
     body = body.replace('\n', '<br>')
     
+    # Debug: print signature image URL
+    print("User signature image URL:", getattr(user, 'signature_image_url', None))
+    
     # Append signature if present
     signature = user.email_signature or ""
     if signature:
@@ -42,6 +45,9 @@ def send_gmail_email(user, to_email, subject, body):
             signature += f'<br><br><img src="{user.signature_image_url}" alt="Signature" style="max-width: 300px; height: auto;" />'
         
         body = f"{body}<br><br>{signature}"
+    
+    # Debug: print final email body
+    print("Final email body:", body)
     
     # Build MIME message for HTML
     message = f"From: {user.email}\r\nTo: {to_email}\r\nSubject: {subject}\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n{body}"
