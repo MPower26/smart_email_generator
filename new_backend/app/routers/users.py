@@ -9,6 +9,7 @@ from ..db.database import get_db
 from ..models.models import User
 from ..schemas.user import UserUpdate
 from ..middleware.auth import get_current_user
+from ..services.blob_storage import blob_storage_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -102,7 +103,7 @@ async def upload_signature_image(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Upload a signature image for the user"""
+    """Upload a signature image for the user using Azure Blob Storage"""
     logger.info(f"Uploading signature image for user: {current_user.email}")
     try:
         # Validate file type
@@ -113,22 +114,18 @@ async def upload_signature_image(
         if signature_image.size > 5 * 1024 * 1024:
             raise HTTPException(status_code=400, detail="File size must be less than 5MB")
         
-        # Create uploads directory if it doesn't exist
-        upload_dir = "uploads/signatures"
-        os.makedirs(upload_dir, exist_ok=True)
+        # Read file content
+        content = await signature_image.read()
         
-        # Generate unique filename
+        # Get file extension
         file_extension = os.path.splitext(signature_image.filename)[1]
-        filename = f"{current_user.email}_{uuid.uuid4()}{file_extension}"
-        file_path = os.path.join(upload_dir, filename)
         
-        # Save file
-        with open(file_path, "wb") as buffer:
-            content = await signature_image.read()
-            buffer.write(content)
-        
-        # Generate URL (you might want to use a CDN or cloud storage in production)
-        image_url = f"/uploads/signatures/{filename}"
+        # Upload to Azure Blob Storage
+        image_url = await blob_storage_service.upload_signature_image(
+            content, 
+            file_extension, 
+            current_user.email
+        )
         
         # Update user's signature image URL
         current_user.signature_image_url = image_url
