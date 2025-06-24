@@ -156,6 +156,7 @@ const GroupedEmails = ({ stage }) => {
   const [regeneratePrompt, setRegeneratePrompt] = useState('');
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [sendingGroups, setSendingGroups] = useState(new Set());
+  const [searchQueries, setSearchQueries] = useState({}); // { [groupId]: searchString }
 
   useEffect(() => {
     loadGroupedEmails();
@@ -321,52 +322,80 @@ const GroupedEmails = ({ stage }) => {
     <div className="grouped-emails">
       <h3>Grouped Emails - {stage.charAt(0).toUpperCase() + stage.slice(1)}</h3>
       
-      {groups.map((group) => (
-        <div key={group.group_id} className="email-group">
-          <div className="group-header">
-            <h4>Batch: {group.group_id}</h4>
-            <div className="group-stats">
-              <span>Total: {group.email_count}</span>
-              <span>Due: {group.status_counts?.followup_due || group.status_counts?.lastchance_due || 0}</span>
-              <span>Sent: {group.status_counts?.followup_sent || group.status_counts?.lastchance_sent || 0}</span>
-            </div>
-            <CountdownTimer dueDate={group.earliest_due_date} />
-            <Button variant="outline-secondary" size="sm" onClick={() => handleOpenRegenerateModal(group)} disabled={isRegenerating}>
-              <i className="bi bi-arrow-clockwise"></i> Re-generate
-            </Button>
-          </div>
-          
-          <div className="group-actions">
-            <button 
-              onClick={() => handleSendAllInGroup(group.group_id)}
-              disabled={!(group.status_counts?.followup_due || group.status_counts?.lastchance_due) || sendingGroups.has(group.group_id)}
-              className="send-all-btn"
-            >
-              {sendingGroups.has(group.group_id) ? (
-                <>
-                  <Spinner animation="border" size="sm" className="me-1" />
-                  Sending...
-                </>
-              ) : (
-                `Send All in Group (${group.status_counts?.followup_due || group.status_counts?.lastchance_due || 0})`
-              )}
-            </button>
-          </div>
-          
-          <div className="emails-list">
-            {group.emails.slice(0, visibleCounts[group.group_id] || 15).map((email) => (
-                <EmailRow key={email.id} email={email} onUpdate={loadGroupedEmails} />
-            ))}
-            {(group.emails.length > (visibleCounts[group.group_id] || 15)) && (
-              <div className="more-emails">
-                <Button variant="link" onClick={() => handleShowMore(group.group_id)}>
-                    See more... ({group.emails.length - (visibleCounts[group.group_id] || 15)} remaining)
-                </Button>
+      {groups.map((group) => {
+        const searchQuery = searchQueries[group.group_id] || '';
+        const handleSearchChange = (e) => {
+          setSearchQueries(prev => ({ ...prev, [group.group_id]: e.target.value }));
+        };
+        // Filter emails by search query
+        const filteredEmails = group.emails.filter(email => {
+          const q = searchQuery.toLowerCase();
+          return (
+            (email.recipient_name && email.recipient_name.toLowerCase().includes(q)) ||
+            (email.recipient_email && email.recipient_email.toLowerCase().includes(q)) ||
+            (email.to && email.to.toLowerCase().includes(q))
+          );
+        });
+        const emailsToShow = filteredEmails.slice(0, visibleCounts[group.group_id] || 15);
+        return (
+          <div key={group.group_id} className="email-group">
+            <div className="group-header">
+              <h4>Batch: {group.group_id}</h4>
+              <div className="group-stats">
+                <span>Total: {group.email_count}</span>
+                <span>Due: {group.status_counts?.followup_due || group.status_counts?.lastchance_due || 0}</span>
+                <span>Sent: {group.status_counts?.followup_sent || group.status_counts?.lastchance_sent || 0}</span>
               </div>
-            )}
+              <CountdownTimer dueDate={group.earliest_due_date} />
+              <Button variant="outline-secondary" size="sm" onClick={() => handleOpenRegenerateModal(group)} disabled={isRegenerating}>
+                <i className="bi bi-arrow-clockwise"></i> Re-generate
+              </Button>
+            </div>
+            {/* Search box for this group */}
+            <div className="mb-2">
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Search by name or email..."
+                value={searchQuery}
+                onChange={handleSearchChange}
+              />
+            </div>
+            <div className="group-actions">
+              <button 
+                onClick={() => handleSendAllInGroup(group.group_id)}
+                disabled={!(group.status_counts?.followup_due || group.status_counts?.lastchance_due) || sendingGroups.has(group.group_id)}
+                className="send-all-btn"
+              >
+                {sendingGroups.has(group.group_id) ? (
+                  <>
+                    <Spinner animation="border" size="sm" className="me-1" />
+                    Sending...
+                  </>
+                ) : (
+                  `Send All in Group (${group.status_counts?.followup_due || group.status_counts?.lastchance_due || 0})`
+                )}
+              </button>
+            </div>
+            <div className="emails-list">
+              {emailsToShow.length === 0 ? (
+                <div className="text-muted">No emails found.</div>
+              ) : (
+                emailsToShow.map((email) => (
+                  <EmailRow key={email.id} email={email} onUpdate={loadGroupedEmails} />
+                ))
+              )}
+              {(filteredEmails.length > (visibleCounts[group.group_id] || 15)) && (
+                <div className="more-emails">
+                  <Button variant="link" onClick={() => handleShowMore(group.group_id)}>
+                      See more... ({filteredEmails.length - (visibleCounts[group.group_id] || 15)} remaining)
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
 
       <Modal show={showRegenerateModal} onHide={handleCloseRegenerateModal}>
         <Modal.Header closeButton>
