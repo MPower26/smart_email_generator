@@ -299,6 +299,7 @@ const GenerateEmailsPage = () => {
   };
   
   const startProgressPolling = (progressId) => {
+    if (!progressId) return; // Guard: do not start polling without a valid progressId
     stopProgressPolling(); 
     const poller = () => pollProgress(progressId);
     poller(); // Poll immediately once
@@ -326,9 +327,10 @@ const GenerateEmailsPage = () => {
     const checkInitialProgress = async () => {
       try {
         const response = await emailService.getGenerationProgress();
-        if (response.data?.status === 'processing') {
+        if (response.data?.status === 'processing' && response.data?.progress_id) {
           setIsGenerating(true);
-          startProgressPolling();
+          setCurrentProgressId(response.data.progress_id);
+          startProgressPolling(response.data.progress_id);
         }
       } catch (error) {
         console.error("Failed to check initial progress", error);
