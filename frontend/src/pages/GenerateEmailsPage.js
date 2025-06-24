@@ -82,6 +82,8 @@ const GenerateEmailsPage = () => {
   // Polling for progress updates
   const pollingIntervalRef = useRef(null);
 
+  const [generationStartTime, setGenerationStartTime] = useState(null);
+
   // Load emails by stage - moved before functions that reference it
   const loadEmailsByStage = async () => {
     setLoadingEmails(true);
@@ -249,31 +251,36 @@ const GenerateEmailsPage = () => {
       const response = await emailService.getGenerationProgressById(progressId);
       const progress = response.data;
 
-      // If the component is no longer in a generating state, stop polling.
-      if (!isGenerating && pollingIntervalRef.current) {
-        stopProgressPolling();
-        return;
+      // Calculate elapsed, speed, and ETA
+      let elapsed = 0;
+      let speed = 0;
+      let eta = 0;
+      if (generationStartTime && progress.generated_emails > 0) {
+        elapsed = (Date.now() - generationStartTime) / 1000;
+        speed = progress.generated_emails / Math.max(1, elapsed);
+        eta = (progress.total_contacts - progress.generated_emails) / Math.max(0.1, speed);
       }
 
-      if (progress.status === 'processing') {
+      // Only stop polling when status is completed AND all emails are generated
+      if (progress.status === 'processing' || (progress.status === 'completed' && progress.generated_emails < progress.total_contacts)) {
         setGenerationProgress({
           type: 'generation',
           current: progress.generated_emails,
           total: progress.total_contacts,
-          startTime: Date.now() - 2000,
-          speed: progress.generated_emails / Math.max(1, (Date.now() - (Date.now() - 2000)) / 1000),
-          status: 'processing'
+          startTime: generationStartTime,
+          speed,
+          eta,
+          status: progress.status
         });
-      } else if (progress.status === 'completed') {
-        setGenerationProgress(prev => ({ ...prev, current: prev.total, status: 'completed' }));
+        // Do not stop polling
+      } else if (progress.status === 'completed' && progress.generated_emails === progress.total_contacts) {
+        setGenerationProgress(prev => ({ ...prev, current: prev.total, status: 'completed', speed, eta }));
         stopProgressPolling();
-        
         setTimeout(() => {
           setIsGenerating(false);
           loadEmailsByStage();
           setActiveTab('outreach');
         }, 1500);
-
       } else if (progress.status === 'error' || (progress.status === 'idle' && isGenerating)) {
         setGenerationProgress(prev => ({ ...prev, status: 'error' }));
         setError(`Email generation failed: ${progress.error_message || 'Unknown error'}`);
@@ -357,6 +364,8 @@ const GenerateEmailsPage = () => {
     setUploadProgress(prev => ({ ...prev, status: 'processing', current: 0, total: file.size, startTime: Date.now() }));
     setGenerationProgress(prev => ({ ...prev, status: 'processing', current: 0, total: 0 }));
     setSendingProgress(prev => ({ ...prev, status: 'idle', current: 0, total: 0 }));
+
+    setGenerationStartTime(Date.now());
 
     try {
       const response = await emailService.generateEmails(
