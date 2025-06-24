@@ -102,7 +102,7 @@ export const emailService = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
-      timeout: 600000, // 10 minutes timeout
+      timeout: 1800000, // 30 minutes timeout
       onUploadProgress,
     });
   },
