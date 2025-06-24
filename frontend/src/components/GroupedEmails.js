@@ -185,7 +185,12 @@ const GroupedEmails = ({ stage }) => {
     try {
       setLoading(true);
       const response = await emailService.getEmailsByStageGrouped(stage);
-      const groupsData = response.data.groups || [];
+      let groupsData = response.data.groups || [];
+      // Filter out groups with no due emails for the current stage
+      const dueKey = stage === 'followup' ? 'followup_due' : (stage === 'lastchance' ? 'lastchance_due' : null);
+      if (dueKey) {
+        groupsData = groupsData.filter(group => group.status_counts?.[dueKey] > 0);
+      }
       setGroups(groupsData);
       // Initialize visible counts for each group
       const initialCounts = {};
@@ -245,7 +250,7 @@ const GroupedEmails = ({ stage }) => {
     
     try {
       await emailService.sendAllByGroup(stage, groupId);
-      // Reload the groups to update the status
+      // Reload the groups to update the status and remove sent groups
       await loadGroupedEmails();
     } catch (err) {
       console.error('Error sending all emails in group:', err);
