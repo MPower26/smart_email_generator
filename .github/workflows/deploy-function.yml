@@ -5,34 +5,33 @@ on:
     branches: [ main ]
     paths:
       - 'new_backend/followup_scheduler/**'
-  workflow_dispatch:
-
-env:
-  AZURE_FUNCTIONAPP_NAME: smart-email-functions
-  AZURE_FUNCTIONAPP_PACKAGE_PATH: 'new_backend/followup_scheduler'
-  PYTHON_VERSION: '3.11'
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
-
+      uses: actions/checkout@v3
+      
     - name: Setup Python
       uses: actions/setup-python@v4
       with:
-        python-version: ${{ env.PYTHON_VERSION }}
-
+        python-version: '3.11'
+        
     - name: Install dependencies
       run: |
-        cd ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
-        python -m pip install --upgrade pip
+        cd new_backend/followup_scheduler
         pip install -r requirements.txt
-
+        
+    - name: Create deployment package
+      run: |
+        cd new_backend/followup_scheduler
+        zip -r followup_scheduler.zip . -x "*.git*" "*.pyc" "__pycache__/*"
+        
     - name: Deploy to Azure Functions
       uses: Azure/functions-action@v1
       with:
-        app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
-        package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
-        publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
+        app-name: 'smart-email-functions'
+        package: 'new_backend/followup_scheduler/followup_scheduler.zip'
+        publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }} 
