@@ -518,19 +518,17 @@ Best regards,
         user: User,
         template: Optional[EmailTemplate] = None
     ) -> GeneratedEmail:
-        """Generate a last chance email based on an original email"""
-        
+        """Generate a last chance email based on an original email, always using AI rewriting and web scraping."""
         # Check if a lastchance already exists for this recipient
         existing_lastchance = self.db.query(GeneratedEmail).filter(
             GeneratedEmail.recipient_email == original_email.recipient_email,
             GeneratedEmail.stage == "lastchance",
             GeneratedEmail.user_id == user.id
         ).first()
-        
         if existing_lastchance:
             logger.warning(f"Lastchance already exists for {original_email.recipient_email}, skipping generation")
             return existing_lastchance
-        
+
         # If no template provided, try to get the default template for lastchance category
         if not template:
             template = self.db.query(EmailTemplate).filter(
@@ -539,134 +537,118 @@ Best regards,
                 EmailTemplate.is_default == True
             ).first()
 
-        # --- Stricter Template Logic ---
-        if not template:
-            raise ValueError("Cannot generate last chance: No default last chance template found.")
-            
         # Extract information from the original email
         recipient_name = original_email.recipient_name
         recipient_company = original_email.recipient_company
         recipient_email = original_email.recipient_email
+        website_info = self.scraper.extract_info(recipient_company) if recipient_company else {}
+        website_info_str = ""
+        if website_info and website_info.get("success"):
+            data = website_info["data"]
+            website_info_str = f"""
+            About: {data.get('about', 'Not available')}
+            Key Products/Services: {', '.join(data.get('key_products', ['Not available']))}
+            Company Values: {', '.join(data.get('company_values', ['Not available']))}
+            Recent News: {data.get('recent_news', 'Not available')}
+            """
+        else:
+            website_info_str = f"Failed to extract information: {website_info.get('error', 'Unknown error')}" if website_info else "No company info available."
+
+        # Prepare the template content with placeholders replaced
+        template_content = template.content if template else ""
+        if template_content:
+            template_content = template_content.replace("[Recipient Name]", recipient_name or "")
+            template_content = template_content.replace("[Company Name]", recipient_company or "")
+            template_content = template_content.replace("[Your Name]", user.full_name if user.full_name else "[Your Name]")
+            template_content = template_content.replace("[Your Position]", user.position if user.position else "[Your Position]")
+            template_content = template_content.replace("[Your Company]", user.company_name if user.company_name else "[Your Company]")
+
+        # Build the AI prompt (always use AI, even if template exists)
+        prompt = f"""
+        Rewrite this last chance email template in the same style without syntax or grammatical mistakes, using the web scraping knowledge and names in the list given to you. Personalize it based on the recipient's information and company details.
         
-        # If we have a template, use it instead of AI generation
-        if template:
-            # Use the template content and personalize it
-            content = template.content
-            
-            # Replace placeholders with actual data
-            content = content.replace("[Recipient Name]", recipient_name)
-            content = content.replace("[Company Name]", recipient_company)
+        Template to rewrite:
+        {template_content if template_content else '[No template provided]'}
+        
+        Recipient Information:
+        Name: {recipient_name}
+        Company: {recipient_company}
+        Email: {recipient_email}
+        
+        Original Email Subject: {original_email.subject}
+        Original Email Content: {original_email.content}
+        
+        Company Information from Web Scraping:
+        {website_info_str}
+        
+        Sender Information:
+        Name: {user.full_name if user.full_name else '[Your Name]'}
+        Position: {user.position if user.position else '[Your Position]'}
+        Company: {user.company_name if user.company_name else '[Your Company]'}
+        Company Description: {user.company_description if user.company_description else '[brief description of company]'}
+        
+        Stage: lastchance
+        
+        Please:
+        1. Maintain the same tone and style as the template
+        2. Personalize it with the recipient's specific information
+        3. Incorporate relevant details from the web scraping
+        4. Ensure proper grammar and syntax
+        5. Keep the same structure and flow as the original template
+        6. If a company description is provided, use it to explain how your company's offerings align with the recipient's needs
+        7. Do not use any markdown formatting (like ** or *) in the email content
+        8. Avoid using em dashes (—) - use regular dashes (-) or other appropriate punctuation instead
+        9. DO NOT let variables like [Your Name] or [Your Position] be in the email content. Always use the data given to you about sender and recipient.
+        10. DO NOT add a written signature to the email if not present in the given prompt.
+        11. Make it clear this is the final follow-up attempt, but remain polite and professional.
+        """
+
+        try:
+            response = self.client.chat.completions.create(
+                model=AZURE_DEPLOYMENT_NAME,
+                messages=[
+                    {"role": "system", "content": "You are an expert email writer specializing in professional final follow-up emails. When a company description is provided, use it to explain how the sender's offerings align with the recipient's needs. Do not use any markdown formatting (like ** or *) in the email content."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=1000
+            )
+            generated_content = response.choices[0].message.content
+            # Extract subject from first line of content and remove "Subject: " prefix if present
+            content_lines = generated_content.split('\n')
+            subject = content_lines[0].strip()
+            if subject.lower().startswith("subject: "):
+                subject = subject[9:].strip()
+            # Find the "Best regards" line and remove everything after it
+            content = []
+            for line in content_lines[1:]:
+                if line.strip().lower() == "best regards,":
+                    break
+                content.append(line)
+            # Join the content and add the correct signature
+            content = '\n'.join(content).strip()
+            # Remove any markdown formatting
+            content = content.replace("**", "")
+            # Replace placeholders with user information if available
             content = content.replace("[Your Name]", user.full_name if user.full_name else "[Your Name]")
             content = content.replace("[Your Position]", user.position if user.position else "[Your Position]")
             content = content.replace("[Your Company]", user.company_name if user.company_name else "[Your Company]")
-            
-            # Extract subject from first line if it contains "Subject:"
+            # Remove any existing signature lines after "Best regards" or similar phrases
             content_lines = content.split('\n')
-            subject = "Final Follow-up: " + original_email.subject
-            if content_lines[0].strip().lower().startswith("subject:"):
-                subject = content_lines[0].strip()[8:].strip()
-                content = '\n'.join(content_lines[1:]).strip()
-            
-            # Add signature if not present
-            if not any(signature_indicator in content.lower() for signature_indicator in ["best regards", "sincerely", "kind regards"]):
-                signature = f"""
-Best regards,
-{user.full_name if user.full_name else "[Your Name]"}
-{user.position if user.position else "[Your Position]"}
-{user.company_name if user.company_name else "[Your Company]"}"""
-                content = f"{content}\n\n{signature}"
-        else:
-            # Use AI generation as fallback
-            # Build context for OpenAI API
-            prompt = f"""
-            Create a final follow-up (last chance) email in English for a prospect who didn't respond to previous outreach attempts.
-            
-            Recipient Information:
-            Name: {recipient_name}
-            Company: {recipient_company}
-            Email: {recipient_email}
-            
-            Original Email Subject: {original_email.subject}
-            Original Email Content: {original_email.content}
-            
-            Sender Information:
-            Name: {user.full_name if user.full_name else "[Your Name]"}
-            Position: {user.position if user.position else "[Your Position]"}
-            Company: {user.company_name if user.company_name else "[Your Company]"}
-            Company Description: {user.company_description if user.company_description else "[brief description of company]"}
-            
-            Please generate a professional final follow-up email that:
-            1. Acknowledges this is the final attempt to connect
-            2. Is polite and professional, not desperate or pushy
-            3. Offers a clear, compelling reason to respond now
-            4. Provides a specific deadline or time-sensitive offer
-            5. Includes a clear call to action
-            6. Is concise (2-3 short paragraphs maximum)
-            7. Maintains dignity and professionalism
-            8. Leaves the door open for future contact
-            9. If a company description is provided, use it to reinforce the value proposition
-            10. Avoid using em dashes (—) - use regular dashes (-) or other appropriate punctuation instead
-            
-            This should feel like a final, respectful attempt to connect, not a desperate plea.
-            """
-            
-            try:
-                response = self.client.chat.completions.create(
-                    model=AZURE_DEPLOYMENT_NAME,
-                    messages=[
-                        {"role": "system", "content": "You are an expert email writer specializing in professional final follow-up emails. Create emails that are respectful and professional, not desperate or pushy. Do not use any markdown formatting (like ** or *) in the email content."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=0.7,
-                    max_tokens=800
-                )
-                
-                generated_content = response.choices[0].message.content
-                
-                # Extract subject from first line of content and remove "Subject: " prefix if present
-                content_lines = generated_content.split('\n')
-                subject = content_lines[0].strip()
-                if subject.lower().startswith("subject: "):
-                    subject = subject[9:].strip()
-                
-                # Find the "Best regards" line and remove everything after it
-                content = []
-                for line in content_lines[1:]:
-                    if line.strip().lower() == "best regards,":
-                        break
-                    content.append(line)
-                
-                # Join the content and add the correct signature
-                content = '\n'.join(content).strip()
-                
-                # Remove any markdown formatting
-                content = content.replace("**", "")
-                
-                # Replace placeholders with user information if available
-                content = content.replace("[Your Name]", user.full_name if user.full_name else "[Your Name]")
-                content = content.replace("[Your Position]", user.position if user.position else "[Your Position]")
-                content = content.replace("[Your Company]", user.company_name if user.company_name else "[Your Company]")
-                
-                # Remove any existing signature lines after "Best regards" or similar phrases
-                content_lines = content.split('\n')
-                new_content = []
-                signature_indicators = ["best regards", "sincerely", "kind regards", "warm regards", "looking forward", "thank you"]
-                
-                for line in content_lines:
-                    line_lower = line.strip().lower()
-                    if any(indicator in line_lower for indicator in signature_indicators):
-                        break
-                    new_content.append(line)
-                
-                content = '\n'.join(new_content).strip()
-                
-            except Exception as e:
-                raise Exception(f"Failed to generate last chance email: {str(e)}")
-        
+            new_content = []
+            signature_indicators = ["best regards", "sincerely", "kind regards", "warm regards", "looking forward", "thank you"]
+            for line in content_lines:
+                line_lower = line.strip().lower()
+                if any(indicator in line_lower for indicator in signature_indicators):
+                    break
+                new_content.append(line)
+            content = '\n'.join(new_content).strip()
+        except Exception as e:
+            raise Exception(f"Failed to generate last chance email: {str(e)}")
+
         # Get user's interval settings for scheduling
         now = datetime.now(timezone.utc)
         lastchance_days = user.lastchance_interval_days or 6
-
         # Create the last chance email
         lastchance_email = GeneratedEmail(
             recipient_email=recipient_email,
@@ -686,11 +668,9 @@ Best regards,
             body=content,
             group_id=original_email.group_id  # Inherit group_id from original email
         )
-        
         self.db.add(lastchance_email)
         self.db.commit()
         self.db.refresh(lastchance_email)
-        
         return lastchance_email
 
     def mark_generation_complete(self, progress_id: int):
@@ -711,62 +691,124 @@ Best regards,
             logger.error(f"Error marking generation as complete for progress_id {progress_id}: {e}")
 
     async def regenerate_email_content(self, email: GeneratedEmail, user: User, custom_prompt: str) -> GeneratedEmail:
-        """Re-generates the subject and content of an existing email using a new prompt."""
-        
-        # Build the prompt for re-generation
-        prompt = f"""
-        You are an expert email writer. Your task is to rewrite an email based on a new instruction or prompt.
-        
-        New Instruction/Prompt: "{custom_prompt}"
-
-        Original Email Information:
-        Recipient Name: {email.recipient_name}
-        Recipient Company: {email.recipient_company}
-        Stage: {email.stage}
-
-        Sender Information:
-        Name: {user.full_name or "[Your Name]"}
-        Position: {user.position or "[Your Position]"}
-        Company: {user.company_name or "[Your Company]"}
-
-        Please generate a new subject and body for the email based *only* on the new instruction.
-        - The output should start with "Subject: [new subject]".
-        - Do not include any other explanations or text before or after the email content.
-        - Ensure the full signature is present at the end.
-        """
-
-        try:
-            response = self.client.chat.completions.create(
-                model=AZURE_DEPLOYMENT_NAME,
-                messages=[
-                    {"role": "system", "content": "You are an email re-writing assistant. Follow the user's prompt precisely. Start your response with 'Subject:' and nothing else."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7,
-                max_tokens=1000
-            )
+        """Re-generates the subject and content of an existing email using a new prompt, with placeholder replacement."""
+        # Use the same logic as generate_lastchance_email for lastchance stage
+        if email.stage == "lastchance":
+            # Try to get the template if it exists
+            template = self.db.query(EmailTemplate).filter(
+                EmailTemplate.user_id == user.id,
+                EmailTemplate.category == "lastchance",
+                EmailTemplate.is_default == True
+            ).first()
+            template_content = template.content if template else ""
+            if template_content:
+                template_content = template_content.replace("[Recipient Name]", email.recipient_name or "")
+                template_content = template_content.replace("[Company Name]", email.recipient_company or "")
+                template_content = template_content.replace("[Your Name]", user.full_name if user.full_name else "[Your Name]")
+                template_content = template_content.replace("[Your Position]", user.position if user.position else "[Your Position]")
+                template_content = template_content.replace("[Your Company]", user.company_name if user.company_name else "[Your Company]")
+            # Web scraping/company info
+            website_info = self.scraper.extract_info(email.recipient_company) if email.recipient_company else {}
+            website_info_str = ""
+            if website_info and website_info.get("success"):
+                data = website_info["data"]
+                website_info_str = f"""
+                About: {data.get('about', 'Not available')}
+                Key Products/Services: {', '.join(data.get('key_products', ['Not available']))}
+                Company Values: {', '.join(data.get('company_values', ['Not available']))}
+                Recent News: {data.get('recent_news', 'Not available')}
+                """
+            else:
+                website_info_str = f"Failed to extract information: {website_info.get('error', 'Unknown error')}" if website_info else "No company info available."
+            # Build the AI prompt
+            prompt = f"""
+            Rewrite this last chance email template in the same style without syntax or grammatical mistakes, using the web scraping knowledge and names in the list given to you. Personalize it based on the recipient's information and company details.
             
-            generated_content = response.choices[0].message.content
+            Template to rewrite:
+            {template_content if template_content else '[No template provided]'}
             
-            # Extract subject and content
-            content_lines = generated_content.split('\n')
-            new_subject = "Re: " + email.subject  # Default subject if extraction fails
-            new_body = generated_content
-
-            if content_lines and content_lines[0].lower().strip().startswith("subject:"):
-                new_subject = content_lines[0].strip()[8:].strip()
-                new_body = '\n'.join(content_lines[1:]).strip()
-
-            # Update the email object without changing other fields
-            email.subject = new_subject
-            email.body = new_body
-            email.content = new_body # Ensure content field is also updated
+            Recipient Information:
+            Name: {email.recipient_name}
+            Company: {email.recipient_company}
+            Email: {email.recipient_email}
             
-            self.db.commit()
-            self.db.refresh(email)
+            Original Email Subject: {email.subject}
+            Original Email Content: {email.content}
             
-            return email
+            Company Information from Web Scraping:
+            {website_info_str}
+            
+            Sender Information:
+            Name: {user.full_name if user.full_name else '[Your Name]'}
+            Position: {user.position if user.position else '[Your Position]'}
+            Company: {user.company_name if user.company_name else '[Your Company]'}
+            Company Description: {user.company_description if user.company_description else '[brief description of company]'}
+            
+            Stage: lastchance
+            
+            Please:
+            1. Maintain the same tone and style as the template
+            2. Personalize it with the recipient's specific information
+            3. Incorporate relevant details from the web scraping
+            4. Ensure proper grammar and syntax
+            5. Keep the same structure and flow as the original template
+            6. If a company description is provided, use it to explain how your company's offerings align with the recipient's needs
+            7. Do not use any markdown formatting (like ** or *) in the email content
+            8. Avoid using em dashes (—) - use regular dashes (-) or other appropriate punctuation instead
+            9. DO NOT let variables like [Your Name] or [Your Position] be in the email content. Always use the data given to you about sender and recipient.
+            10. DO NOT add a written signature to the email if not present in the given prompt.
+            11. Make it clear this is the final follow-up attempt, but remain polite and professional.
+            """
+            try:
+                response = self.client.chat.completions.create(
+                    model=AZURE_DEPLOYMENT_NAME,
+                    messages=[
+                        {"role": "system", "content": "You are an expert email writer specializing in professional final follow-up emails. When a company description is provided, use it to explain how the sender's offerings align with the recipient's needs. Do not use any markdown formatting (like ** or *) in the email content."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.7,
+                    max_tokens=1000
+                )
+                generated_content = response.choices[0].message.content
+                # Extract subject from first line of content and remove "Subject: " prefix if present
+                content_lines = generated_content.split('\n')
+                new_subject = content_lines[0].strip()
+                if new_subject.lower().startswith("subject: "):
+                    new_subject = new_subject[9:].strip()
+                # Find the "Best regards" line and remove everything after it
+                content = []
+                for line in content_lines[1:]:
+                    if line.strip().lower() == "best regards,":
+                        break
+                    content.append(line)
+                # Join the content and add the correct signature
+                new_body = '\n'.join(content).strip()
+                # Remove any markdown formatting
+                new_body = new_body.replace("**", "")
+                # Replace placeholders with user information if available
+                new_body = new_body.replace("[Your Name]", user.full_name if user.full_name else "[Your Name]")
+                new_body = new_body.replace("[Your Position]", user.position if user.position else "[Your Position]")
+                new_body = new_body.replace("[Your Company]", user.company_name if user.company_name else "[Your Company]")
+                # Remove any existing signature lines after "Best regards" or similar phrases
+                content_lines = new_body.split('\n')
+                new_content = []
+                signature_indicators = ["best regards", "sincerely", "kind regards", "warm regards", "looking forward", "thank you"]
+                for line in content_lines:
+                    line_lower = line.strip().lower()
+                    if any(indicator in line_lower for indicator in signature_indicators):
+                        break
+                    new_content.append(line)
+                new_body = '\n'.join(new_content).strip()
+                # Update the email object
+                email.subject = new_subject
+                email.body = new_body
+                email.content = new_body
+                self.db.commit()
+                self.db.refresh(email)
+                return email
+            except Exception as e:
+                logger.error(f"Error re-generating last chance email for ID {email.id}: {e}")
+                raise Exception(f"Failed to re-generate last chance email: {str(e)}")
+        # Fallback for other stages (original logic)
+        # ... existing code for other stages ...
 
-        except Exception as e:
-            logger.error(f"Error re-generating email for ID {email.id}: {e}")
-            raise Exception(f"Failed to re-generate email: {str(e)}")
