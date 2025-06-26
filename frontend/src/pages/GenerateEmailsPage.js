@@ -81,6 +81,8 @@ const GenerateEmailsPage = () => {
 
   // Polling for progress updates
   const pollingIntervalRef = useRef(null);
+  const pollingRetryCountRef = useRef(0);
+  const maxRetries = 5;
 
   const [generationStartTime, setGenerationStartTime] = useState(null);
 
@@ -251,6 +253,9 @@ const GenerateEmailsPage = () => {
       const response = await emailService.getGenerationProgressById(progressId);
       const progress = response.data;
 
+      // Reset retry count on successful request
+      pollingRetryCountRef.current = 0;
+
       // Calculate elapsed, speed, and ETA
       let elapsed = 0;
       let speed = 0;
@@ -273,7 +278,7 @@ const GenerateEmailsPage = () => {
           status: progress.status
         });
         // Do not stop polling
-      } else if (progress.status === 'completed' && progress.generated_emails === progress.total_contacts) {
+      } else if (progress.status === 'completed' && progress.generated_emails >= progress.total_contacts) {
         setGenerationProgress(prev => ({ ...prev, current: prev.total, status: 'completed', speed, eta }));
         stopProgressPolling();
         setTimeout(() => {
@@ -292,15 +297,47 @@ const GenerateEmailsPage = () => {
       }
     } catch (error) {
       console.error("Progress polling error:", error);
-      setError("Progress tracking error: Network Error");
-      stopProgressPolling();
-      setIsGenerating(false);
+      
+      // Handle network errors with exponential backoff
+      if (error.code === 'ERR_NETWORK' || error.message === 'Network Error' || error.code === 'ECONNABORTED') {
+        pollingRetryCountRef.current += 1;
+        
+        if (pollingRetryCountRef.current <= maxRetries) {
+          // Calculate exponential backoff delay (2^retry * 1000ms, max 30 seconds)
+          const delay = Math.min(Math.pow(2, pollingRetryCountRef.current) * 1000, 30000);
+          console.log(`Network error, retrying in ${delay}ms (attempt ${pollingRetryCountRef.current}/${maxRetries})`);
+          
+          // Update progress to show retry status
+          setGenerationProgress(prev => ({
+            ...prev,
+            status: 'retrying',
+            retryCount: pollingRetryCountRef.current,
+            retryDelay: delay
+          }));
+          
+          // Schedule retry
+          setTimeout(() => pollProgress(progressId), delay);
+          return;
+        } else {
+          // Max retries exceeded
+          console.error("Max retries exceeded for progress polling");
+          setError("Progress tracking error: Network connection lost. Email generation may still be running in the background.");
+          stopProgressPolling();
+          setIsGenerating(false);
+        }
+      } else {
+        // Non-network error
+        setError("Progress tracking error: " + (error.response?.data?.detail || error.message || 'Unknown error'));
+        stopProgressPolling();
+        setIsGenerating(false);
+      }
     }
   };
   
   const startProgressPolling = (progressId) => {
     if (!progressId) return; // Guard: do not start polling without a valid progressId
     stopProgressPolling(); 
+    pollingRetryCountRef.current = 0; // Reset retry count
     const poller = () => pollProgress(progressId);
     poller(); // Poll immediately once
     pollingIntervalRef.current = setInterval(poller, 2000); // Then poll every 2 seconds
