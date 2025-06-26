@@ -398,8 +398,6 @@ const GenerateEmailsPage = () => {
       checkSystemReady();
     });
 
-    setIsGenerating(true); // Show the progress view after system init
-    
     // Reset progress trackers
     setUploadProgress(prev => ({ ...prev, status: 'processing', current: 0, total: file.size, startTime: Date.now() }));
     setGenerationProgress(prev => ({ ...prev, status: 'processing', current: 0, total: 0 }));
@@ -425,6 +423,12 @@ const GenerateEmailsPage = () => {
       
       setUploadProgress(prev => ({ ...prev, status: 'completed', current: prev.total }));
       
+      // Now show the generation progress
+      setIsGenerating(true);
+      
+      // Hide the system initialization overlay now that generation is starting
+      setShowSystemInit(false);
+      
       setGenerationProgress({
         type: 'generation',
         current: 0,
@@ -432,7 +436,6 @@ const GenerateEmailsPage = () => {
         startTime: Date.now(),
         status: 'starting'
       });
-      setIsGenerating(true);
       setCurrentProgressId(response.data.progress_id); // <-- Store the specific ID
       startProgressPolling(response.data.progress_id); // <-- Pass ID to start polling
 
@@ -608,7 +611,9 @@ const GenerateEmailsPage = () => {
 
   const handleSystemInitComplete = () => {
     setIsSystemReady(true);
-    setShowSystemInit(false);
+    // Don't hide the overlay yet - it will be hidden when the first email is generated
+    // The overlay will show the slot machine effect, then the normal initialization
+    // and finally disappear when the generation progress starts
   };
 
   const handlePauseGeneration = async () => {
