@@ -69,7 +69,7 @@ const SystemInitialization = ({ onComplete }) => {
           return prev;
         }
       });
-    }, 150); // Fast slot machine effect
+    }, 120); // Faster slot machine effect for more dynamic feel
 
     // Rotate fun facts every 3 seconds (only after slot machine)
     const funFactInterval = setInterval(() => {
