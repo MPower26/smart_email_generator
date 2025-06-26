@@ -4,6 +4,8 @@ import FileUpload from '../components/FileUpload';
 import EmailPreview from '../components/EmailPreview';
 import ProgressTracker from '../components/ProgressTracker';
 import GroupedEmails from '../components/GroupedEmails';
+import SystemInitialization from '../components/SystemInitialization';
+import EmailControlPanel from '../components/EmailControlPanel';
 import { emailService, templateService } from '../services/api';
 import { UserContext } from '../contexts/UserContext';
 import '../styles/GroupedEmails.css';
@@ -83,6 +85,11 @@ const GenerateEmailsPage = () => {
   const pollingIntervalRef = useRef(null);
 
   const [generationStartTime, setGenerationStartTime] = useState(null);
+
+  // New state for improved UX
+  const [showSystemInit, setShowSystemInit] = useState(false);
+  const [isSystemReady, setIsSystemReady] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
 
   // Load emails by stage - moved before functions that reference it
   const loadEmailsByStage = async () => {
@@ -261,8 +268,13 @@ const GenerateEmailsPage = () => {
         eta = (progress.total_contacts - progress.generated_emails) / Math.max(0.1, speed);
       }
 
+      // Update paused state
+      if (progress.is_paused !== undefined) {
+        setIsPaused(progress.is_paused);
+      }
+
       // Only stop polling when status is completed AND all emails are generated
-      if (progress.status === 'processing' || (progress.status === 'completed' && progress.generated_emails < progress.total_contacts)) {
+      if (progress.status === 'processing' || progress.status === 'paused' || (progress.status === 'completed' && progress.generated_emails < progress.total_contacts)) {
         setGenerationProgress({
           type: 'generation',
           current: progress.generated_emails,
@@ -281,9 +293,11 @@ const GenerateEmailsPage = () => {
           loadEmailsByStage();
           setActiveTab('outreach');
         }, 1500);
-      } else if (progress.status === 'error' || (progress.status === 'idle' && isGenerating)) {
-        setGenerationProgress(prev => ({ ...prev, status: 'error' }));
-        setError(`Email generation failed: ${progress.error_message || 'Unknown error'}`);
+      } else if (progress.status === 'error' || progress.status === 'stopped' || (progress.status === 'idle' && isGenerating)) {
+        setGenerationProgress(prev => ({ ...prev, status: progress.status }));
+        if (progress.status === 'error') {
+          setError(`Email generation failed: ${progress.error_message || 'Unknown error'}`);
+        }
         stopProgressPolling();
         setTimeout(() => setIsGenerating(false), 5000);
       } else if (progress.status === 'not_found') {
@@ -292,7 +306,14 @@ const GenerateEmailsPage = () => {
       }
     } catch (error) {
       console.error("Progress polling error:", error);
-      setError("Progress tracking error: Network Error");
+      
+      // Don't show error for network issues during polling, just log them
+      if (error.code === 'ERR_NETWORK' || error.message?.includes('Network Error')) {
+        console.log("Network error during progress polling, will retry...");
+        return; // Continue polling
+      }
+      
+      setError("Progress tracking error: " + (error.response?.data?.detail || error.message || 'Unknown error'));
       stopProgressPolling();
       setIsGenerating(false);
     }
@@ -360,7 +381,24 @@ const GenerateEmailsPage = () => {
     setLoading(true);
     setError('');
     setPreRequisiteError(''); // Clear previous prerequisite errors
-    setIsGenerating(true); // Immediately show the progress view
+    
+    // Show system initialization first
+    setShowSystemInit(true);
+    setIsSystemReady(false);
+    
+    // Wait for system initialization to complete
+    await new Promise(resolve => {
+      const checkSystemReady = () => {
+        if (isSystemReady) {
+          resolve();
+        } else {
+          setTimeout(checkSystemReady, 100);
+        }
+      };
+      checkSystemReady();
+    });
+
+    setIsGenerating(true); // Show the progress view after system init
     
     // Reset progress trackers
     setUploadProgress(prev => ({ ...prev, status: 'processing', current: 0, total: file.size, startTime: Date.now() }));
@@ -568,13 +606,82 @@ const GenerateEmailsPage = () => {
     return () => websocketService.onProgress(null);
   }, []);
 
+  const handleSystemInitComplete = () => {
+    setIsSystemReady(true);
+    setShowSystemInit(false);
+  };
+
+  const handlePauseGeneration = async () => {
+    if (!currentProgressId) return;
+    
+    try {
+      await emailService.pauseGeneration(currentProgressId);
+      setIsPaused(true);
+      setError(null);
+    } catch (err) {
+      setError('Failed to pause generation. Please try again.');
+      console.error('Error pausing generation:', err);
+    }
+  };
+
+  const handleResumeGeneration = async () => {
+    if (!currentProgressId) return;
+    
+    try {
+      await emailService.resumeGeneration(currentProgressId);
+      setIsPaused(false);
+      setError(null);
+    } catch (err) {
+      setError('Failed to resume generation. Please try again.');
+      console.error('Error resuming generation:', err);
+    }
+  };
+
+  const handleStopGeneration = async () => {
+    if (!currentProgressId) return;
+    
+    try {
+      await emailService.stopGeneration(currentProgressId);
+      setIsGenerating(false);
+      setIsPaused(false);
+      setCurrentProgressId(null);
+      stopProgressPolling();
+      setError(null);
+    } catch (err) {
+      setError('Failed to stop generation. Please try again.');
+      console.error('Error stopping generation:', err);
+    }
+  };
+
+  const handleRefreshProgress = () => {
+    if (currentProgressId) {
+      pollProgress(currentProgressId);
+    }
+  };
+
   return (
-    <Container className="templates-page">
-      <h1 className="mb-4">Email Campaign Manager</h1>
+    <Container fluid className="mt-4">
+      {/* System Initialization Overlay */}
+      {showSystemInit && (
+        <SystemInitialization onComplete={handleSystemInitComplete} />
+      )}
+
+      {/* Email Control Panel */}
+      {(isGenerating || isSending) && (
+        <EmailControlPanel
+          isGenerating={isGenerating}
+          isSending={isSending}
+          currentProgress={generationProgress}
+          onPause={handlePauseGeneration}
+          onResume={handleResumeGeneration}
+          onStop={handleStopGeneration}
+          onRefresh={handleRefreshProgress}
+        />
+      )}
 
       <Tabs
         activeKey={activeTab}
-        onSelect={(k) => handleTabChange(k)}
+        onSelect={handleTabChange}
         className="mb-4"
       >
         <Tab eventKey="generation" title="Generation">
