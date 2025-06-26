@@ -5,6 +5,9 @@ import './SystemInitialization.css';
 const SystemInitialization = ({ onComplete }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
+  const [showSlotMachine, setShowSlotMachine] = useState(true);
+  const [slotMachineMessages, setSlotMachineMessages] = useState([]);
+  const [currentSlotIndex, setCurrentSlotIndex] = useState(0);
 
   const initializationSteps = [
     {
@@ -34,15 +37,19 @@ const SystemInitialization = ({ onComplete }) => {
     }
   ];
 
-  const funFacts = [
-    "Did you know? The first email was sent in 1971 by Ray Tomlinson! 📧",
-    "Fun fact: Over 306 billion emails are sent every day worldwide! 🌍",
-    "Interesting: The '@' symbol was chosen because it was rarely used in 1971! @",
-    "Amazing: Email marketing has an average ROI of 3800%! 💰",
-    "Cool fact: The word 'email' was first used in 1982! 📅",
-    "Did you know? Personalized emails have 6x higher transaction rates! 📈",
-    "Fun fact: 99% of email users check their inbox every day! 📱",
-    "Interesting: The average person spends 2.5 hours checking email daily! ⏰"
+  const slotMachineFacts = [
+    "🎯 Preparing AI models for email generation...",
+    "📧 Loading personalized templates...",
+    "🔍 Analyzing contact data patterns...",
+    "⚡ Optimizing email content algorithms...",
+    "🎨 Crafting unique email variations...",
+    "📊 Processing engagement metrics...",
+    "🤖 Training neural networks...",
+    "💡 Generating creative subject lines...",
+    "📱 Optimizing for mobile devices...",
+    "🎪 Finalizing email sequences...",
+    "🚀 Launching email generation engine...",
+    "✨ System initialization complete!"
   ];
 
   const [currentFunFact, setCurrentFunFact] = useState(0);
@@ -50,34 +57,53 @@ const SystemInitialization = ({ onComplete }) => {
   useEffect(() => {
     setIsVisible(true);
     
-    // Rotate fun facts every 3 seconds
-    const funFactInterval = setInterval(() => {
-      setCurrentFunFact(prev => (prev + 1) % funFacts.length);
-    }, 3000);
-
-    // Progress through initialization steps
-    const stepInterval = setInterval(() => {
-      setCurrentStep(prev => {
-        if (prev < initializationSteps.length - 1) {
+    // Start slot machine effect
+    const slotInterval = setInterval(() => {
+      setCurrentSlotIndex(prev => {
+        if (prev < slotMachineFacts.length - 1) {
           return prev + 1;
         } else {
-          clearInterval(stepInterval);
-          clearInterval(funFactInterval);
-          // Complete initialization after a short delay
-          setTimeout(() => {
-            setIsVisible(false);
-            setTimeout(onComplete, 500); // Call onComplete after fade out
-          }, 1000);
+          // Slot machine effect complete, show normal initialization
+          setShowSlotMachine(false);
+          clearInterval(slotInterval);
           return prev;
         }
       });
+    }, 150); // Fast slot machine effect
+
+    // Rotate fun facts every 3 seconds (only after slot machine)
+    const funFactInterval = setInterval(() => {
+      if (!showSlotMachine) {
+        setCurrentFunFact(prev => (prev + 1) % slotMachineFacts.length);
+      }
+    }, 3000);
+
+    // Progress through initialization steps (only after slot machine)
+    const stepInterval = setInterval(() => {
+      if (!showSlotMachine) {
+        setCurrentStep(prev => {
+          if (prev < initializationSteps.length - 1) {
+            return prev + 1;
+          } else {
+            clearInterval(stepInterval);
+            clearInterval(funFactInterval);
+            // Complete initialization after a short delay
+            setTimeout(() => {
+              setIsVisible(false);
+              setTimeout(onComplete, 500); // Call onComplete after fade out
+            }, 1000);
+            return prev;
+          }
+        });
+      }
     }, 1000);
 
     return () => {
+      clearInterval(slotInterval);
       clearInterval(stepInterval);
       clearInterval(funFactInterval);
     };
-  }, [onComplete]);
+  }, [onComplete, showSlotMachine]);
 
   return (
     <div className={`system-initialization ${isVisible ? 'visible' : ''}`}>
@@ -88,50 +114,74 @@ const SystemInitialization = ({ onComplete }) => {
             <p className="text-muted">Preparing your personalized email campaign...</p>
           </div>
 
-          <div className="initialization-steps">
-            {initializationSteps.map((step, index) => (
-              <div
-                key={index}
-                className={`step-item ${index <= currentStep ? 'active' : ''} ${
-                  index === currentStep ? 'current' : ''
-                }`}
-              >
-                <div className="step-content">
-                  <div className="step-icon">
-                    {index < currentStep ? (
-                      <span className="step-check">✅</span>
-                    ) : index === currentStep ? (
-                      <Spinner animation="border" size="sm" />
-                    ) : (
-                      <span className="step-pending">⏳</span>
-                    )}
-                  </div>
-                  <div className="step-text">
-                    <h6 className="step-title">{step.title}</h6>
-                    <p className="step-description">{step.description}</p>
-                  </div>
+          {showSlotMachine ? (
+            // Slot Machine Effect
+            <div className="slot-machine-container">
+              <div className="slot-machine-message">
+                <div className="slot-machine-text">
+                  {slotMachineFacts[currentSlotIndex]}
                 </div>
               </div>
-            ))}
-          </div>
-
-          <div className="fun-fact-container">
-            <div className="fun-fact-slide">
-              <p className="fun-fact-text">💡 {funFacts[currentFunFact]}</p>
+              <div className="slot-machine-indicator">
+                <div className="slot-dots">
+                  {slotMachineFacts.map((_, index) => (
+                    <div 
+                      key={index} 
+                      className={`slot-dot ${index === currentSlotIndex ? 'active' : ''}`}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
+          ) : (
+            // Normal Initialization Steps
+            <>
+              <div className="initialization-steps">
+                {initializationSteps.map((step, index) => (
+                  <div
+                    key={index}
+                    className={`step-item ${index <= currentStep ? 'active' : ''} ${
+                      index === currentStep ? 'current' : ''
+                    }`}
+                  >
+                    <div className="step-content">
+                      <div className="step-icon">
+                        {index < currentStep ? (
+                          <span className="step-check">✅</span>
+                        ) : index === currentStep ? (
+                          <Spinner animation="border" size="sm" />
+                        ) : (
+                          <span className="step-pending">⏳</span>
+                        )}
+                      </div>
+                      <div className="step-text">
+                        <h6 className="step-title">{step.title}</h6>
+                        <p className="step-description">{step.description}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
 
-          <div className="progress-indicator">
-            <div className="progress-bar">
-              <div 
-                className="progress-fill"
-                style={{ width: `${((currentStep + 1) / initializationSteps.length) * 100}%` }}
-              ></div>
-            </div>
-            <small className="text-muted">
-              {currentStep + 1} of {initializationSteps.length} steps completed
-            </small>
-          </div>
+              <div className="fun-fact-container">
+                <div className="fun-fact-slide">
+                  <p className="fun-fact-text">💡 {slotMachineFacts[currentFunFact]}</p>
+                </div>
+              </div>
+
+              <div className="progress-indicator">
+                <div className="progress-bar">
+                  <div 
+                    className="progress-fill"
+                    style={{ width: `${((currentStep + 1) / initializationSteps.length) * 100}%` }}
+                  ></div>
+                </div>
+                <small className="text-muted">
+                  {currentStep + 1} of {initializationSteps.length} steps completed
+                </small>
+              </div>
+            </>
+          )}
         </Card.Body>
       </Card>
     </div>
