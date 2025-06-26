@@ -8,7 +8,9 @@ const ProgressTracker = ({
   fileSize = 0,
   startTime = null,
   speed = 0,
-  status = 'idle' // 'idle', 'processing', 'completed', 'error'
+  status = 'idle', // 'idle', 'processing', 'completed', 'error', 'retrying'
+  retryCount = 0,
+  retryDelay = 0
 }) => {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [estimatedTimeLeft, setEstimatedTimeLeft] = useState(0);
@@ -63,6 +65,7 @@ const ProgressTracker = ({
       case 'completed': return 'success';
       case 'error': return 'danger';
       case 'processing': return 'primary';
+      case 'retrying': return 'warning';
       default: return 'secondary';
     }
   };
@@ -72,6 +75,7 @@ const ProgressTracker = ({
       case 'completed': return '✅';
       case 'error': return '❌';
       case 'processing': return <Spinner animation="border" size="sm" />;
+      case 'retrying': return <Spinner animation="grow" size="sm" variant="warning" />;
       default: return '⏳';
     }
   };
@@ -147,11 +151,19 @@ const ProgressTracker = ({
           </div>
         )}
 
-        {type !== 'upload' && status === 'processing' && (
+        {type === 'generation' && (
           <div className="mt-2 text-center">
             <small className="text-muted">
               Elapsed: {formatTime(elapsedTime)} | 
               ETA: {formatTime(estimatedTimeLeft)}
+            </small>
+          </div>
+        )}
+
+        {status === 'retrying' && (
+          <div className="mt-2 text-center">
+            <small className="text-warning">
+              Connection lost. Retrying in {Math.ceil(retryDelay / 1000)}s... (Attempt {retryCount}/5)
             </small>
           </div>
         )}
