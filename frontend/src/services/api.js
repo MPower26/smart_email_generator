@@ -55,7 +55,29 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    console.error('[API] Error:', error?.response || error?.message || error);
+    // Enhanced error logging with specific timeout handling
+    if (error.code === 'ECONNABORTED') {
+      console.error('[API] Request timeout:', {
+        url: error.config?.url,
+        method: error.config?.method,
+        timeout: error.config?.timeout,
+        message: 'Request timed out - this may be normal for long-running operations'
+      });
+    } else if (error.message === 'Network Error') {
+      console.error('[API] Network error:', {
+        url: error.config?.url,
+        method: error.config?.method,
+        message: 'Network connection lost - retrying with exponential backoff'
+      });
+    } else {
+      console.error('[API] Error:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        url: error.config?.url,
+        method: error.config?.method,
+        message: error.response?.data?.detail || error.message
+      });
+    }
     return Promise.reject(error);
   }
 );
@@ -117,8 +139,12 @@ export const emailService = {
   sendAllViaGmail: (stage) => api.post(`/api/emails/send_all_via_gmail/${stage}`),
   
   // Get email generation progress
-  getGenerationProgress: () => api.get('/api/emails/generation-progress', { timeout: 30000 }), // 30 second timeout for initial check
-  getGenerationProgressById: (progressId) => api.get(`/api/emails/generation-progress/${progressId}`, { timeout: 15000 }), // 15 second timeout for polling
+  getGenerationProgress: () => api.get('/api/emails/generation-progress', { 
+    timeout: parseInt(process.env.REACT_APP_INITIAL_PROGRESS_TIMEOUT) || 30000 
+  }), // Configurable timeout for initial check
+  getGenerationProgressById: (progressId) => api.get(`/api/emails/generation-progress/${progressId}`, { 
+    timeout: parseInt(process.env.REACT_APP_POLLING_TIMEOUT) || 15000 
+  }), // Configurable timeout for polling
   
   // Delete email
   deleteEmail: (emailId) => api.delete(`/api/emails/${emailId}`),
