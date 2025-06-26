@@ -45,6 +45,8 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=86400,  # 24 hours
 )
 
 # Add HTTPS redirection middleware SECOND
@@ -85,6 +87,16 @@ async def emails_followup_options():
 
 @app.options("/api/emails/last-chance")
 async def emails_lastchance_options():
+    return Response(status_code=200)
+
+@app.options("/api/emails/generation-progress/{progress_id}")
+async def emails_generation_progress_options(progress_id: int):
+    """Handle OPTIONS request for generation progress endpoint"""
+    return Response(status_code=200)
+
+@app.options("/api/emails/generation-progress")
+async def emails_generation_progress_generic_options():
+    """Handle OPTIONS request for generic generation progress endpoint"""
     return Response(status_code=200)
 
 @app.options("/api/friends/list")
@@ -211,10 +223,6 @@ async def cors_test(request: Request):
         "method": request.method
     }
 
-@app.options("/cors-test")
-async def cors_test_options():
-    """Handle OPTIONS request for CORS test"""
-    return {"message": "CORS preflight successful"} 
 @app.options("/cors-test")
 async def cors_test_options():
     """Handle OPTIONS request for CORS test"""
