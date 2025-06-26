@@ -47,6 +47,34 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Custom middleware to handle CORS for timeout responses
+@app.middleware("http")
+async def cors_timeout_middleware(request: Request, call_next):
+    try:
+        response = await call_next(request)
+        return response
+    except Exception as e:
+        # If there's an exception (including timeout), return a proper CORS response
+        logger.error(f"Request failed with exception: {str(e)}")
+        origin = request.headers.get("origin")
+        if origin in origins:
+            return Response(
+                content=json.dumps({"error": "Request timeout or server error"}),
+                status_code=500,
+                headers={
+                    "Access-Control-Allow-Origin": origin,
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Allow-Methods": "*",
+                    "Access-Control-Allow-Headers": "*",
+                    "Content-Type": "application/json"
+                }
+            )
+        return Response(
+            content=json.dumps({"error": "Request timeout or server error"}),
+            status_code=500,
+            headers={"Content-Type": "application/json"}
+        )
+
 # Add HTTPS redirection middleware SECOND
 @app.middleware("http")
 async def https_redirect(request: Request, call_next):
