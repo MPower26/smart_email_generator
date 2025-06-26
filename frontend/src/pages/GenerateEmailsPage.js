@@ -362,21 +362,38 @@ const GenerateEmailsPage = () => {
   useEffect(() => {
     // Check for ongoing generation when the page loads
     const checkInitialProgress = async () => {
+      // Skip initial progress check if disabled via environment variable
+      if (process.env.REACT_APP_DISABLE_INITIAL_PROGRESS_CHECK === 'true') {
+        console.log("Initial progress check disabled via environment variable");
+        return;
+      }
+
       try {
+        console.log("Checking for ongoing email generation...");
         const response = await emailService.getGenerationProgress();
         if (response.data?.status === 'processing' && response.data?.progress_id) {
+          console.log("Found ongoing generation, starting progress tracking...");
           setIsGenerating(true);
           setCurrentProgressId(response.data.progress_id);
           startProgressPolling(response.data.progress_id);
+        } else {
+          console.log("No ongoing generation found");
         }
       } catch (error) {
         console.error("Failed to check initial progress", error);
+        // Don't show error to user for initial check - it's not critical
+        // Just log it and continue with normal page loading
+        if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+          console.log("Initial progress check timed out - this is normal for slow connections");
+        }
       }
     };
 
     loadTemplates();
     loadEmailsByStage();
-    checkInitialProgress();
+    
+    // Run initial progress check with a small delay to avoid blocking page load
+    setTimeout(checkInitialProgress, 1000);
   }, [userProfile]);
 
   // Debug user profile
