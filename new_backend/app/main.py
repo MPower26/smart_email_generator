@@ -45,8 +45,6 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"],
-    max_age=86400,  # 24 hours
 )
 
 # Add HTTPS redirection middleware SECOND
@@ -65,21 +63,6 @@ async def https_redirect(request: Request, call_next):
         return RedirectResponse(url=url, status_code=301)
     
     response = await call_next(request)
-    return response
-
-# Add custom CORS middleware for progress endpoints
-@app.middleware("http")
-async def cors_progress_middleware(request: Request, call_next):
-    response = await call_next(request)
-    
-    # Add CORS headers for progress endpoints
-    if "generation-progress" in request.url.path:
-        response.headers["Access-Control-Allow-Origin"] = FRONTEND_URL
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Max-Age"] = "86400"
-    
     return response
 
 # Include API routers
@@ -102,16 +85,6 @@ async def emails_followup_options():
 
 @app.options("/api/emails/last-chance")
 async def emails_lastchance_options():
-    return Response(status_code=200)
-
-@app.options("/api/emails/generation-progress/{progress_id}")
-async def emails_generation_progress_options(progress_id: int):
-    """Handle OPTIONS request for generation progress endpoint"""
-    return Response(status_code=200)
-
-@app.options("/api/emails/generation-progress")
-async def emails_generation_progress_generic_options():
-    """Handle OPTIONS request for generic generation progress endpoint"""
     return Response(status_code=200)
 
 @app.options("/api/friends/list")
