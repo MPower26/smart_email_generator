@@ -67,6 +67,21 @@ async def https_redirect(request: Request, call_next):
     response = await call_next(request)
     return response
 
+# Add custom CORS middleware for progress endpoints
+@app.middleware("http")
+async def cors_progress_middleware(request: Request, call_next):
+    response = await call_next(request)
+    
+    # Add CORS headers for progress endpoints
+    if "generation-progress" in request.url.path:
+        response.headers["Access-Control-Allow-Origin"] = FRONTEND_URL
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Max-Age"] = "86400"
+    
+    return response
+
 # Include API routers
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(emails.router, prefix="/api/emails", tags=["Emails"])
