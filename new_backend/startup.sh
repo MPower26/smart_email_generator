@@ -7,6 +7,10 @@ export PYTHONUNBUFFERED=1
 export PORT=${PORT:-8000}
 export PYTHONPATH=/home/site/wwwroot
 
+# Configure Azure App Service timeout settings
+export WEBSITES_CONTAINER_START_TIME_LIMIT=1800  # 30 minutes
+export WEBSITES_ENABLE_APP_SERVICE_STORAGE=true
+
 # Print diagnostic information
 echo "Current directory: $(pwd)"
 echo "Directory contents: $(ls -la)"
@@ -32,7 +36,8 @@ echo "Starting FastAPI application with Gunicorn..."
 exec gunicorn --bind=0.0.0.0:$PORT \
     --workers=2 \
     --worker-class=uvicorn.workers.UvicornWorker \
-    --timeout=600 \
+    --timeout=1800 \
+    --keep-alive=5 \
     --max-requests=1000 \
     --max-requests-jitter=100 \
     --access-logfile=- \
