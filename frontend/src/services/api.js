@@ -117,8 +117,8 @@ export const emailService = {
   sendAllViaGmail: (stage) => api.post(`/api/emails/send_all_via_gmail/${stage}`),
   
   // Get email generation progress
-  getGenerationProgress: () => api.get('/api/emails/generation-progress'),
-  getGenerationProgressById: (progressId) => api.get(`/api/emails/generation-progress/${progressId}`),
+  getGenerationProgress: () => api.get('/api/emails/generation-progress', { timeout: 10000 }), // 10 second timeout
+  getGenerationProgressById: (progressId) => api.get(`/api/emails/generation-progress/${progressId}`, { timeout: 10000 }), // 10 second timeout
   
   // Delete email
   deleteEmail: (emailId) => api.delete(`/api/emails/${emailId}`),
