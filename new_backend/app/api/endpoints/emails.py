@@ -10,7 +10,6 @@ import os
 import uuid
 from fastapi import status
 from sqlalchemy import or_, and_, text
-import asyncio
 
 from app.db.database import get_db
 from app.models.models import GeneratedEmail, User, EmailTemplate, EmailGenerationProgress
@@ -502,110 +501,11 @@ async def get_generation_progress_by_id(
             "processed_contacts": progress.processed_contacts,
             "generated_emails": progress.generated_emails,
             "percentage": round(percentage, 1),
-            "group_id": progress.group_id,
-            "is_paused": progress.status == "paused",
-            "can_resume": progress.status in ["paused", "processing"],
-            "can_stop": progress.status in ["processing", "paused"]
+            "group_id": progress.group_id
         }
     except Exception as e:
         logger.error(f"Error in get_generation_progress_by_id for progress_id {progress_id}: {str(e)}")
         return {"status": "error", "error": str(e)}
-
-@router.post("/generation-progress/{progress_id}/pause")
-async def pause_generation(
-    progress_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Pause email generation for a specific progress ID."""
-    try:
-        progress = db.query(EmailGenerationProgress).filter(
-            EmailGenerationProgress.id == progress_id,
-            EmailGenerationProgress.user_id == current_user.id
-        ).first()
-
-        if not progress:
-            raise HTTPException(status_code=404, detail="Progress record not found")
-
-        if progress.status not in ["processing", "starting"]:
-            raise HTTPException(status_code=400, detail="Generation is not currently running")
-
-        progress.status = "paused"
-        progress.updated_at = datetime.utcnow()
-        db.commit()
-
-        logger.info(f"Email generation paused for progress_id {progress_id} by user {current_user.email}")
-        return {"message": "Email generation paused successfully", "status": "paused"}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error pausing generation for progress_id {progress_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to pause generation")
-
-@router.post("/generation-progress/{progress_id}/resume")
-async def resume_generation(
-    progress_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Resume email generation for a specific progress ID."""
-    try:
-        progress = db.query(EmailGenerationProgress).filter(
-            EmailGenerationProgress.id == progress_id,
-            EmailGenerationProgress.user_id == current_user.id
-        ).first()
-
-        if not progress:
-            raise HTTPException(status_code=404, detail="Progress record not found")
-
-        if progress.status != "paused":
-            raise HTTPException(status_code=400, detail="Generation is not currently paused")
-
-        progress.status = "processing"
-        progress.updated_at = datetime.utcnow()
-        db.commit()
-
-        logger.info(f"Email generation resumed for progress_id {progress_id} by user {current_user.email}")
-        return {"message": "Email generation resumed successfully", "status": "processing"}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error resuming generation for progress_id {progress_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to resume generation")
-
-@router.post("/generation-progress/{progress_id}/stop")
-async def stop_generation(
-    progress_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Stop email generation for a specific progress ID."""
-    try:
-        progress = db.query(EmailGenerationProgress).filter(
-            EmailGenerationProgress.id == progress_id,
-            EmailGenerationProgress.user_id == current_user.id
-        ).first()
-
-        if not progress:
-            raise HTTPException(status_code=404, detail="Progress record not found")
-
-        if progress.status not in ["processing", "paused", "starting"]:
-            raise HTTPException(status_code=400, detail="Generation is not currently running or paused")
-
-        progress.status = "stopped"
-        progress.updated_at = datetime.utcnow()
-        db.commit()
-
-        logger.info(f"Email generation stopped for progress_id {progress_id} by user {current_user.email}")
-        return {"message": "Email generation stopped successfully", "status": "stopped"}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error stopping generation for progress_id {progress_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to stop generation")
 
 async def generate_emails_background(
     contacts: List[Dict[str, Any]],
@@ -664,21 +564,6 @@ async def generate_emails_background(
         
         for contact in contacts:
             try:
-                # Check if generation has been paused or stopped
-                db.refresh(progress_record)
-                if progress_record.status == "paused":
-                    logger.info(f"Generation paused for progress_id {progress_id}. Waiting...")
-                    while progress_record.status == "paused":
-                        await asyncio.sleep(1)  # Wait 1 second before checking again
-                        db.refresh(progress_record)
-                        if progress_record.status == "stopped":
-                            logger.info(f"Generation stopped for progress_id {progress_id}. Exiting.")
-                            return
-                
-                if progress_record.status == "stopped":
-                    logger.info(f"Generation stopped for progress_id {progress_id}. Exiting.")
-                    return
-
                 contact_email = contact.get("Email")
                 if not contact_email or not contact.get("First Name"):
                     logger.warning(f"Skipping contact due to missing email or first name: {contact}")
