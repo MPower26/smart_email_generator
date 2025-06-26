@@ -261,4 +261,206 @@
   .step-icon {
     background: rgba(255, 255, 255, 0.1);
   }
+}
+
+/* Slot Machine Effect Styles */
+.slot-machine-container {
+  margin: 2rem 0;
+  text-align: center;
+}
+
+.slot-machine-message {
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.slot-machine-text {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #2c3e50;
+  animation: slotMachineSpin 0.15s ease-in-out;
+  background: linear-gradient(45deg, #667eea, #764ba2);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  padding: 1rem;
+  border-radius: 12px;
+  background: rgba(102, 126, 234, 0.1);
+  border: 2px solid rgba(102, 126, 234, 0.2);
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
+  transition: all 0.3s ease;
+}
+
+.slot-machine-text:hover {
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+  transform: translateY(-2px);
+}
+
+@keyframes slotMachineSpin {
+  0% {
+    transform: translateY(30px) scale(0.9);
+    opacity: 0;
+    filter: blur(2px);
+  }
+  25% {
+    transform: translateY(-8px) scale(1.05);
+    opacity: 0.6;
+    filter: blur(1px);
+  }
+  50% {
+    transform: translateY(-3px) scale(1.02);
+    opacity: 0.8;
+    filter: blur(0.5px);
+  }
+  75% {
+    transform: translateY(-1px) scale(1.01);
+    opacity: 0.9;
+    filter: blur(0.2px);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+.slot-machine-indicator {
+  margin-top: 1rem;
+}
+
+.slot-dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.slot-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e9ecef;
+  transition: all 0.3s ease;
+  animation: slotDotPulse 0.15s ease-in-out;
+}
+
+.slot-dot.active {
+  background: linear-gradient(45deg, #667eea, #764ba2);
+  transform: scale(1.3);
+  box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+}
+
+@keyframes slotDotPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.5);
+  }
+  100% {
+    transform: scale(1.3);
+  }
+}
+
+/* Enhanced slot machine text animation */
+.slot-machine-text {
+  position: relative;
+  overflow: hidden;
+}
+
+.slot-machine-text::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  animation: slotShimmer 0.5s ease-in-out;
+}
+
+@keyframes slotShimmer {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+/* Slot machine container animation */
+.slot-machine-container {
+  animation: slotContainerFade 0.3s ease-in-out;
+}
+
+@keyframes slotContainerFade {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Transition between slot machine and normal initialization */
+.initialization-steps {
+  animation: stepsFadeIn 0.5s ease-in-out;
+}
+
+@keyframes stepsFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive design for slot machine */
+@media (max-width: 768px) {
+  .slot-machine-text {
+    font-size: 1.1rem;
+    padding: 0.8rem;
+    min-height: 50px;
+  }
+  
+  .slot-dots {
+    gap: 0.3rem;
+  }
+  
+  .slot-dot {
+    width: 6px;
+    height: 6px;
+  }
+}
+
+/* Dark mode support for slot machine */
+@media (prefers-color-scheme: dark) {
+  .slot-machine-text {
+    background: rgba(102, 126, 234, 0.2);
+    border-color: rgba(102, 126, 234, 0.4);
+  }
+  
+  .slot-dot {
+    background: #4a5568;
+  }
+  
+  .slot-dot.active {
+    background: linear-gradient(45deg, #667eea, #764ba2);
+  }
 } 
