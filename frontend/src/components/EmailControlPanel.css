@@ -1,0 +1,247 @@
+.email-control-panel {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  margin-bottom: 1rem;
+}
+
+.email-control-panel:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.email-control-panel .card-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 12px 12px 0 0;
+  border: none;
+  padding: 1rem 1.5rem;
+}
+
+.email-control-panel .card-header h6 {
+  font-weight: 600;
+  margin: 0;
+}
+
+.email-control-panel .card-body {
+  padding: 1.5rem;
+}
+
+.control-status {
+  margin-bottom: 1.5rem;
+}
+
+.status-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.status-item:last-child {
+  border-bottom: none;
+}
+
+.status-label {
+  font-weight: 600;
+  color: #495057;
+}
+
+.status-value {
+  font-weight: 500;
+}
+
+.control-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.control-btn {
+  flex: 1;
+  min-width: 100px;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  border-width: 2px;
+}
+
+.control-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.control-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.control-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.control-btn.btn-outline-primary:hover:not(:disabled) {
+  background-color: #007bff;
+  border-color: #007bff;
+  color: white;
+}
+
+.control-btn.btn-outline-success:hover:not(:disabled) {
+  background-color: #28a745;
+  border-color: #28a745;
+  color: white;
+}
+
+.control-btn.btn-outline-danger:hover:not(:disabled) {
+  background-color: #dc3545;
+  border-color: #dc3545;
+  color: white;
+}
+
+.control-btn.btn-outline-secondary:hover:not(:disabled) {
+  background-color: #6c757d;
+  border-color: #6c757d;
+  color: white;
+}
+
+.control-info {
+  padding: 1rem;
+  background: rgba(0, 123, 255, 0.05);
+  border-radius: 8px;
+  border-left: 4px solid #007bff;
+}
+
+.control-info small {
+  line-height: 1.4;
+}
+
+/* Badge animations */
+.badge {
+  font-size: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 20px;
+  font-weight: 500;
+  animation: badgePulse 2s infinite;
+}
+
+@keyframes badgePulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.badge.bg-primary {
+  background: linear-gradient(45deg, #007bff, #0056b3) !important;
+}
+
+.badge.bg-success {
+  background: linear-gradient(45deg, #28a745, #1e7e34) !important;
+}
+
+.badge.bg-warning {
+  background: linear-gradient(45deg, #ffc107, #e0a800) !important;
+  color: #212529 !important;
+}
+
+.badge.bg-secondary {
+  background: linear-gradient(45deg, #6c757d, #545b62) !important;
+}
+
+.badge.bg-info {
+  background: linear-gradient(45deg, #17a2b8, #138496) !important;
+}
+
+.badge.bg-danger {
+  background: linear-gradient(45deg, #dc3545, #c82333) !important;
+}
+
+/* Alert styling */
+.alert {
+  border: none;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.alert-danger {
+  background: rgba(220, 53, 69, 0.1);
+  color: #721c24;
+  border-left: 4px solid #dc3545;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .control-buttons {
+    flex-direction: column;
+  }
+  
+  .control-btn {
+    min-width: auto;
+  }
+  
+  .status-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+  
+  .email-control-panel .card-body {
+    padding: 1rem;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .email-control-panel {
+    background: #2d3748;
+    color: #e2e8f0;
+  }
+  
+  .status-item {
+    border-bottom-color: #4a5568;
+  }
+  
+  .status-label {
+    color: #cbd5e0;
+  }
+  
+  .control-info {
+    background: rgba(0, 123, 255, 0.1);
+  }
+  
+  .alert-danger {
+    background: rgba(220, 53, 69, 0.2);
+    color: #feb2b2;
+  }
+}
+
+/* Loading animation for buttons */
+.control-btn:disabled {
+  position: relative;
+  overflow: hidden;
+}
+
+.control-btn:disabled::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  animation: loadingShimmer 1.5s infinite;
+}
+
+@keyframes loadingShimmer {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+} 
