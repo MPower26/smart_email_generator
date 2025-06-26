@@ -21,8 +21,6 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
   withCredentials: false,
-  timeout: 30000, // 30 seconds timeout for regular requests
-  maxRedirects: 5,
 });
 
 // Intercept requests: Log and enforce HTTPS
@@ -53,24 +51,10 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Add retry logic for failed requests
+// Intercept responses: Log errors
 api.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
-    
-    // Retry logic for network errors or 5xx errors
-    if ((error.code === 'ERR_NETWORK' || error.response?.status >= 500) && 
-        !originalRequest._retry && 
-        originalRequest.method !== 'post') {
-      originalRequest._retry = true;
-      
-      // Wait 1 second before retrying
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      return api(originalRequest);
-    }
-    
+  (error) => {
     console.error('[API] Error:', error?.response || error?.message || error);
     return Promise.reject(error);
   }
@@ -135,11 +119,6 @@ export const emailService = {
   // Get email generation progress
   getGenerationProgress: () => api.get('/api/emails/generation-progress'),
   getGenerationProgressById: (progressId) => api.get(`/api/emails/generation-progress/${progressId}`),
-  
-  // Control email generation
-  pauseGeneration: (progressId) => api.post(`/api/emails/generation-progress/${progressId}/pause`),
-  resumeGeneration: (progressId) => api.post(`/api/emails/generation-progress/${progressId}/resume`),
-  stopGeneration: (progressId) => api.post(`/api/emails/generation-progress/${progressId}/stop`),
   
   // Delete email
   deleteEmail: (emailId) => api.delete(`/api/emails/${emailId}`),
