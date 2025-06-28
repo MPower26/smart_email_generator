@@ -86,6 +86,8 @@ const GenerateEmailsPage = () => {
 
   const [generationStartTime, setGenerationStartTime] = useState(null);
 
+  const hasStartedReceivingProgressRef = useRef(false);
+
   // Load emails by stage - moved before functions that reference it
   const loadEmailsByStage = async () => {
     setLoadingEmails(true);
@@ -250,12 +252,8 @@ const GenerateEmailsPage = () => {
         console.warn("pollProgress called without a progressId.");
         return;
       }
-      
-      console.log(`Polling progress for ID: ${progressId}`);
       const response = await emailService.getGenerationProgressById(progressId);
       const progress = response.data;
-      
-      console.log(`Progress response:`, progress);
 
       // Reset retry count on successful request
       pollingRetryCountRef.current = 0;
@@ -270,9 +268,8 @@ const GenerateEmailsPage = () => {
         eta = (progress.total_contacts - progress.generated_emails) / Math.max(0.1, speed);
       }
 
-      // Update progress display - use generated_emails for real-time progress
-      if (progress.status === 'processing') {
-        console.log(`Progress: ${progress.generated_emails}/${progress.total_contacts} (${((progress.generated_emails / progress.total_contacts) * 100).toFixed(1)}%)`);
+      // Only stop polling when status is completed AND all emails are generated
+      if (progress.status === 'processing' || (progress.status === 'completed' && progress.generated_emails < progress.total_contacts)) {
         setGenerationProgress({
           type: 'generation',
           current: progress.generated_emails,
@@ -282,17 +279,9 @@ const GenerateEmailsPage = () => {
           eta,
           status: progress.status
         });
-        // Continue polling
-      } else if (progress.status === 'completed') {
-        console.log(`Generation completed: ${progress.generated_emails}/${progress.total_contacts} emails generated`);
-        // Job is complete, show final progress
-        setGenerationProgress(prev => ({ 
-          ...prev, 
-          current: progress.total_contacts, 
-          status: 'completed', 
-          speed, 
-          eta 
-        }));
+        // Do not stop polling
+      } else if (progress.status === 'completed' && progress.generated_emails >= progress.total_contacts) {
+        setGenerationProgress(prev => ({ ...prev, current: prev.total, status: 'completed', speed, eta }));
         stopProgressPolling();
         setTimeout(() => {
           setIsGenerating(false);
@@ -300,7 +289,6 @@ const GenerateEmailsPage = () => {
           setActiveTab('outreach');
         }, 1500);
       } else if (progress.status === 'error' || (progress.status === 'idle' && isGenerating)) {
-        console.error(`Generation error: ${progress.error_message || 'Unknown error'}`);
         setGenerationProgress(prev => ({ ...prev, status: 'error' }));
         setError(`Email generation failed: ${progress.error_message || 'Unknown error'}`);
         stopProgressPolling();
@@ -308,6 +296,12 @@ const GenerateEmailsPage = () => {
       } else if (progress.status === 'not_found') {
         // This is okay on the first 1-2 polls, just means the backend is setting up.
         console.log("Progress record not found yet, will retry...");
+      }
+
+      // Force refresh when first valid progress arrives
+      if (progress.generated_emails > 0 && !hasStartedReceivingProgressRef.current) {
+        hasStartedReceivingProgressRef.current = true;
+        loadEmailsByStage(); // Soft refresh
       }
     } catch (error) {
       console.error("Progress polling error:", error);
@@ -909,4 +903,3 @@ const GenerateEmailsPage = () => {
 };
 
 export default GenerateEmailsPage; 
-
