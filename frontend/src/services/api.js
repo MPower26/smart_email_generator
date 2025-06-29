@@ -231,4 +231,25 @@ export const userService = {
   },
 };
 
+export const attachmentService = {
+  // Upload attachment (image/video)
+  uploadAttachment: (file, placeholder, category = null) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('placeholder', placeholder);
+    if (category) formData.append('category', category);
+    return api.post('/api/templates/attachments/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+  // List attachments
+  listAttachments: () => api.get('/api/templates/attachments'),
+  // Delete attachment
+  deleteAttachment: (attachmentId) => api.delete(`/api/templates/attachments/${attachmentId}`),
+  // Resolve placeholder
+  resolvePlaceholder: (placeholder) => api.get(`/api/templates/attachments/resolve/${placeholder}`),
+};
+
 export default api;
