@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Container, Card, Form, Button, Alert, Modal, Tabs, Tab, Accordion, Badge, OverlayTrigger, Tooltip } from 'react-bootstrap';
-import { templateService, userService } from '../services/api';
+import { templateService, userService, attachmentService } from '../services/api';
 import { UserContext } from '../contexts/UserContext';
 
 const TemplatesPage = () => {
@@ -45,10 +45,20 @@ const TemplatesPage = () => {
     'Your Company': 'Tech Solutions Inc.'
   };
 
+  // Attachment state
+  const [attachments, setAttachments] = useState([]);
+  const [attachmentFile, setAttachmentFile] = useState(null);
+  const [attachmentPlaceholder, setAttachmentPlaceholder] = useState('');
+  const [attachmentCategory, setAttachmentCategory] = useState('');
+  const [attachmentLoading, setAttachmentLoading] = useState(false);
+  const [attachmentError, setAttachmentError] = useState('');
+  const [attachmentSuccess, setAttachmentSuccess] = useState('');
+
   // Charger les templates au chargement de la page
   useEffect(() => {
     loadTemplates();
     loadSignature();
+    loadAttachments();
   }, []);
 
   // Load user signature
@@ -65,6 +75,16 @@ const TemplatesPage = () => {
   useEffect(() => {
     loadSignature();
   }, [userProfile]);
+
+  // Load attachments on mount
+  const loadAttachments = async () => {
+    try {
+      const res = await attachmentService.listAttachments();
+      setAttachments(res.data);
+    } catch (err) {
+      setAttachmentError('Failed to load attachments.');
+    }
+  };
 
   // Fonction pour charger les templates
   const loadTemplates = async () => {
@@ -305,6 +325,47 @@ const TemplatesPage = () => {
     return preview;
   };
 
+  // Handle file select
+  const handleAttachmentFile = (e) => {
+    setAttachmentFile(e.target.files[0]);
+  };
+
+  // Handle upload
+  const handleUploadAttachment = async (e) => {
+    e.preventDefault();
+    setAttachmentLoading(true);
+    setAttachmentError('');
+    setAttachmentSuccess('');
+    try {
+      if (!attachmentFile || !attachmentPlaceholder) {
+        setAttachmentError('File and placeholder are required.');
+        setAttachmentLoading(false);
+        return;
+      }
+      await attachmentService.uploadAttachment(attachmentFile, attachmentPlaceholder, attachmentCategory);
+      setAttachmentSuccess('Attachment uploaded!');
+      setAttachmentFile(null);
+      setAttachmentPlaceholder('');
+      setAttachmentCategory('');
+      await loadAttachments();
+    } catch (err) {
+      setAttachmentError(err.response?.data?.detail || 'Failed to upload attachment.');
+    } finally {
+      setAttachmentLoading(false);
+    }
+  };
+
+  // Handle delete
+  const handleDeleteAttachment = async (id) => {
+    if (!window.confirm('Delete this attachment?')) return;
+    try {
+      await attachmentService.deleteAttachment(id);
+      await loadAttachments();
+    } catch (err) {
+      setAttachmentError('Failed to delete attachment.');
+    }
+  };
+
   // Render template card
   const renderTemplateCard = (template) => (
     <Card key={template.id} className="mb-3">
@@ -542,6 +603,69 @@ Your signature text here..."
                 </Card.Body>
               </Card>
             )}
+          </Accordion.Body>
+        </Accordion.Item>
+      </Accordion>
+      
+      {/* Attachment Section */}
+      <Accordion className="mt-4">
+        <Accordion.Item eventKey="attachments">
+          <Accordion.Header>
+            <div className="d-flex justify-content-between align-items-center w-100 me-3">
+              <span>Attachments</span>
+              <Badge bg="info">Images & Videos for Templates</Badge>
+            </div>
+          </Accordion.Header>
+          <Accordion.Body>
+            <p className="text-muted mb-3">
+              Upload images or videos and assign a placeholder name. In your template, use <code>[YourPlaceholder]</code> to insert the file. E.g., <code>[LogoImage]</code>.<br/>
+              <strong>Accepted:</strong> JPG, PNG, GIF, MP4, MOV, AVI, WMV, MKV, WEBM. Max 20MB each.
+            </p>
+            {attachmentError && <Alert variant="danger">{attachmentError}</Alert>}
+            {attachmentSuccess && <Alert variant="success" onClose={() => setAttachmentSuccess('')} dismissible>{attachmentSuccess}</Alert>}
+            <Form onSubmit={handleUploadAttachment} className="mb-3">
+              <Form.Group className="mb-2">
+                <Form.Label>File</Form.Label>
+                <Form.Control type="file" accept="image/*,video/*" onChange={handleAttachmentFile} />
+              </Form.Group>
+              <Form.Group className="mb-2">
+                <Form.Label>Placeholder</Form.Label>
+                <Form.Control type="text" value={attachmentPlaceholder} onChange={e => setAttachmentPlaceholder(e.target.value)} placeholder="e.g. LogoImage" required />
+                <Form.Text className="text-muted">Use this placeholder in your template: <code>[{attachmentPlaceholder || 'YourPlaceholder'}]</code></Form.Text>
+              </Form.Group>
+              <Form.Group className="mb-2">
+                <Form.Label>Category (optional)</Form.Label>
+                <Form.Control type="text" value={attachmentCategory} onChange={e => setAttachmentCategory(e.target.value)} placeholder="e.g. branding" />
+              </Form.Group>
+              <Button type="submit" variant="primary" disabled={attachmentLoading}>{attachmentLoading ? 'Uploading...' : 'Upload Attachment'}</Button>
+            </Form>
+            {/* List attachments */}
+            <div className="mt-3">
+              {attachments.length === 0 ? (
+                <Alert variant="info">No attachments uploaded yet.</Alert>
+              ) : (
+                <div className="row">
+                  {attachments.map(att => (
+                    <div className="col-md-4 mb-3" key={att.id}>
+                      <Card>
+                        <Card.Body>
+                          <div className="mb-2">
+                            {att.file_type === 'image' ? (
+                              <img src={att.blob_url} alt={att.placeholder} style={{ maxWidth: '100%', maxHeight: 120 }} />
+                            ) : (
+                              <video src={att.blob_url} controls style={{ maxWidth: '100%', maxHeight: 120 }} />
+                            )}
+                          </div>
+                          <div><strong>Placeholder:</strong> <code>[{att.placeholder}]</code></div>
+                          {att.category && <div><strong>Category:</strong> {att.category}</div>}
+                          <Button variant="outline-danger" size="sm" className="mt-2" onClick={() => handleDeleteAttachment(att.id)}>Delete</Button>
+                        </Card.Body>
+                      </Card>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </Accordion.Body>
         </Accordion.Item>
       </Accordion>
