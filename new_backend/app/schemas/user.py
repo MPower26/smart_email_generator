@@ -1,5 +1,6 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_serializer
 from typing import List, Optional
+from datetime import datetime
 
 class AttachmentBase(BaseModel):
     id: int
@@ -8,7 +9,14 @@ class AttachmentBase(BaseModel):
     placeholder: str
     file_type: str
     category: Optional[str] = None
-    created_at: Optional[str] = None
+    created_at: Optional[datetime] = None
+    
+    @field_serializer('created_at')
+    def serialize_created_at(self, value: Optional[datetime]) -> Optional[str]:
+        if value is None:
+            return None
+        return value.isoformat()
+    
     class Config:
         from_attributes = True
 
