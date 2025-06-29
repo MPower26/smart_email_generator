@@ -88,6 +88,11 @@ const GenerateEmailsPage = () => {
 
   const hasStartedReceivingProgressRef = useRef(false);
 
+  const [warmingUp, setWarmingUp] = useState(false);
+  const [warmingUpTimer, setWarmingUpTimer] = useState(15);
+  const warmingUpIntervalRef = useRef(null);
+  const progressSectionRef = useRef(null);
+
   // Load emails by stage - moved before functions that reference it
   const loadEmailsByStage = async () => {
     setLoadingEmails(true);
@@ -412,25 +417,52 @@ const GenerateEmailsPage = () => {
     console.log('Profile in localStorage:', storedProfile ? JSON.parse(storedProfile) : null);
   }, [userProfile]);
 
+  // Warming up effect
+  useEffect(() => {
+    if (warmingUp) {
+      setWarmingUpTimer(15);
+      warmingUpIntervalRef.current = setInterval(() => {
+        setWarmingUpTimer(prev => {
+          if (prev <= 1) {
+            clearInterval(warmingUpIntervalRef.current);
+            // After timer, refresh and scroll to progress
+            window.location.reload();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      if (warmingUpIntervalRef.current) clearInterval(warmingUpIntervalRef.current);
+    }
+    return () => {
+      if (warmingUpIntervalRef.current) clearInterval(warmingUpIntervalRef.current);
+    };
+  }, [warmingUp]);
+
+  // Scroll to progress section after reload
+  useEffect(() => {
+    if (window.location.hash === '#progress-section' && progressSectionRef.current) {
+      progressSectionRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, []);
+
   // Generate emails
   const handleGenerateEmails = async () => {
     if (!file) {
       setError('Please select a CSV file to upload.');
       return;
     }
-
     setLoading(true);
     setError('');
-    setPreRequisiteError(''); // Clear previous prerequisite errors
-    setIsGenerating(true); // Immediately show the progress view
-    
+    setPreRequisiteError('');
+    setIsGenerating(true);
+    setWarmingUp(true); // Start warming up
     // Reset progress trackers
     setUploadProgress(prev => ({ ...prev, status: 'processing', current: 0, total: file.size, startTime: Date.now() }));
     setGenerationProgress(prev => ({ ...prev, status: 'processing', current: 0, total: 0 }));
     setSendingProgress(prev => ({ ...prev, status: 'idle', current: 0, total: 0 }));
-
     setGenerationStartTime(Date.now());
-
     try {
       const response = await emailService.generateEmails(
         file,
@@ -446,9 +478,7 @@ const GenerateEmailsPage = () => {
           }));
         }
       );
-      
       setUploadProgress(prev => ({ ...prev, status: 'completed', current: prev.total }));
-      
       setGenerationProgress({
         type: 'generation',
         current: 0,
@@ -457,24 +487,22 @@ const GenerateEmailsPage = () => {
         status: 'starting'
       });
       setIsGenerating(true);
-      setCurrentProgressId(response.data.progress_id); // <-- Store the specific ID
-      startProgressPolling(response.data.progress_id); // <-- Pass ID to start polling
-
+      setCurrentProgressId(response.data.progress_id);
+      // Instead of starting polling, let the warming up timer handle the refresh
+      // window.location.hash = '#progress-section';
     } catch (err) {
-      // Handle the new prerequisite error
       if (err.response && err.response.status === 412) {
-          setPreRequisiteError(err.response.data.detail);
-          setIsGenerating(false); // Stop the loading state
+        setPreRequisiteError(err.response.data.detail);
+        setIsGenerating(false);
       } else {
-      const errorMessage = err.response?.data?.detail || 'An unexpected error occurred during email generation.';
-      setError(errorMessage);
-      console.error('Email generation failed:', err);
+        const errorMessage = err.response?.data?.detail || 'An unexpected error occurred during email generation.';
+        setError(errorMessage);
+        console.error('Email generation failed:', err);
       }
-      
       setUploadProgress(prev => ({ ...prev, status: 'error' }));
       setGenerationProgress(prev => ({ ...prev, status: 'error' }));
-      setIsGenerating(false); // Hide progress on immediate failure
-
+      setIsGenerating(false);
+      setWarmingUp(false);
     } finally {
       setLoading(false);
     }
@@ -898,6 +926,35 @@ const GenerateEmailsPage = () => {
           </Card>
         </Tab>
       </Tabs>
+      {/* Progress Section Anchor */}
+      <div ref={progressSectionRef} id="progress-section"></div>
+      {/* Warming Up UI */}
+      {warmingUp ? (
+        <div className="warming-up-container text-center my-4">
+          <div className="warming-up-effect">
+            <h3>🤖 AI is warming up, hang on a sec...</h3>
+            <div className="warming-up-timer" style={{ fontSize: '2rem', margin: '1rem 0' }}>{warmingUpTimer}s</div>
+            <div className="warming-up-bar" style={{ width: '100%', height: '8px', background: '#eee', borderRadius: '4px', overflow: 'hidden', margin: '0 auto', maxWidth: '400px' }}>
+              <div style={{ width: `${(15-warmingUpTimer)/15*100}%`, height: '100%', background: 'linear-gradient(90deg, #D8400D, #ffb347)', transition: 'width 1s' }}></div>
+            </div>
+            <div style={{ marginTop: '1rem', color: '#888' }}>
+              <em>Preparing your personalized emails...</em>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          {uploadProgress.status !== 'idle' && (
+            <ProgressTracker {...uploadProgress} />
+          )}
+          {generationProgress && (
+            <ProgressTracker {...generationProgress} />
+          )}
+          {sendingProgress.status !== 'idle' && (
+            <ProgressTracker {...sendingProgress} />
+          )}
+        </>
+      )}
     </Container>
   );
 };
