@@ -1,11 +1,47 @@
 import os
 import uuid
+import time
 from typing import Optional
 from azure.storage.blob import BlobServiceClient, ContentSettings
 from fastapi import HTTPException
 import logging
 
 logger = logging.getLogger(__name__)
+
+def format_file_size(size_bytes: int) -> str:
+    """Format file size in human readable format"""
+    if size_bytes == 0:
+        return "0B"
+    size_names = ["B", "KB", "MB", "GB"]
+    i = 0
+    while size_bytes >= 1024 and i < len(size_names) - 1:
+        size_bytes /= 1024.0
+        i += 1
+    return f"{size_bytes:.1f}{size_names[i]}"
+
+def format_speed(bytes_per_second: float) -> str:
+    """Format transfer speed in human readable format"""
+    if bytes_per_second == 0:
+        return "0 B/s"
+    speed_names = ["B/s", "KB/s", "MB/s", "GB/s"]
+    i = 0
+    while bytes_per_second >= 1024 and i < len(speed_names) - 1:
+        bytes_per_second /= 1024.0
+        i += 1
+    return f"{bytes_per_second:.1f} {speed_names[i]}"
+
+def format_time(seconds: float) -> str:
+    """Format time in human readable format"""
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+    elif seconds < 3600:
+        minutes = int(seconds // 60)
+        remaining_seconds = seconds % 60
+        return f"{minutes}m {remaining_seconds:.0f}s"
+    else:
+        hours = int(seconds // 3600)
+        remaining_minutes = int((seconds % 3600) // 60)
+        return f"{hours}h {remaining_minutes}m"
 
 class BlobStorageService:
     def __init__(self):
@@ -53,10 +89,19 @@ class BlobStorageService:
                 detail="Blob storage not configured. Please set AZURE_STORAGE_CONNECTION_STRING environment variable."
             )
         
+        file_size = len(file_content)
+        start_time = time.time()
+        
         try:
+            logger.info(f"🚀 Starting signature image upload for user: {user_email}")
+            logger.info(f"📁 File size: {format_file_size(file_size)}")
+            logger.info(f"📊 Estimated upload time: {self._estimate_upload_time(file_size)}")
+            
             # Generate unique filename
             filename = f"{user_email}_{uuid.uuid4()}{file_extension}"
             blob_name = f"signatures/{filename}"
+            
+            logger.info(f"📝 Generated blob name: {blob_name}")
             
             # Get blob client
             blob_client = self.client.get_blob_client(
@@ -66,19 +111,39 @@ class BlobStorageService:
             
             # Determine content type based on file extension
             content_type = self._get_content_type(file_extension)
+            logger.info(f"🎯 Content type: {content_type}")
             
             # Upload the file
+            logger.info("⏳ Starting blob upload to Azure...")
+            upload_start = time.time()
+            
             blob_client.upload_blob(
                 file_content,
                 content_settings=ContentSettings(content_type=content_type),
-                overwrite=True
+                overwrite=True,
+                timeout=300  # 5 minutes timeout
             )
+            
+            upload_duration = time.time() - upload_start
+            total_duration = time.time() - start_time
+            speed = file_size / upload_duration if upload_duration > 0 else 0
+            
+            logger.info(f"✅ Signature image upload completed successfully!")
+            logger.info(f"📈 Upload statistics:")
+            logger.info(f"   • Duration: {format_time(upload_duration)}")
+            logger.info(f"   • Speed: {format_speed(speed)}")
+            logger.info(f"   • Total time: {format_time(total_duration)}")
+            logger.info(f"🔗 URL: {blob_client.url}")
             
             # Return the public URL
             return blob_client.url
             
         except Exception as e:
-            logger.error(f"Failed to upload signature image: {str(e)}")
+            elapsed_time = time.time() - start_time
+            logger.error(f"❌ Failed to upload signature image for user {user_email}")
+            logger.error(f"📊 Upload failed after {format_time(elapsed_time)}")
+            logger.error(f"📁 File size: {format_file_size(file_size)}, extension: {file_extension}")
+            logger.error(f"💥 Error: {str(e)}")
             raise HTTPException(
                 status_code=500, 
                 detail=f"Failed to upload image: {str(e)}"
@@ -93,26 +158,68 @@ class BlobStorageService:
                 status_code=500,
                 detail="Blob storage not configured. Please set AZURE_STORAGE_CONNECTION_STRING environment variable."
             )
+        
+        file_size = len(file_content)
+        start_time = time.time()
+        
         try:
+            logger.info(f"🚀 Starting attachment upload for user: {user_email}")
+            logger.info(f"📁 File size: {format_file_size(file_size)}")
+            logger.info(f"📊 Estimated upload time: {self._estimate_upload_time(file_size)}")
+            
             filename = f"{user_email}_{uuid.uuid4()}{file_extension}"
             blob_name = f"attachments/{filename}"
+            
+            logger.info(f"📝 Generated blob name: {blob_name}")
+            
             blob_client = self.client.get_blob_client(
                 container=self.container_name,
                 blob=blob_name
             )
+            
             content_type = self._get_content_type(file_extension)
+            logger.info(f"🎯 Content type: {content_type}")
+            
+            # Upload with timeout and progress logging
+            logger.info("⏳ Starting blob upload to Azure...")
+            upload_start = time.time()
+            
             blob_client.upload_blob(
                 file_content,
                 content_settings=ContentSettings(content_type=content_type),
-                overwrite=True
+                overwrite=True,
+                timeout=300  # 5 minutes timeout
             )
+            
+            upload_duration = time.time() - upload_start
+            total_duration = time.time() - start_time
+            speed = file_size / upload_duration if upload_duration > 0 else 0
+            
+            logger.info(f"✅ Upload completed successfully!")
+            logger.info(f"📈 Upload statistics:")
+            logger.info(f"   • Duration: {format_time(upload_duration)}")
+            logger.info(f"   • Speed: {format_speed(speed)}")
+            logger.info(f"   • Total time: {format_time(total_duration)}")
+            logger.info(f"🔗 URL: {blob_client.url}")
+            
             return blob_client.url
+            
         except Exception as e:
-            logger.error(f"Failed to upload attachment: {str(e)}")
+            elapsed_time = time.time() - start_time
+            logger.error(f"❌ Failed to upload attachment for user {user_email}")
+            logger.error(f"📊 Upload failed after {format_time(elapsed_time)}")
+            logger.error(f"📁 File size: {format_file_size(file_size)}, extension: {file_extension}")
+            logger.error(f"💥 Error: {str(e)}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to upload attachment: {str(e)}"
             )
+    
+    def _estimate_upload_time(self, file_size: int) -> str:
+        """Estimate upload time based on file size"""
+        # Assume average speed of 1 MB/s for estimation
+        estimated_seconds = file_size / (1024 * 1024)  # 1 MB/s
+        return format_time(estimated_seconds)
     
     def _get_content_type(self, file_extension: str) -> str:
         """Get the content type based on file extension"""
