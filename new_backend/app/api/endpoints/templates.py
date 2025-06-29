@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from datetime import datetime
 import os
+import logging
+import time
 
 from app.db.database import get_db
 from app.models.models import EmailTemplate, User, Attachment
@@ -302,20 +304,51 @@ async def upload_attachment(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    logger = logging.getLogger(__name__)
+    
+    start_time = time.time()
+    
+    logger.info(f"🎯 Starting attachment upload for user: {current_user.email}")
+    logger.info(f"📁 File: {file.filename}")
+    logger.info(f"📊 Size: {file.size} bytes ({file.size / (1024*1024):.1f} MB)")
+    logger.info(f"🎬 Type: {file.content_type}")
+    logger.info(f"🏷️  Placeholder: {placeholder}")
+    if category:
+        logger.info(f"📂 Category: {category}")
+    
     # Validate file type (image/video)
     allowed_types = ["image/", "video/"]
     if not any(file.content_type.startswith(t) for t in allowed_types):
+        logger.warning(f"❌ Invalid file type: {file.content_type}")
         raise HTTPException(status_code=400, detail="File must be an image or video")
+    
     # Validate file size (max 20MB)
-    if file.size > 20 * 1024 * 1024:
+    max_size = 20 * 1024 * 1024  # 20MB
+    if file.size > max_size:
+        logger.warning(f"❌ File too large: {file.size} bytes ({file.size / (1024*1024):.1f} MB) > {max_size / (1024*1024)} MB")
         raise HTTPException(status_code=400, detail="File size must be < 20MB")
+    
     # Only allow one placeholder per user
     existing = db.query(Attachment).filter_by(user_id=current_user.id, placeholder=placeholder).first()
     if existing:
+        logger.warning(f"❌ Placeholder already exists: {placeholder}")
         raise HTTPException(status_code=400, detail="Placeholder already exists for this user")
+    
+    logger.info("📖 Reading file content...")
+    read_start = time.time()
     content = await file.read()
+    read_duration = time.time() - read_start
+    logger.info(f"✅ File content read: {len(content)} bytes in {read_duration:.2f}s")
+    
     file_extension = os.path.splitext(file.filename)[1]
+    logger.info(f"📝 File extension: {file_extension}")
+    
+    logger.info("☁️  Starting Azure Blob Storage upload...")
+    blob_start = time.time()
     blob_url = await blob_storage_service.upload_attachment(content, file_extension, current_user.email)
+    blob_duration = time.time() - blob_start
+    logger.info(f"✅ Blob upload completed in {blob_duration:.2f}s")
+    
     file_type = "image" if file.content_type.startswith("image/") else "video"
     attachment = Attachment(
         user_id=current_user.id,
@@ -325,9 +358,21 @@ async def upload_attachment(
         file_type=file_type,
         category=category
     )
+    
+    logger.info("💾 Saving attachment to database...")
+    db_start = time.time()
     db.add(attachment)
     db.commit()
     db.refresh(attachment)
+    db_duration = time.time() - db_start
+    logger.info(f"✅ Database save completed in {db_duration:.2f}s")
+    
+    total_duration = time.time() - start_time
+    logger.info(f"🎉 Attachment upload completed successfully!")
+    logger.info(f"📈 Total processing time: {total_duration:.2f}s")
+    logger.info(f"👤 User: {current_user.email}")
+    logger.info(f"🏷️  Placeholder: [{placeholder}]")
+    
     return {"message": "Attachment uploaded", "blob_url": blob_url}
 
 @router.get("/attachments", response_model=List[AttachmentOut])
@@ -349,4 +394,3 @@ async def resolve_placeholder(placeholder: str, current_user: User = Depends(get
     if not attachment:
         raise HTTPException(status_code=404, detail="Placeholder not found")
     return {"blob_url": attachment.blob_url} 
-
