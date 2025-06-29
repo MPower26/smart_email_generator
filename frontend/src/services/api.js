@@ -232,17 +232,25 @@ export const userService = {
 };
 
 export const attachmentService = {
-  // Upload attachment (image/video)
-  uploadAttachment: (file, placeholder, category = null) => {
+  // Upload attachment (image/video) with progress support
+  uploadAttachment: (file, placeholder, category = null, onUploadProgress = null) => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('placeholder', placeholder);
     if (category) formData.append('category', category);
-    return api.post('/api/templates/attachments/upload', formData, {
+    
+    const config = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
-    });
+    };
+    
+    // Add progress callback if provided
+    if (onUploadProgress) {
+      config.onUploadProgress = onUploadProgress;
+    }
+    
+    return api.post('/api/templates/attachments/upload', formData, config);
   },
   // List attachments
   listAttachments: () => api.get('/api/templates/attachments'),
