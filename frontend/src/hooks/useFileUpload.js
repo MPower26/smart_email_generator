@@ -113,8 +113,15 @@ export const useFileUpload = (onSuccess = null, onError = null) => {
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
     let uploadedBytes = 0;
     
-    console.log(`📦 Starting chunked upload: ${totalChunks} chunks of ${CHUNK_SIZE / (1024 * 1024)}MB each`);
+    // Generate unique upload_id for this file
+    const upload_id = uuidv4();
+    const file_extension = file.name.split('.').pop();
+    const original_filename = file.name;
     
+    console.log(`📦 Starting chunked upload: ${totalChunks} chunks of ${CHUNK_SIZE / (1024 * 1024)}MB each`);
+    console.log(`🆔 Upload ID: ${upload_id}`);
+    
+    // Upload all chunks first
     for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
       const start = chunkIndex * CHUNK_SIZE;
       const end = Math.min(start + CHUNK_SIZE, file.size);
@@ -127,11 +134,14 @@ export const useFileUpload = (onSuccess = null, onError = null) => {
         type: file.type
       });
       
-      // Upload this chunk
-      await attachmentService.uploadAttachment(
+      // Upload this chunk using the new endpoint
+      await attachmentService.uploadChunk(
         chunkFile,
-        `${placeholder}_chunk_${chunkIndex}`,
-        category,
+        upload_id,
+        chunkIndex,
+        totalChunks,
+        original_filename,
+        file_extension,
         (evt) => {
           // Calculate overall progress including previous chunks
           const chunkProgress = (evt.loaded / evt.total) * (CHUNK_SIZE / file.size);
@@ -170,7 +180,19 @@ export const useFileUpload = (onSuccess = null, onError = null) => {
       }
     }
     
-    console.log(`✅ Chunked upload completed: ${uploadedBytes / (1024 * 1024)}MB uploaded`);
+    console.log(`✅ All chunks uploaded, now assembling...`);
+    
+    // Now assemble all chunks into a single file
+    await attachmentService.assembleChunks(
+      upload_id,
+      totalChunks,
+      original_filename,
+      file_extension,
+      placeholder,
+      category
+    );
+    
+    console.log(`🎉 File assembly completed: ${uploadedBytes / (1024 * 1024)}MB uploaded and assembled`);
   };
 
   const reset = () => {
