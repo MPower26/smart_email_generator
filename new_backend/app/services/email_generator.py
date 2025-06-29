@@ -359,19 +359,17 @@ class EmailGenerator:
         user: User,
         template: Optional[EmailTemplate] = None
     ) -> GeneratedEmail:
-        """Generate a personalized follow-up email"""
-        
+        """Generate a personalized follow-up email using AI, always rewriting the template if present."""
+        logger = logging.getLogger(__name__)
         # Check if a follow-up already exists for this recipient
         existing_followup = self.db.query(GeneratedEmail).filter(
             GeneratedEmail.recipient_email == original_email.recipient_email,
             GeneratedEmail.stage == "followup",
             GeneratedEmail.user_id == user.id
         ).first()
-        
         if existing_followup:
             logger.warning(f"Follow-up already exists for {original_email.recipient_email}, skipping generation")
             return existing_followup
-        
         # If no template provided, try to get the default template for followup category
         if not template:
             template = self.db.query(EmailTemplate).filter(
@@ -379,133 +377,89 @@ class EmailGenerator:
                 EmailTemplate.category == "followup",
                 EmailTemplate.is_default == True
             ).first()
-
-        # --- Stricter Template Logic ---
         if not template:
             raise ValueError("Cannot generate follow-up: No default follow-up template found.")
-
         # Extract information from the original email
         recipient_name = original_email.recipient_name
         recipient_company = original_email.recipient_company
         recipient_email = original_email.recipient_email
-        
-        # If we have a template, use it instead of AI generation
-        if template:
-            # Use the template content and personalize it
-            content = template.content
-            
-            # Replace placeholders with actual data
-            content = content.replace("[Recipient Name]", recipient_name)
-            content = content.replace("[Company Name]", recipient_company)
+        # Always use AI rewriting, using the template as a base
+        template_content = template.content
+        template_content = template_content.replace("[Recipient Name]", recipient_name)
+        template_content = template_content.replace("[Company Name]", recipient_company)
+        template_content = template_content.replace("[Your Name]", user.full_name if user.full_name else "[Your Name]")
+        template_content = template_content.replace("[Your Position]", user.position if user.position else "[Your Position]")
+        template_content = template_content.replace("[Your Company]", user.company_name if user.company_name else "[Your Company]")
+        prompt = f"""
+        Rewrite this follow-up email template in the same style without syntax or grammatical mistakes, using the information and names in the list given to you. Personalize it based on the recipient's information and company details.
+        Template to rewrite:
+        {template_content}
+        Recipient Information:
+        Name: {recipient_name}
+        Company: {recipient_company}
+        Email: {recipient_email}
+        Original Email Subject: {original_email.subject}
+        Original Email Content: {original_email.content}
+        Sender Information:
+        Name: {user.full_name if user.full_name else '[Your Name]'}
+        Position: {user.position if user.position else '[Your Position]'}
+        Company: {user.company_name if user.company_name else '[Your Company]'}
+        Company Description: {user.company_description if user.company_description else '[brief description of company]'}
+        Stage: followup
+        Please:
+        1. Maintain the same tone and style as the template
+        2. Personalize it with the recipient's specific information
+        3. Incorporate relevant details if available
+        4. Ensure proper grammar and syntax
+        5. Keep the same structure and flow as the original template
+        6. If a company description is provided, use it to explain how your company's offerings align with the recipient's needs
+        7. Do not use any markdown formatting (like ** or *) in the email content
+        8. Avoid using em dashes (—) - use regular dashes (-) or other appropriate punctuation instead
+        9. DO NOT let variables like [Your Name] or [Your Position] be in the email content. Always use the data given to you about sender and recipient.
+        10. DO NOT add a written signature to the email if not present in the given prompt.
+        """
+        try:
+            response = self.client.chat.completions.create(
+                model=AZURE_DEPLOYMENT_NAME,
+                messages=[
+                    {"role": "system", "content": "You are an expert email writer specializing in professional follow-up emails. Create emails that add value and feel natural, not pushy. Do not use any markdown formatting (like ** or *) in the email content."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=1000
+            )
+            generated_content = response.choices[0].message.content
+            # Extract subject from first line of content and remove "Subject: " prefix if present
+            content_lines = generated_content.split('\n')
+            subject = content_lines[0].strip()
+            if subject.lower().startswith("subject: "):
+                subject = subject[9:].strip()
+            # Find the "Best regards" line and remove everything after it
+            content = []
+            for line in content_lines[1:]:
+                if line.strip().lower() == "best regards,":
+                    break
+                content.append(line)
+            content = '\n'.join(content).strip()
+            # Remove any markdown formatting
+            content = content.replace("**", "")
+            # Replace placeholders with user information if available
             content = content.replace("[Your Name]", user.full_name if user.full_name else "[Your Name]")
             content = content.replace("[Your Position]", user.position if user.position else "[Your Position]")
             content = content.replace("[Your Company]", user.company_name if user.company_name else "[Your Company]")
-            
-            # Extract subject from first line if it contains "Subject:"
+            # Remove any existing signature lines after "Best regards" or similar phrases
             content_lines = content.split('\n')
-            subject = "Follow-up: " + original_email.subject
-            if content_lines[0].strip().lower().startswith("subject:"):
-                subject = content_lines[0].strip()[8:].strip()
-                content = '\n'.join(content_lines[1:]).strip()
-            
-            # Add signature if not present
-            if not any(signature_indicator in content.lower() for signature_indicator in ["best regards", "sincerely", "kind regards"]):
-                signature = f"""
-Best regards,
-{user.full_name if user.full_name else "[Your Name]"}
-{user.position if user.position else "[Your Position]"}
-{user.company_name if user.company_name else "[Your Company]"}"""
-                content = f"{content}\n\n{signature}"
-        else:
-            # Use AI generation as fallback
-            # Build context for OpenAI API
-            prompt = f"""
-            Create a follow-up email in English for a prospect who didn't respond to the initial outreach.
-            
-            Recipient Information:
-            Name: {recipient_name}
-            Company: {recipient_company}
-            Email: {recipient_email}
-            
-            Original Email Subject: {original_email.subject}
-            Original Email Content: {original_email.content}
-            
-            Sender Information:
-            Name: {user.full_name if user.full_name else "[Your Name]"}
-            Position: {user.position if user.position else "[Your Position]"}
-            Company: {user.company_name if user.company_name else "[Your Company]"}
-            Company Description: {user.company_description if user.company_description else "[brief description of company]"}
-            
-            Please generate a professional follow-up email that:
-            1. References the previous email sent to them
-            2. Is polite and not pushy
-            3. Offers additional value or information
-            4. Has a different angle or approach than the original
-            5. Includes a clear but gentle call to action
-            6. Is concise (2-3 short paragraphs maximum)
-            7. Maintains a professional yet friendly tone
-            8. Avoids being repetitive or aggressive
-            9. If a company description is provided, use it to reinforce the value proposition
-            10. Avoid using em dashes (—) - use regular dashes (-) or other appropriate punctuation instead
-            
-            The follow-up should feel natural and add value, not just be a reminder.
-            """
-            
-            try:
-                response = self.client.chat.completions.create(
-                    model=AZURE_DEPLOYMENT_NAME,
-                    messages=[
-                        {"role": "system", "content": "You are an expert email writer specializing in professional follow-up emails. Create emails that add value and feel natural, not pushy. Do not use any markdown formatting (like ** or *) in the email content."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=0.7,
-                    max_tokens=800
-                )
-                
-                generated_content = response.choices[0].message.content
-                
-                # Extract subject from first line of content and remove "Subject: " prefix if present
-                content_lines = generated_content.split('\n')
-                subject = content_lines[0].strip()
-                if subject.lower().startswith("subject: "):
-                    subject = subject[9:].strip()
-                
-                # Find the "Best regards" line and remove everything after it
-                content = []
-                for line in content_lines[1:]:
-                    if line.strip().lower() == "best regards,":
-                        break
-                    content.append(line)
-                
-                # Join the content and add the correct signature
-                content = '\n'.join(content).strip()
-                
-                # Remove any markdown formatting
-                content = content.replace("**", "")
-                
-                # Replace placeholders with user information if available
-                content = content.replace("[Your Name]", user.full_name if user.full_name else "[Your Name]")
-                content = content.replace("[Your Position]", user.position if user.position else "[Your Position]")
-                content = content.replace("[Your Company]", user.company_name if user.company_name else "[Your Company]")
-                
-                # Remove any existing signature lines after "Best regards" or similar phrases
-                content_lines = content.split('\n')
-                new_content = []
-                signature_indicators = ["best regards", "sincerely", "kind regards", "warm regards", "looking forward", "thank you"]
-                
-                for line in content_lines:
-                    line_lower = line.strip().lower()
-                    if any(indicator in line_lower for indicator in signature_indicators):
-                        break
-                    new_content.append(line)
-                
-                content = '\n'.join(new_content).strip()
-                
-            except Exception as e:
-                raise Exception(f"Failed to generate follow-up email: {str(e)}")
-        
-        # --- Attachment placeholder replacement ---
-        # Query all attachments for the user and replace [Placeholder] with the correct HTML tag
+            new_content = []
+            signature_indicators = ["best regards", "sincerely", "kind regards", "warm regards", "looking forward", "thank you"]
+            for line in content_lines:
+                line_lower = line.strip().lower()
+                if any(indicator in line_lower for indicator in signature_indicators):
+                    break
+                new_content.append(line)
+            content = '\n'.join(new_content).strip()
+        except Exception as e:
+            raise Exception(f"Failed to generate follow-up email: {str(e)}")
+        # --- Attachment placeholder replacement with logging ---
         attachments = self.db.query(Attachment).filter_by(user_id=user.id).all()
         for att in attachments:
             if att.placeholder:
@@ -514,15 +468,16 @@ Best regards,
                     html_tag = f'<img src="{att.blob_url}" style="max-width:300px; height:auto;" alt="Attachment" />'
                 elif att.file_type.lower().startswith("video"):
                     html_tag = f'<video src="{att.blob_url}" controls style="max-width:300px; height:auto;"></video>'
-                # Replace [Placeholder] and [placeholder] (case-insensitive)
+                # Log before replacement
+                if re.search(rf"\\[{att.placeholder}\\]", content, flags=re.IGNORECASE):
+                    logger.info(f"Replacing placeholder [{att.placeholder}] with HTML tag in follow-up email.")
+                else:
+                    logger.warning(f"Placeholder [{att.placeholder}] not found in follow-up email content.")
                 content = re.sub(rf"\\[{att.placeholder}\\]", html_tag, content, flags=re.IGNORECASE)
                 subject = re.sub(rf"\\[{att.placeholder}\\]", html_tag, subject, flags=re.IGNORECASE)
-        
         # Get user's interval settings for scheduling
         now = datetime.now(timezone.utc)
         followup_days = user.followup_interval_days or 3
-        
-        # Create a new email object for the follow-up
         followup_email = GeneratedEmail(
             recipient_email=recipient_email,
             recipient_name=recipient_name,
@@ -531,21 +486,17 @@ Best regards,
             content=content,
             user_id=user.id,
             template_id=template.id if template else None,
-            status="followup_due",  # Set status to 'followup_due'
+            status="followup_due",
             stage="followup",
-            # Use the correct field names for due dates
             followup_due_at=now + timedelta(days=followup_days),
             created_at=now,
-            # Set legacy fields for backward compatibility
             to=recipient_email,
             body=content,
-            group_id=original_email.group_id  # Inherit group_id from original email
+            group_id=original_email.group_id
         )
-        
         self.db.add(followup_email)
         self.db.commit()
         self.db.refresh(followup_email)
-        
         return followup_email
 
     def generate_lastchance_email(
@@ -859,3 +810,5 @@ Best regards,
             except Exception as e:
                 logger.error(f"Error re-generating last chance email for ID {email.id}: {e}")
                 raise Exception(f"Failed to re-generate last chance email: {str(e)}")
+        # Fallback for other stages (original logic)
+        # ... existing code for other stages ...
