@@ -1,12 +1,14 @@
 from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from datetime import datetime
+import os
 
 from app.db.database import get_db
-from app.models.models import EmailTemplate, User
+from app.models.models import EmailTemplate, User, Attachment
 from app.api.auth import get_current_user
+from app.services.blob_storage_service import blob_storage_service
 
 router = APIRouter()
 
@@ -289,4 +291,60 @@ async def delete_template(
     db.delete(template)
     db.commit()
     
-    return {"message": "Template deleted successfully"} 
+    return {"message": "Template deleted successfully"}
+
+@router.post("/attachments/upload", response_model=Dict[str, str])
+async def upload_attachment(
+    file: UploadFile = File(...),
+    placeholder: str = Form(...),
+    category: str = Form(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Validate file type (image/video)
+    allowed_types = ["image/", "video/"]
+    if not any(file.content_type.startswith(t) for t in allowed_types):
+        raise HTTPException(status_code=400, detail="File must be an image or video")
+    # Validate file size (max 20MB)
+    if file.size > 20 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File size must be < 20MB")
+    # Only allow one placeholder per user
+    existing = db.query(Attachment).filter_by(user_id=current_user.id, placeholder=placeholder).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Placeholder already exists for this user")
+    content = await file.read()
+    file_extension = os.path.splitext(file.filename)[1]
+    blob_url = await blob_storage_service.upload_attachment(content, file_extension, current_user.email)
+    file_type = "image" if file.content_type.startswith("image/") else "video"
+    attachment = Attachment(
+        user_id=current_user.id,
+        filename=file.filename,
+        blob_url=blob_url,
+        placeholder=placeholder,
+        file_type=file_type,
+        category=category
+    )
+    db.add(attachment)
+    db.commit()
+    db.refresh(attachment)
+    return {"message": "Attachment uploaded", "blob_url": blob_url}
+
+@router.get("/attachments", response_model=List[AttachmentOut])
+async def list_attachments(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return db.query(Attachment).filter_by(user_id=current_user.id).all()
+
+@router.delete("/attachments/{attachment_id}", response_model=Dict[str, str])
+async def delete_attachment(attachment_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    attachment = db.query(Attachment).filter_by(id=attachment_id, user_id=current_user.id).first()
+    if not attachment:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    db.delete(attachment)
+    db.commit()
+    return {"message": "Attachment deleted"}
+
+@router.get("/attachments/resolve/{placeholder}", response_model=Dict[str, str])
+async def resolve_placeholder(placeholder: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    attachment = db.query(Attachment).filter_by(user_id=current_user.id, placeholder=placeholder).first()
+    if not attachment:
+        raise HTTPException(status_code=404, detail="Placeholder not found")
+    return {"blob_url": attachment.blob_url} 
