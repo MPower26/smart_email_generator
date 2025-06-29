@@ -46,6 +46,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 # Custom middleware to handle CORS for timeout responses
@@ -54,16 +55,25 @@ async def cors_timeout_middleware(request: Request, call_next):
     start_time = time.time()
     origin = request.headers.get("origin")
     
+    # Log CORS preflight requests
+    if request.method == "OPTIONS":
+        logger.info(f"🔄 CORS preflight request: {request.url.path} from origin: {origin}")
+        logger.info(f"   Headers: {dict(request.headers)}")
+    
     try:
         logger.info(f"🔄 Processing request: {request.method} {request.url.path} from origin: {origin}")
         response = await call_next(request)
         
-        # Add CORS headers to successful responses
+        # Ensure CORS headers are present for all responses
         if origin in origins:
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Credentials"] = "true"
             response.headers["Access-Control-Allow-Methods"] = "*"
             response.headers["Access-Control-Allow-Headers"] = "*"
+            
+            # Log CORS headers for debugging
+            if request.method == "OPTIONS":
+                logger.info(f"✅ CORS preflight response headers: {dict(response.headers)}")
         
         duration = time.time() - start_time
         logger.info(f"✅ Request completed: {request.method} {request.url.path} in {duration:.2f}s")
@@ -127,129 +137,6 @@ app.include_router(users.router, prefix="/api/users", tags=["Users"])
 app.include_router(auth_gmail.router, prefix="/api", tags=["Gmail Auth"])
 app.include_router(user_settings.router, prefix="/api", tags=["User Settings"])
 app.include_router(templates.router, prefix="/api/templates", tags=["Templates"])
-
-# Add explicit OPTIONS handlers for all API routes
-@app.options("/api/emails/generate")
-async def emails_generate_options():
-    return Response(
-        status_code=200,
-        headers={
-            "Access-Control-Allow-Origin": FRONTEND_URL,
-            "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Allow-Methods": "*",
-            "Access-Control-Allow-Headers": "*"
-        }
-    )
-
-@app.options("/api/emails/followup")
-async def emails_followup_options():
-    return Response(
-        status_code=200,
-        headers={
-            "Access-Control-Allow-Origin": FRONTEND_URL,
-            "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Allow-Methods": "*",
-            "Access-Control-Allow-Headers": "*"
-        }
-    )
-
-@app.options("/api/emails/last-chance")
-async def emails_lastchance_options():
-    return Response(
-        status_code=200,
-        headers={
-            "Access-Control-Allow-Origin": FRONTEND_URL,
-            "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Allow-Methods": "*",
-            "Access-Control-Allow-Headers": "*"
-        }
-    )
-
-@app.options("/api/friends/list")
-async def friends_list_options():
-    return Response(
-        status_code=200,
-        headers={
-            "Access-Control-Allow-Origin": FRONTEND_URL,
-            "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Allow-Methods": "*",
-            "Access-Control-Allow-Headers": "*"
-        }
-    )
-
-@app.options("/api/users/profile")
-async def users_profile_options():
-    return Response(
-        status_code=200,
-        headers={
-            "Access-Control-Allow-Origin": FRONTEND_URL,
-            "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Allow-Methods": "*",
-            "Access-Control-Allow-Headers": "*"
-        }
-    )
-
-@app.options("/auth/login")
-async def auth_login_options():
-    return Response(
-        status_code=200,
-        headers={
-            "Access-Control-Allow-Origin": FRONTEND_URL,
-            "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Allow-Methods": "*",
-            "Access-Control-Allow-Headers": "*"
-        }
-    )
-
-@app.options("/api/gmail/auth")
-async def gmail_auth_options():
-    return Response(
-        status_code=200,
-        headers={
-            "Access-Control-Allow-Origin": FRONTEND_URL,
-            "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Allow-Methods": "*",
-            "Access-Control-Allow-Headers": "*"
-        }
-    )
-
-@app.options("/api/settings")
-async def settings_options():
-    return Response(
-        status_code=200,
-        headers={
-            "Access-Control-Allow-Origin": FRONTEND_URL,
-            "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Allow-Methods": "*",
-            "Access-Control-Allow-Headers": "*"
-        }
-    )
-
-# Add OPTIONS handler for attachments upload
-@app.options("/api/templates/attachments/upload")
-async def attachments_upload_options():
-    return Response(
-        status_code=200,
-        headers={
-            "Access-Control-Allow-Origin": FRONTEND_URL,
-            "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Allow-Methods": "*",
-            "Access-Control-Allow-Headers": "*"
-        }
-    )
-
-# Add OPTIONS handler for all templates routes
-@app.options("/api/templates/{path:path}")
-async def templates_options():
-    return Response(
-        status_code=200,
-        headers={
-            "Access-Control-Allow-Origin": FRONTEND_URL,
-            "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Allow-Methods": "*",
-            "Access-Control-Allow-Headers": "*"
-        }
-    )
 
 @app.get("/")
 async def root():
