@@ -252,6 +252,40 @@ export const attachmentService = {
     
     return api.post('/api/templates/attachments/upload', formData, config);
   },
+  // Upload a single chunk
+  uploadChunk: (chunkFile, upload_id, chunk_index, total_chunks, original_filename, file_extension, onUploadProgress = null) => {
+    const formData = new FormData();
+    formData.append('chunk', chunkFile);
+    formData.append('upload_id', upload_id);
+    formData.append('chunk_index', chunk_index);
+    formData.append('total_chunks', total_chunks);
+    formData.append('original_filename', original_filename);
+    formData.append('file_extension', file_extension);
+    const config = {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    };
+    if (onUploadProgress) {
+      config.onUploadProgress = onUploadProgress;
+    }
+    return api.post('/api/templates/attachments/upload_chunk', formData, config);
+  },
+  // Assemble all chunks into a single file
+  assembleChunks: (upload_id, total_chunks, original_filename, file_extension, placeholder, category = null) => {
+    const formData = new FormData();
+    formData.append('upload_id', upload_id);
+    formData.append('total_chunks', total_chunks);
+    formData.append('original_filename', original_filename);
+    formData.append('file_extension', file_extension);
+    formData.append('placeholder', placeholder);
+    if (category) formData.append('category', category);
+    return api.post('/api/templates/attachments/assemble', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
   // List attachments
   listAttachments: () => api.get('/api/templates/attachments'),
   // Delete attachment
