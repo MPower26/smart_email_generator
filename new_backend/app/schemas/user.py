@@ -48,8 +48,20 @@ class User(UserBase):
     id: int
     is_verified: bool
     is_active: bool
-    created_at: str
-    updated_at: str | None = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    @field_serializer('created_at')
+    def serialize_created_at(self, value: Optional[datetime]) -> Optional[str]:
+        if value is None:
+            return None
+        return value.isoformat()
+    
+    @field_serializer('updated_at')
+    def serialize_updated_at(self, value: Optional[datetime]) -> Optional[str]:
+        if value is None:
+            return None
+        return value.isoformat()
 
     class Config:
         from_attributes = True 
