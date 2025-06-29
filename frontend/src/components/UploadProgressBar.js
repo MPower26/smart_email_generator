@@ -13,6 +13,7 @@ import { ProgressBar } from 'react-bootstrap';
  * @param {number} props.fileSize - File size in bytes
  * @param {number} props.uploadSpeed - Upload speed in bytes per second
  * @param {string} props.eta - Estimated time of arrival (ISO string)
+ * @param {string} props.uploadMode - Upload mode ('direct' or 'chunked')
  */
 const UploadProgressBar = ({ 
   progress, 
@@ -23,7 +24,8 @@ const UploadProgressBar = ({
   striped = true,
   fileSize,
   uploadSpeed,
-  eta
+  eta,
+  uploadMode
 }) => {
   const [timeRemaining, setTimeRemaining] = useState(null);
   const [etaString, setEtaString] = useState('');
@@ -96,6 +98,12 @@ const UploadProgressBar = ({
         {filename && (
           <small className="text-muted d-block">
             📁 Uploading: {filename}
+          </small>
+        )}
+        
+        {uploadMode && (
+          <small className="text-info d-block">
+            🔧 Mode: {uploadMode === 'chunked' ? 'Chunked upload (large file)' : 'Direct upload'}
           </small>
         )}
         
