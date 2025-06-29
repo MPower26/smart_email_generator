@@ -377,7 +377,23 @@ async def upload_attachment(
 
 @router.get("/attachments", response_model=List[AttachmentOut])
 async def list_attachments(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return db.query(Attachment).filter_by(user_id=current_user.id).all()
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"📋 Listing attachments for user: {current_user.email}")
+    
+    try:
+        attachments = db.query(Attachment).filter_by(user_id=current_user.id).all()
+        logger.info(f"✅ Found {len(attachments)} attachments for user {current_user.email}")
+        
+        # Log each attachment for debugging
+        for att in attachments:
+            logger.info(f"   • {att.filename} ({att.placeholder}) - {att.file_type}")
+        
+        return attachments
+        
+    except Exception as e:
+        logger.error(f"❌ Error listing attachments for user {current_user.email}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to list attachments: {str(e)}")
 
 @router.delete("/attachments/{attachment_id}", response_model=Dict[str, str])
 async def delete_attachment(attachment_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -393,4 +409,51 @@ async def resolve_placeholder(placeholder: str, current_user: User = Depends(get
     attachment = db.query(Attachment).filter_by(user_id=current_user.id, placeholder=placeholder).first()
     if not attachment:
         raise HTTPException(status_code=404, detail="Placeholder not found")
-    return {"blob_url": attachment.blob_url} 
+    return {"blob_url": attachment.blob_url}
+
+@router.post("/attachments/upload_chunk", response_model=Dict[str, str])
+async def upload_chunk(
+    chunk: UploadFile = File(...),
+    upload_id: str = Form(...),
+    chunk_index: int = Form(...),
+    total_chunks: int = Form(...),
+    original_filename: str = Form(...),
+    file_extension: str = Form(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    content = await chunk.read()
+    url = await blob_storage_service.upload_chunk(content, upload_id, chunk_index, file_extension, current_user.email)
+    return {"message": "Chunk uploaded", "url": url}
+
+@router.post("/attachments/assemble", response_model=Dict[str, str])
+async def assemble_chunks(
+    upload_id: str = Form(...),
+    total_chunks: int = Form(...),
+    original_filename: str = Form(...),
+    file_extension: str = Form(...),
+    placeholder: str = Form(...),
+    category: str = Form(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Download and assemble all chunks
+    assembled_bytes = await blob_storage_service.assemble_chunks(upload_id, total_chunks, file_extension, current_user.email)
+    # Upload the assembled file as a new attachment
+    blob_url = await blob_storage_service.upload_attachment(assembled_bytes, file_extension, current_user.email)
+    # Save to DB
+    file_type = "image" if file_extension.lower() in [".jpg", ".jpeg", ".png", ".gif", ".webp"] else "video"
+    attachment = Attachment(
+        user_id=current_user.id,
+        filename=original_filename,
+        blob_url=blob_url,
+        placeholder=placeholder,
+        file_type=file_type,
+        category=category
+    )
+    db.add(attachment)
+    db.commit()
+    db.refresh(attachment)
+    # Delete all chunk blobs
+    await blob_storage_service.delete_chunks(upload_id, total_chunks, file_extension)
+    return {"message": "File assembled and uploaded", "blob_url": blob_url} 
