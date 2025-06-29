@@ -790,16 +790,31 @@ const GenerateEmailsPage = () => {
                 {error && <Alert variant="danger">{error}</Alert>}
 
                 {/* Progress Trackers */}
-                {uploadProgress.status !== 'idle' && (
-                  <ProgressTracker {...uploadProgress} />
-                )}
-                
-                {generationProgress && (
-                  <ProgressTracker {...generationProgress} />
-                )}
-                
-                {sendingProgress.status !== 'idle' && (
-                  <ProgressTracker {...sendingProgress} />
+                {warmingUp ? (
+                  <div className="warming-up-container text-center my-4">
+                    <div className="warming-up-effect">
+                      <h3>🤖 AI is warming up, hang on a sec...</h3>
+                      <div className="warming-up-timer" style={{ fontSize: '2rem', margin: '1rem 0' }}>{warmingUpTimer}s</div>
+                      <div className="warming-up-bar" style={{ width: '100%', height: '8px', background: '#eee', borderRadius: '4px', overflow: 'hidden', margin: '0 auto', maxWidth: '400px' }}>
+                        <div style={{ width: `${(15-warmingUpTimer)/15*100}%`, height: '100%', background: 'linear-gradient(90deg, #D8400D, #ffb347)', transition: 'width 1s' }}></div>
+                      </div>
+                      <div style={{ marginTop: '1rem', color: '#888' }}>
+                        <em>Preparing your personalized emails...</em>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {uploadProgress.status !== 'idle' && (
+                      <ProgressTracker {...uploadProgress} />
+                    )}
+                    {generationProgress && (
+                      <ProgressTracker {...generationProgress} />
+                    )}
+                    {sendingProgress.status !== 'idle' && (
+                      <ProgressTracker {...sendingProgress} />
+                    )}
+                  </>
                 )}
 
                 <div className="d-grid mt-4">
@@ -928,33 +943,6 @@ const GenerateEmailsPage = () => {
       </Tabs>
       {/* Progress Section Anchor */}
       <div ref={progressSectionRef} id="progress-section"></div>
-      {/* Warming Up UI */}
-      {warmingUp ? (
-        <div className="warming-up-container text-center my-4">
-          <div className="warming-up-effect">
-            <h3>🤖 AI is warming up, hang on a sec...</h3>
-            <div className="warming-up-timer" style={{ fontSize: '2rem', margin: '1rem 0' }}>{warmingUpTimer}s</div>
-            <div className="warming-up-bar" style={{ width: '100%', height: '8px', background: '#eee', borderRadius: '4px', overflow: 'hidden', margin: '0 auto', maxWidth: '400px' }}>
-              <div style={{ width: `${(15-warmingUpTimer)/15*100}%`, height: '100%', background: 'linear-gradient(90deg, #D8400D, #ffb347)', transition: 'width 1s' }}></div>
-            </div>
-            <div style={{ marginTop: '1rem', color: '#888' }}>
-              <em>Preparing your personalized emails...</em>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <>
-          {uploadProgress.status !== 'idle' && (
-            <ProgressTracker {...uploadProgress} />
-          )}
-          {generationProgress && (
-            <ProgressTracker {...generationProgress} />
-          )}
-          {sendingProgress.status !== 'idle' && (
-            <ProgressTracker {...sendingProgress} />
-          )}
-        </>
-      )}
     </Container>
   );
 };
