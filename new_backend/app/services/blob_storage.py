@@ -151,7 +151,7 @@ class BlobStorageService:
     
     async def upload_attachment(self, file_content: bytes, file_extension: str, user_email: str) -> Optional[str]:
         """
-        Upload an attachment (image or video) to Azure Blob Storage
+        Upload an attachment (image or video) to Azure Blob Storage with ETA
         """
         if not self.client:
             raise HTTPException(
@@ -165,7 +165,14 @@ class BlobStorageService:
         try:
             logger.info(f"🚀 Starting attachment upload for user: {user_email}")
             logger.info(f"📁 File size: {format_file_size(file_size)}")
-            logger.info(f"📊 Estimated upload time: {self._estimate_upload_time(file_size)}")
+            
+            # Calculate estimated upload time and ETA
+            estimated_upload_time = self._estimate_upload_time_seconds(file_size)
+            eta_time = time.time() + estimated_upload_time
+            eta_str = time.strftime("%H:%M:%S", time.localtime(eta_time))
+            
+            logger.info(f"📊 Estimated upload time: {format_time(estimated_upload_time)}")
+            logger.info(f"⏰ Expected completion: {eta_str}")
             
             filename = f"{user_email}_{uuid.uuid4()}{file_extension}"
             blob_name = f"attachments/{filename}"
@@ -180,15 +187,19 @@ class BlobStorageService:
             content_type = self._get_content_type(file_extension)
             logger.info(f"🎯 Content type: {content_type}")
             
-            # Upload with timeout and progress logging
+            # Upload with extended timeout and progress logging
             logger.info("⏳ Starting blob upload to Azure...")
             upload_start = time.time()
+            
+            # Use a more generous timeout for large files
+            timeout_seconds = max(600, estimated_upload_time * 2)  # At least 10 minutes, or 2x estimated time
+            logger.info(f"⏱️ Upload timeout set to: {format_time(timeout_seconds)}")
             
             blob_client.upload_blob(
                 file_content,
                 content_settings=ContentSettings(content_type=content_type),
                 overwrite=True,
-                timeout=300  # 5 minutes timeout
+                timeout=timeout_seconds
             )
             
             upload_duration = time.time() - upload_start
@@ -200,6 +211,7 @@ class BlobStorageService:
             logger.info(f"   • Duration: {format_time(upload_duration)}")
             logger.info(f"   • Speed: {format_speed(speed)}")
             logger.info(f"   • Total time: {format_time(total_duration)}")
+            logger.info(f"   • Estimated vs Actual: {format_time(estimated_upload_time)} vs {format_time(upload_duration)}")
             logger.info(f"🔗 URL: {blob_client.url}")
             
             return blob_client.url
@@ -210,15 +222,29 @@ class BlobStorageService:
             logger.error(f"📊 Upload failed after {format_time(elapsed_time)}")
             logger.error(f"📁 File size: {format_file_size(file_size)}, extension: {file_extension}")
             logger.error(f"💥 Error: {str(e)}")
+            
+            # Provide more specific error messages
+            if "timeout" in str(e).lower():
+                error_msg = f"Upload timeout after {format_time(elapsed_time)}. File may be too large or connection too slow."
+            elif "connection" in str(e).lower():
+                error_msg = f"Connection error during upload: {str(e)}"
+            else:
+                error_msg = f"Upload failed: {str(e)}"
+                
             raise HTTPException(
                 status_code=500,
-                detail=f"Failed to upload attachment: {str(e)}"
+                detail=error_msg
             )
+    
+    def _estimate_upload_time_seconds(self, file_size: int) -> float:
+        """Estimate upload time in seconds based on file size"""
+        # Assume average speed of 2 MB/s for estimation (more realistic)
+        estimated_seconds = file_size / (2 * 1024 * 1024)  # 2 MB/s
+        return max(estimated_seconds, 30)  # Minimum 30 seconds
     
     def _estimate_upload_time(self, file_size: int) -> str:
         """Estimate upload time based on file size"""
-        # Assume average speed of 1 MB/s for estimation
-        estimated_seconds = file_size / (1024 * 1024)  # 1 MB/s
+        estimated_seconds = self._estimate_upload_time_seconds(file_size)
         return format_time(estimated_seconds)
     
     def _get_content_type(self, file_extension: str) -> str:
