@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { attachmentService } from '../services/api';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Custom hook for file upload with progress tracking, ETA calculation, and chunked upload for large files
