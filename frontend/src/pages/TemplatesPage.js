@@ -3,6 +3,7 @@ import { Container, Card, Form, Button, Alert, Modal, Tabs, Tab, Accordion, Badg
 import { templateService, userService, attachmentService } from '../services/api';
 import { UserContext } from '../contexts/UserContext';
 import UploadProgressBar from '../components/UploadProgressBar';
+import { useFileUpload } from '../hooks/useFileUpload';
 
 const TemplatesPage = () => {
   const { userProfile, updateUserProfile } = useContext(UserContext);
@@ -51,10 +52,34 @@ const TemplatesPage = () => {
   const [attachmentFile, setAttachmentFile] = useState(null);
   const [attachmentPlaceholder, setAttachmentPlaceholder] = useState('');
   const [attachmentCategory, setAttachmentCategory] = useState('');
-  const [attachmentLoading, setAttachmentLoading] = useState(false);
   const [attachmentError, setAttachmentError] = useState('');
   const [attachmentSuccess, setAttachmentSuccess] = useState('');
-  const [uploadProgress, setUploadProgress] = useState(0);
+  
+  // Use the file upload hook
+  const { 
+    uploading: attachmentLoading, 
+    progress: uploadProgress, 
+    error: uploadError, 
+    success: uploadSuccess,
+    fileSize,
+    uploadSpeed,
+    eta,
+    uploadFile: uploadAttachmentFile,
+    reset: resetUpload
+  } = useFileUpload(
+    () => {
+      // onSuccess callback
+      setAttachmentSuccess('Attachment uploaded successfully!');
+      loadAttachments(); // Reload attachments list
+      setAttachmentFile(null);
+      setAttachmentPlaceholder('');
+      setAttachmentCategory('');
+    },
+    (err) => {
+      // onError callback
+      setAttachmentError(err.response?.data?.detail || 'Failed to upload attachment.');
+    }
+  );
 
   // Charger les templates au chargement de la page
   useEffect(() => {
@@ -335,40 +360,18 @@ const TemplatesPage = () => {
   // Handle upload
   const handleUploadAttachment = async (e) => {
     e.preventDefault();
-    setAttachmentLoading(true);
-    setUploadProgress(0); // Reset progress
+    
+    if (!attachmentFile || !attachmentPlaceholder) {
+      setAttachmentError('File and placeholder are required.');
+      return;
+    }
+    
+    // Reset any previous errors/success messages
     setAttachmentError('');
     setAttachmentSuccess('');
     
-    try {
-      if (!attachmentFile || !attachmentPlaceholder) {
-        setAttachmentError('File and placeholder are required.');
-        setAttachmentLoading(false);
-        return;
-      }
-      
-      await attachmentService.uploadAttachment(
-        attachmentFile, 
-        attachmentPlaceholder, 
-        attachmentCategory,
-        (evt) => {
-          // Calculate upload progress percentage
-          const percent = Math.round((evt.loaded * 100) / evt.total);
-          setUploadProgress(percent);
-        }
-      );
-      
-      setAttachmentSuccess('Attachment uploaded!');
-      setAttachmentFile(null);
-      setAttachmentPlaceholder('');
-      setAttachmentCategory('');
-      await loadAttachments();
-    } catch (err) {
-      setAttachmentError(err.response?.data?.detail || 'Failed to upload attachment.');
-    } finally {
-      setAttachmentLoading(false);
-      setUploadProgress(0); // Reset progress
-    }
+    // Use the hook's upload function
+    await uploadAttachmentFile(attachmentFile, attachmentPlaceholder, attachmentCategory);
   };
 
   // Handle delete
@@ -656,12 +659,21 @@ Your signature text here..."
               <Button type="submit" variant="primary" disabled={attachmentLoading}>{attachmentLoading ? 'Uploading...' : 'Upload Attachment'}</Button>
             </Form>
             
-            {/* Upload Progress Bar */}
+            {/* Error and Success Messages */}
+            {uploadError && <Alert variant="danger" className="mt-2">{uploadError}</Alert>}
+            {uploadSuccess && <Alert variant="success" className="mt-2">{uploadSuccess}</Alert>}
+            {attachmentError && <Alert variant="danger" className="mt-2">{attachmentError}</Alert>}
+            {attachmentSuccess && <Alert variant="success" className="mt-2">{attachmentSuccess}</Alert>}
+            
+            {/* Upload Progress Bar with ETA */}
             <UploadProgressBar 
               progress={uploadProgress}
               show={attachmentLoading}
               filename={attachmentFile?.name}
               variant="primary"
+              fileSize={fileSize}
+              uploadSpeed={uploadSpeed}
+              eta={eta}
             />
             
             {/* List attachments */}
