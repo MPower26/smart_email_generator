@@ -1,6 +1,20 @@
 from pydantic import BaseModel, EmailStr
 from typing import List, Optional
 
+class AttachmentBase(BaseModel):
+    id: int
+    filename: str
+    blob_url: str
+    placeholder: str
+    file_type: str
+    category: Optional[str] = None
+    created_at: Optional[str] = None
+    class Config:
+        orm_mode = True
+
+class AttachmentOut(AttachmentBase):
+    pass
+
 class UserBase(BaseModel):
     email: EmailStr
     full_name: str | None = None
@@ -30,18 +44,4 @@ class User(UserBase):
     updated_at: str | None = None
 
     class Config:
-        from_attributes = True
-
-class AttachmentBase(BaseModel):
-    id: int
-    filename: str
-    blob_url: str
-    placeholder: str
-    file_type: str
-    category: Optional[str] = None
-    created_at: Optional[str] = None
-    class Config:
-        orm_mode = True
-
-class AttachmentOut(AttachmentBase):
-    pass 
+        from_attributes = True 
