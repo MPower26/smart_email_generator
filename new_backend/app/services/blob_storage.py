@@ -298,5 +298,48 @@ class BlobStorageService:
             logger.error(f"Failed to delete signature image: {str(e)}")
             return False
 
+    async def upload_chunk(self, chunk_content: bytes, upload_id: str, chunk_index: int, file_extension: str, user_email: str) -> str:
+        """Upload a single chunk to blob storage under chunks/{upload_id}/{chunk_index}"""
+        if not self.client:
+            raise HTTPException(status_code=500, detail="Blob storage not configured.")
+        blob_name = f"chunks/{upload_id}/{chunk_index}{file_extension}"
+        blob_client = self.client.get_blob_client(container=self.container_name, blob=blob_name)
+        content_type = self._get_content_type(file_extension)
+        blob_client.upload_blob(chunk_content, content_settings=ContentSettings(content_type=content_type), overwrite=True)
+        return blob_client.url
+
+    async def list_chunks(self, upload_id: str) -> list:
+        """List all chunk blob names for a given upload_id"""
+        if not self.client:
+            raise HTTPException(status_code=500, detail="Blob storage not configured.")
+        container_client = self.client.get_container_client(self.container_name)
+        prefix = f"chunks/{upload_id}/"
+        return [blob.name for blob in container_client.list_blobs(name_starts_with=prefix)]
+
+    async def download_chunk(self, blob_name: str) -> bytes:
+        """Download a chunk by blob name"""
+        if not self.client:
+            raise HTTPException(status_code=500, detail="Blob storage not configured.")
+        blob_client = self.client.get_blob_client(container=self.container_name, blob=blob_name)
+        return await blob_client.download_blob().readall()
+
+    async def assemble_chunks(self, upload_id: str, total_chunks: int, file_extension: str, user_email: str) -> bytes:
+        """Download and concatenate all chunks for upload_id in order, return the assembled file bytes"""
+        chunk_names = [f"chunks/{upload_id}/{i}{file_extension}" for i in range(total_chunks)]
+        assembled = b''
+        for name in chunk_names:
+            assembled += await self.download_chunk(name)
+        return assembled
+
+    async def delete_chunks(self, upload_id: str, total_chunks: int, file_extension: str):
+        """Delete all chunk blobs for upload_id"""
+        for i in range(total_chunks):
+            blob_name = f"chunks/{upload_id}/{i}{file_extension}"
+            blob_client = self.client.get_blob_client(container=self.container_name, blob=blob_name)
+            try:
+                blob_client.delete_blob()
+            except Exception:
+                pass
+
 # Global instance
 blob_storage_service = BlobStorageService() 
