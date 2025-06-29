@@ -262,13 +262,18 @@ class EmailGenerator:
                 status = "lastchance_due"
             
             # --- Attachment placeholder replacement ---
-            # Query all attachments for the user and replace [Placeholder] with blob_url
+            # Query all attachments for the user and replace [Placeholder] with the correct HTML tag
             attachments = self.db.query(Attachment).filter_by(user_id=user.id).all()
             for att in attachments:
                 if att.placeholder:
+                    html_tag = att.blob_url
+                    if att.file_type.lower().startswith("image"):
+                        html_tag = f'<img src="{att.blob_url}" style="max-width:300px; height:auto;" alt="Attachment" />'
+                    elif att.file_type.lower().startswith("video"):
+                        html_tag = f'<video src="{att.blob_url}" controls style="max-width:300px; height:auto;"></video>'
                     # Replace [Placeholder] and [placeholder] (case-insensitive)
-                    content = re.sub(rf"\[{att.placeholder}\]", att.blob_url, content, flags=re.IGNORECASE)
-                    subject = re.sub(rf"\[{att.placeholder}\]", att.blob_url, subject, flags=re.IGNORECASE)
+                    content = re.sub(rf"\\[{att.placeholder}\\]", html_tag, content, flags=re.IGNORECASE)
+                    subject = re.sub(rf"\\[{att.placeholder}\\]", html_tag, subject, flags=re.IGNORECASE)
             
             # Create and save the generated email
             email = GeneratedEmail(
