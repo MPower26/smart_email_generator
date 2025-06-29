@@ -9,6 +9,7 @@ from app.db.database import get_db
 from app.models.models import EmailTemplate, User, Attachment
 from app.api.auth import get_current_user
 from app.services.blob_storage import blob_storage_service
+from app.schemas.user import AttachmentOut
 
 router = APIRouter()
 
@@ -348,3 +349,4 @@ async def resolve_placeholder(placeholder: str, current_user: User = Depends(get
     if not attachment:
         raise HTTPException(status_code=404, detail="Placeholder not found")
     return {"blob_url": attachment.blob_url} 
+
