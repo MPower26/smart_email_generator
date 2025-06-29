@@ -114,13 +114,18 @@ async def create_template(
         raise HTTPException(status_code=400, detail="Invalid category. Must be one of: outreach, followup, lastchance")
     
     # Check if user already has 3 templates in this category
-    existing_count = db.query(EmailTemplate).filter(
+    existing_templates = db.query(EmailTemplate).filter(
         EmailTemplate.user_id == current_user.id,
         EmailTemplate.category == category
-    ).count()
+    ).all()
+    existing_count = len(existing_templates)
     
     if existing_count >= 3:
         raise HTTPException(status_code=400, detail=f"Maximum of 3 templates allowed per category. You already have {existing_count} templates in the '{category}' category.")
+    
+    # If this is the first template for this category, force is_default True
+    if existing_count == 0:
+        is_default = True
     
     # If setting as default, unset previous default in this category
     if is_default:
@@ -201,7 +206,18 @@ async def update_template(
                 EmailTemplate.is_default == True,
                 EmailTemplate.id != template_id
             ).update({"is_default": False})
-        template.is_default = is_default
+            template.is_default = True
+        else:
+            # Prevent unsetting the only default in this category
+            other_defaults = db.query(EmailTemplate).filter(
+                EmailTemplate.user_id == current_user.id,
+                EmailTemplate.category == template.category,
+                EmailTemplate.is_default == True,
+                EmailTemplate.id != template_id
+            ).count()
+            if other_defaults == 0:
+                raise HTTPException(status_code=400, detail="There must be at least one default template per category.")
+            template.is_default = False
     
     template.updated_at = datetime.utcnow()
     db.commit()
