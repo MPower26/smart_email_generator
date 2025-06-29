@@ -9,8 +9,9 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import or_
 import uuid
+import re
 
-from app.models.models import GeneratedEmail, User, EmailTemplate, EmailGenerationProgress
+from app.models.models import GeneratedEmail, User, EmailTemplate, EmailGenerationProgress, Attachment
 
 # --- Environment Variable Configuration ---
 AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
@@ -259,6 +260,15 @@ class EmailGenerator:
                 status = "followup_due"
             elif stage == "lastchance":
                 status = "lastchance_due"
+            
+            # --- Attachment placeholder replacement ---
+            # Query all attachments for the user and replace [Placeholder] with blob_url
+            attachments = self.db.query(Attachment).filter_by(user_id=user.id).all()
+            for att in attachments:
+                if att.placeholder:
+                    # Replace [Placeholder] and [placeholder] (case-insensitive)
+                    content = re.sub(rf"\[{att.placeholder}\]", att.blob_url, content, flags=re.IGNORECASE)
+                    subject = re.sub(rf"\[{att.placeholder}\]", att.blob_url, subject, flags=re.IGNORECASE)
             
             # Create and save the generated email
             email = GeneratedEmail(
@@ -816,4 +826,3 @@ Best regards,
             except Exception as e:
                 logger.error(f"Error re-generating last chance email for ID {email.id}: {e}")
                 raise Exception(f"Failed to re-generate last chance email: {str(e)}")
-
