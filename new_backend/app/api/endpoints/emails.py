@@ -37,7 +37,7 @@ class EmailSchema(BaseModel):
     lastchance_due_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class EmailGroup(BaseModel):
     group_id: str
@@ -310,8 +310,7 @@ async def get_generation_progress_generic(
                 "processed_contacts": 0,
                 "generated_emails": 0,
                 "percentage": 0,
-                "error": "Database table not available - please run the SQL migration",
-                "progress_id": None
+                "error": "Database table not available - please run the SQL migration"
             }
         
         try:
@@ -331,8 +330,7 @@ async def get_generation_progress_generic(
                 "processed_contacts": 0,
                 "generated_emails": 0,
                 "percentage": 0,
-                "error": f"Database query error: {str(query_error)}",
-                "progress_id": None
+                "error": f"Database query error: {str(query_error)}"
             }
         
         if not progress:
@@ -342,9 +340,7 @@ async def get_generation_progress_generic(
                 "total_contacts": 0,
                 "processed_contacts": 0,
                 "generated_emails": 0,
-                "percentage": 0,
-                "error": "No active progress found",
-                "progress_id": None
+                "percentage": 0
             }
         
         percentage = (progress.processed_contacts / progress.total_contacts * 100) if progress.total_contacts > 0 else 0
@@ -359,8 +355,7 @@ async def get_generation_progress_generic(
             "percentage": round(percentage, 1),
             "stage": progress.stage,
             "created_at": progress.created_at.isoformat(),
-            "updated_at": progress.updated_at.isoformat(),
-            "progress_id": progress.id
+            "updated_at": progress.updated_at.isoformat()
         }
         
     except Exception as e:
@@ -372,8 +367,7 @@ async def get_generation_progress_generic(
             "processed_contacts": 0,
             "generated_emails": 0,
             "percentage": 0,
-            "error": str(e),
-            "progress_id": None
+            "error": str(e)
         }
 
 @router.post("/generate", response_model=Dict[str, Any])
@@ -490,8 +484,6 @@ async def get_generation_progress_by_id(
 ):
     """Get email generation progress by its specific ID."""
     try:
-        logger.info(f"Getting generation progress for progress_id: {progress_id}, user_id: {current_user.id}")
-        
         progress = db.query(EmailGenerationProgress).filter(
             EmailGenerationProgress.id == progress_id,
             EmailGenerationProgress.user_id == current_user.id
@@ -499,24 +491,18 @@ async def get_generation_progress_by_id(
 
         if not progress:
             # This is a valid case if polling starts before the record is findable
-            logger.info(f"Progress record {progress_id} not found for user {current_user.id}")
             return {"status": "not_found"}
 
         percentage = (progress.processed_contacts / progress.total_contacts * 100) if progress.total_contacts > 0 else 0
         
-        response_data = {
+        return {
             "status": progress.status,
             "total_contacts": progress.total_contacts,
             "processed_contacts": progress.processed_contacts,
             "generated_emails": progress.generated_emails,
             "percentage": round(percentage, 1),
-            "group_id": progress.group_id,
-            "progress_id": progress.id
+            "group_id": progress.group_id
         }
-        
-        logger.info(f"Progress for ID {progress_id}: {progress.generated_emails}/{progress.total_contacts} emails generated, status: {progress.status}")
-        
-        return response_data
     except Exception as e:
         logger.error(f"Error in get_generation_progress_by_id for progress_id {progress_id}: {str(e)}")
         return {"status": "error", "error": str(e)}
