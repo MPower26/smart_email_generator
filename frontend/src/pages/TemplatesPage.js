@@ -64,6 +64,7 @@ const TemplatesPage = () => {
     fileSize,
     uploadSpeed,
     eta,
+    uploadMode,
     uploadFile: uploadAttachmentFile,
     reset: resetUpload
   } = useFileUpload(
@@ -674,6 +675,7 @@ Your signature text here..."
               fileSize={fileSize}
               uploadSpeed={uploadSpeed}
               eta={eta}
+              uploadMode={uploadMode}
             />
             
             {/* List attachments */}
