@@ -81,6 +81,9 @@ class User(Base):
     # New relationships
     generation_progress = relationship("EmailGenerationProgress", back_populates="user")
 
+    # New relationship for attachments
+    attachments = relationship("Attachment", back_populates="user", cascade="all, delete-orphan")
+
 class VerificationCode(Base):
     __tablename__ = "verification_codes"
 
@@ -162,3 +165,19 @@ class EmailGenerationProgress(Base):
     
     def __repr__(self):
         return f"<EmailGenerationProgress(id={self.id}, user_id={self.user_id}, status={self.status})>"
+
+# ---
+# Alembic migration required: New table 'attachments' with fields (id, user_id, filename, blob_url, placeholder, file_type, category, created_at)
+# ---
+
+class Attachment(Base):
+    __tablename__ = "attachments"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    filename = Column(String(255), nullable=False)
+    blob_url = Column(String(500), nullable=False)
+    placeholder = Column(String(100), nullable=False)  # User-defined placeholder
+    file_type = Column(String(50), nullable=False)  # e.g., 'image', 'video'
+    category = Column(String(50), nullable=True)  # Optional: for grouping
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    user = relationship("User", back_populates="attachments")
