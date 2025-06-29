@@ -84,6 +84,36 @@ class BlobStorageService:
                 detail=f"Failed to upload image: {str(e)}"
             )
     
+    async def upload_attachment(self, file_content: bytes, file_extension: str, user_email: str) -> Optional[str]:
+        """
+        Upload an attachment (image or video) to Azure Blob Storage
+        """
+        if not self.client:
+            raise HTTPException(
+                status_code=500,
+                detail="Blob storage not configured. Please set AZURE_STORAGE_CONNECTION_STRING environment variable."
+            )
+        try:
+            filename = f"{user_email}_{uuid.uuid4()}{file_extension}"
+            blob_name = f"attachments/{filename}"
+            blob_client = self.client.get_blob_client(
+                container=self.container_name,
+                blob=blob_name
+            )
+            content_type = self._get_content_type(file_extension)
+            blob_client.upload_blob(
+                file_content,
+                content_settings=ContentSettings(content_type=content_type),
+                overwrite=True
+            )
+            return blob_client.url
+        except Exception as e:
+            logger.error(f"Failed to upload attachment: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to upload attachment: {str(e)}"
+            )
+    
     def _get_content_type(self, file_extension: str) -> str:
         """Get the content type based on file extension"""
         content_types = {
@@ -91,7 +121,13 @@ class BlobStorageService:
             '.jpeg': 'image/jpeg',
             '.png': 'image/png',
             '.gif': 'image/gif',
-            '.webp': 'image/webp'
+            '.webp': 'image/webp',
+            '.mp4': 'video/mp4',
+            '.mov': 'video/quicktime',
+            '.avi': 'video/x-msvideo',
+            '.wmv': 'video/x-ms-wmv',
+            '.mkv': 'video/x-matroska',
+            '.webm': 'video/webm',
         }
         return content_types.get(file_extension.lower(), 'application/octet-stream')
     
