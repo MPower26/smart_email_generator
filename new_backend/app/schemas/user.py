@@ -1,4 +1,5 @@
 from pydantic import BaseModel, EmailStr
+from typing import List, Optional
 
 class UserBase(BaseModel):
     email: EmailStr
@@ -7,6 +8,8 @@ class UserBase(BaseModel):
     company_name: str | None = None
     company_description: str | None = None
     email_signature: str | None = None
+    signature_image_url: str | None = None
+    attachments: List[AttachmentOut] = []
 
 class UserCreate(UserBase):
     password: str
@@ -17,6 +20,7 @@ class UserUpdate(BaseModel):
     company_name: str | None = None
     company_description: str | None = None
     email_signature: str | None = None
+    signature_image_url: str | None = None
 
 class User(UserBase):
     id: int
@@ -26,4 +30,18 @@ class User(UserBase):
     updated_at: str | None = None
 
     class Config:
-        from_attributes = True 
+        from_attributes = True
+
+class AttachmentBase(BaseModel):
+    id: int
+    filename: str
+    blob_url: str
+    placeholder: str
+    file_type: str
+    category: Optional[str] = None
+    created_at: Optional[str] = None
+    class Config:
+        orm_mode = True
+
+class AttachmentOut(AttachmentBase):
+    pass 
