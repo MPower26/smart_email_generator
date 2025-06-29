@@ -8,6 +8,7 @@ from typing import Dict, List
 import asyncio
 from datetime import datetime
 import os
+import time
 
 from app.api.endpoints import emails, friends, auth_gmail, user_settings, templates
 from app.api import auth
@@ -50,16 +51,37 @@ app.add_middleware(
 # Custom middleware to handle CORS for timeout responses
 @app.middleware("http")
 async def cors_timeout_middleware(request: Request, call_next):
+    start_time = time.time()
+    origin = request.headers.get("origin")
+    
     try:
+        logger.info(f"🔄 Processing request: {request.method} {request.url.path} from origin: {origin}")
         response = await call_next(request)
+        
+        # Add CORS headers to successful responses
+        if origin in origins:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Allow-Methods"] = "*"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+        
+        duration = time.time() - start_time
+        logger.info(f"✅ Request completed: {request.method} {request.url.path} in {duration:.2f}s")
         return response
+        
     except Exception as e:
+        duration = time.time() - start_time
+        logger.error(f"❌ Request failed: {request.method} {request.url.path} after {duration:.2f}s")
+        logger.error(f"💥 Error: {str(e)}")
+        
         # If there's an exception (including timeout), return a proper CORS response
-        logger.error(f"Request failed with exception: {str(e)}")
-        origin = request.headers.get("origin")
         if origin in origins:
             return Response(
-                content=json.dumps({"error": "Request timeout or server error"}),
+                content=json.dumps({
+                    "error": "Request timeout or server error",
+                    "details": str(e),
+                    "duration": f"{duration:.2f}s"
+                }),
                 status_code=500,
                 headers={
                     "Access-Control-Allow-Origin": origin,
@@ -70,7 +92,11 @@ async def cors_timeout_middleware(request: Request, call_next):
                 }
             )
         return Response(
-            content=json.dumps({"error": "Request timeout or server error"}),
+            content=json.dumps({
+                "error": "Request timeout or server error",
+                "details": str(e),
+                "duration": f"{duration:.2f}s"
+            }),
             status_code=500,
             headers={"Content-Type": "application/json"}
         )
@@ -133,6 +159,16 @@ async def gmail_auth_options():
 
 @app.options("/api/settings")
 async def settings_options():
+    return Response(status_code=200)
+
+# Add OPTIONS handler for attachments upload
+@app.options("/api/templates/attachments/upload")
+async def attachments_upload_options():
+    return Response(status_code=200)
+
+# Add OPTIONS handler for all templates routes
+@app.options("/api/templates/{path:path}")
+async def templates_options():
     return Response(status_code=200)
 
 @app.get("/")
