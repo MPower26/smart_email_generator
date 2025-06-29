@@ -504,6 +504,20 @@ Best regards,
             except Exception as e:
                 raise Exception(f"Failed to generate follow-up email: {str(e)}")
         
+        # --- Attachment placeholder replacement ---
+        # Query all attachments for the user and replace [Placeholder] with the correct HTML tag
+        attachments = self.db.query(Attachment).filter_by(user_id=user.id).all()
+        for att in attachments:
+            if att.placeholder:
+                html_tag = att.blob_url
+                if att.file_type.lower().startswith("image"):
+                    html_tag = f'<img src="{att.blob_url}" style="max-width:300px; height:auto;" alt="Attachment" />'
+                elif att.file_type.lower().startswith("video"):
+                    html_tag = f'<video src="{att.blob_url}" controls style="max-width:300px; height:auto;"></video>'
+                # Replace [Placeholder] and [placeholder] (case-insensitive)
+                content = re.sub(rf"\\[{att.placeholder}\\]", html_tag, content, flags=re.IGNORECASE)
+                subject = re.sub(rf"\\[{att.placeholder}\\]", html_tag, subject, flags=re.IGNORECASE)
+        
         # Get user's interval settings for scheduling
         now = datetime.now(timezone.utc)
         followup_days = user.followup_interval_days or 3
@@ -668,6 +682,20 @@ Best regards,
         except Exception as e:
             raise Exception(f"Failed to generate last chance email: {str(e)}")
 
+        # --- Attachment placeholder replacement ---
+        # Query all attachments for the user and replace [Placeholder] with the correct HTML tag
+        attachments = self.db.query(Attachment).filter_by(user_id=user.id).all()
+        for att in attachments:
+            if att.placeholder:
+                html_tag = att.blob_url
+                if att.file_type.lower().startswith("image"):
+                    html_tag = f'<img src="{att.blob_url}" style="max-width:300px; height:auto;" alt="Attachment" />'
+                elif att.file_type.lower().startswith("video"):
+                    html_tag = f'<video src="{att.blob_url}" controls style="max-width:300px; height:auto;"></video>'
+                # Replace [Placeholder] and [placeholder] (case-insensitive)
+                content = re.sub(rf"\\[{att.placeholder}\\]", html_tag, content, flags=re.IGNORECASE)
+                subject = re.sub(rf"\\[{att.placeholder}\\]", html_tag, subject, flags=re.IGNORECASE)
+        
         # Get user's interval settings for scheduling
         now = datetime.now(timezone.utc)
         lastchance_days = user.lastchance_interval_days or 6
