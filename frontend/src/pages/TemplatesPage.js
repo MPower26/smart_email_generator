@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Container, Card, Form, Button, Alert, Modal, Tabs, Tab, Accordion, Badge, OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { templateService, userService, attachmentService } from '../services/api';
 import { UserContext } from '../contexts/UserContext';
+import UploadProgressBar from '../components/UploadProgressBar';
 
 const TemplatesPage = () => {
   const { userProfile, updateUserProfile } = useContext(UserContext);
@@ -53,6 +54,7 @@ const TemplatesPage = () => {
   const [attachmentLoading, setAttachmentLoading] = useState(false);
   const [attachmentError, setAttachmentError] = useState('');
   const [attachmentSuccess, setAttachmentSuccess] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   // Charger les templates au chargement de la page
   useEffect(() => {
@@ -334,15 +336,28 @@ const TemplatesPage = () => {
   const handleUploadAttachment = async (e) => {
     e.preventDefault();
     setAttachmentLoading(true);
+    setUploadProgress(0); // Reset progress
     setAttachmentError('');
     setAttachmentSuccess('');
+    
     try {
       if (!attachmentFile || !attachmentPlaceholder) {
         setAttachmentError('File and placeholder are required.');
         setAttachmentLoading(false);
         return;
       }
-      await attachmentService.uploadAttachment(attachmentFile, attachmentPlaceholder, attachmentCategory);
+      
+      await attachmentService.uploadAttachment(
+        attachmentFile, 
+        attachmentPlaceholder, 
+        attachmentCategory,
+        (evt) => {
+          // Calculate upload progress percentage
+          const percent = Math.round((evt.loaded * 100) / evt.total);
+          setUploadProgress(percent);
+        }
+      );
+      
       setAttachmentSuccess('Attachment uploaded!');
       setAttachmentFile(null);
       setAttachmentPlaceholder('');
@@ -352,6 +367,7 @@ const TemplatesPage = () => {
       setAttachmentError(err.response?.data?.detail || 'Failed to upload attachment.');
     } finally {
       setAttachmentLoading(false);
+      setUploadProgress(0); // Reset progress
     }
   };
 
@@ -639,6 +655,15 @@ Your signature text here..."
               </Form.Group>
               <Button type="submit" variant="primary" disabled={attachmentLoading}>{attachmentLoading ? 'Uploading...' : 'Upload Attachment'}</Button>
             </Form>
+            
+            {/* Upload Progress Bar */}
+            <UploadProgressBar 
+              progress={uploadProgress}
+              show={attachmentLoading}
+              filename={attachmentFile?.name}
+              variant="primary"
+            />
+            
             {/* List attachments */}
             <div className="mt-3">
               {attachments.length === 0 ? (
