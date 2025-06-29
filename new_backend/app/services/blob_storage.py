@@ -321,7 +321,8 @@ class BlobStorageService:
         if not self.client:
             raise HTTPException(status_code=500, detail="Blob storage not configured.")
         blob_client = self.client.get_blob_client(container=self.container_name, blob=blob_name)
-        return await blob_client.download_blob().readall()
+        download_stream = await blob_client.download_blob()
+        return download_stream.readall()
 
     async def assemble_chunks(self, upload_id: str, total_chunks: int, file_extension: str, user_email: str) -> bytes:
         """Download and concatenate all chunks for upload_id in order, return the assembled file bytes"""
