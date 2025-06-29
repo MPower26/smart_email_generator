@@ -8,7 +8,7 @@ import os
 from app.db.database import get_db
 from app.models.models import EmailTemplate, User, Attachment
 from app.api.auth import get_current_user
-from app.services.blob_storage_service import blob_storage_service
+from app.services.blob_storage import blob_storage_service
 
 router = APIRouter()
 
