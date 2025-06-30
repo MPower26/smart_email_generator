@@ -442,8 +442,13 @@ async def assemble_chunks(
 ):
     # Download and assemble all chunks
     assembled_bytes = await blob_storage_service.assemble_chunks(upload_id, total_chunks, file_extension, current_user.email)
+    
+    # Determine if this is a video file
+    is_video = file_extension.lower() in [".mp4", ".mov", ".avi", ".wmv", ".mkv", ".webm", ".flv", ".m4v", ".3gp", ".ogv", ".ts", ".mts", ".m2ts"]
+    
     # Upload the assembled file as a new attachment
-    blob_url = await blob_storage_service.upload_attachment(assembled_bytes, file_extension, current_user.email)
+    blob_url, gif_url = await blob_storage_service.upload_attachment(assembled_bytes, file_extension, current_user.email, is_video=is_video)
+    
     # Save to DB
     file_type = "image" if file_extension.lower() in [".jpg", ".jpeg", ".png", ".gif", ".webp"] else "video"
     attachment = Attachment(
@@ -452,11 +457,14 @@ async def assemble_chunks(
         blob_url=blob_url,
         placeholder=placeholder,
         file_type=file_type,
-        category=category
+        category=category,
+        gif_url=gif_url
     )
     db.add(attachment)
     db.commit()
     db.refresh(attachment)
+    
     # Delete all chunk blobs
     await blob_storage_service.delete_chunks(upload_id, total_chunks, file_extension)
+    
     return {"message": "File assembled and uploaded", "blob_url": blob_url} 
