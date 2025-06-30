@@ -181,7 +181,8 @@ class Attachment(Base):
     category = Column(String(50), nullable=True)  # Optional: for grouping
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     gif_url = Column(String(500), nullable=True)  # URL to uploaded GIF preview
+    custom_thumbnail_url = Column(String(500), nullable=True)  # URL to custom thumbnail uploaded by user
     user = relationship("User", back_populates="attachments")
 
     def __repr__(self):
-        return f"<Attachment(id={self.id}, user_id={self.user_id}, placeholder={self.placeholder}, file_type={self.file_type}, gif_url={self.gif_url})>"
+        return f"<Attachment(id={self.id}, user_id={self.user_id}, placeholder={self.placeholder}, file_type={self.file_type}, gif_url={self.gif_url}, custom_thumbnail_url={self.custom_thumbnail_url})>"
