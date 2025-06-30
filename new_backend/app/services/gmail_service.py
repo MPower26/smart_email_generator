@@ -43,6 +43,43 @@ def send_gmail_email(user, to_email, subject, body):
     attachments = db.query(Attachment).filter_by(user_id=user.id).all()
     print(f"🔍 Found {len(attachments)} attachments for user {user.email}")
     
+    # First, restore any __ATTACHMENT_*__ markers to [Placeholder] format
+    for att in attachments:
+        if att.placeholder:
+            marker = f"__ATTACHMENT_{att.placeholder.upper()}__"
+            if marker in body:
+                print(f"🔄 Restoring marker {marker} to [{att.placeholder}] in Gmail service")
+                body = body.replace(marker, f"[{att.placeholder}]")
+                subject = subject.replace(marker, f"[{att.placeholder}]")
+            
+            # Also check for corrupted markers and restore them
+            corrupted_patterns = [
+                f"ATTACHMENT{att.placeholder.upper()}",
+                f"ATTACHMENT_{att.placeholder.upper()}",
+                f"__ATTACHMENT{att.placeholder.upper()}",
+                f"ATTACHMENT{att.placeholder.upper()}ET",
+                f"ATTACHMENT{att.placeholder.upper()}T"
+            ]
+            
+            for corrupted_pattern in corrupted_patterns:
+                if corrupted_pattern in body:
+                    print(f"🔧 Restoring corrupted marker in Gmail: {corrupted_pattern} -> [{att.placeholder}]")
+                    body = body.replace(corrupted_pattern, f"[{att.placeholder}]")
+                    subject = subject.replace(corrupted_pattern, f"[{att.placeholder}]")
+                    break
+            
+            # If no exact match, try to find patterns with extra characters
+            else:
+                # Look for patterns that start with ATTACHMENT and contain the placeholder
+                pattern = rf"ATTACHMENT{att.placeholder.upper()}[A-Z]*"
+                matches = re.findall(pattern, body)
+                if matches:
+                    for match in matches:
+                        print(f"🔧 Restoring corrupted marker with extra chars in Gmail: {match} -> [{att.placeholder}]")
+                        body = body.replace(match, f"[{att.placeholder}]")
+                        subject = subject.replace(match, f"[{att.placeholder}]")
+                        break
+    
     for att in attachments:
         if att.placeholder:
             print(f"🎯 Processing attachment: {att.placeholder} (type: {att.file_type})")
