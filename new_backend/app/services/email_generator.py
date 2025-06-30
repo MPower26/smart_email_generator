@@ -17,6 +17,7 @@ from app.models.models import GeneratedEmail, User, EmailTemplate, EmailGenerati
 AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
 AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
 AZURE_DEPLOYMENT_NAME = os.getenv("AZURE_DEPLOYMENT_NAME", "Avocat")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 # --- Initialize Logger ---
 logger = logging.getLogger(__name__)
@@ -270,15 +271,18 @@ class EmailGenerator:
                     if att.file_type.lower().startswith("image"):
                         html_tag = f'<img src="{att.blob_url}" style="max-width:300px; height:auto;" alt="Attachment" />'
                     elif att.file_type.lower().startswith("video"):
+                        # Use the watch page URL for videos instead of direct blob URL
+                        watch_url = f"{FRONTEND_URL}/watch?src={att.blob_url}&title={att.placeholder}"
                         if getattr(att, 'gif_url', None):
                             html_tag = (
-                                f'<a href="{att.blob_url}" target="_blank" rel="noopener">'
+                                f'<a href="{watch_url}" target="_blank" rel="noopener">'
                                 f'  <img src="{att.gif_url}" alt="\u25B6\ufe0f Watch video" '
                                 f'       style="max-width:300px; height:auto; display:block; margin:0 auto;" />'
                                 f'</a>'
                             )
                         else:
-                            html_tag = f'<video src="{att.blob_url}" controls style="max-width:300px; height:auto;"></video>'
+                            # Fallback to direct video link if no GIF
+                            html_tag = f'<a href="{watch_url}" target="_blank" rel="noopener">Watch Video</a>'
                     # Replace [Placeholder] and [placeholder] (case-insensitive)
                     content = re.sub(rf"\\[{att.placeholder}\\]", html_tag, content, flags=re.IGNORECASE)
                     subject = re.sub(rf"\\[{att.placeholder}\\]", html_tag, subject, flags=re.IGNORECASE)
@@ -475,15 +479,18 @@ class EmailGenerator:
                 if att.file_type.lower().startswith("image"):
                     html_tag = f'<img src="{att.blob_url}" style="max-width:300px; height:auto;" alt="Attachment" />'
                 elif att.file_type.lower().startswith("video"):
+                    # Use the watch page URL for videos instead of direct blob URL
+                    watch_url = f"{FRONTEND_URL}/watch?src={att.blob_url}&title={att.placeholder}"
                     if getattr(att, 'gif_url', None):
                         html_tag = (
-                            f'<a href="{att.blob_url}" target="_blank" rel="noopener">'
+                            f'<a href="{watch_url}" target="_blank" rel="noopener">'
                             f'  <img src="{att.gif_url}" alt="\u25B6\ufe0f Watch video" '
                             f'       style="max-width:300px; height:auto; display:block; margin:0 auto;" />'
                             f'</a>'
                         )
                     else:
-                        html_tag = f'<video src="{att.blob_url}" controls style="max-width:300px; height:auto;"></video>'
+                        # Fallback to direct video link if no GIF
+                        html_tag = f'<a href="{watch_url}" target="_blank" rel="noopener">Watch Video</a>'
                 # Log before replacement
                 if re.search(rf"\\[{att.placeholder}\\]", content, flags=re.IGNORECASE):
                     logger.info(f"Replacing placeholder [{att.placeholder}] with HTML tag in follow-up email.")
@@ -658,15 +665,18 @@ class EmailGenerator:
                 if att.file_type.lower().startswith("image"):
                     html_tag = f'<img src="{att.blob_url}" style="max-width:300px; height:auto;" alt="Attachment" />'
                 elif att.file_type.lower().startswith("video"):
+                    # Use the watch page URL for videos instead of direct blob URL
+                    watch_url = f"{FRONTEND_URL}/watch?src={att.blob_url}&title={att.placeholder}"
                     if getattr(att, 'gif_url', None):
                         html_tag = (
-                            f'<a href="{att.blob_url}" target="_blank" rel="noopener">'
+                            f'<a href="{watch_url}" target="_blank" rel="noopener">'
                             f'  <img src="{att.gif_url}" alt="\u25B6\ufe0f Watch video" '
                             f'       style="max-width:300px; height:auto; display:block; margin:0 auto;" />'
                             f'</a>'
                         )
                     else:
-                        html_tag = f'<video src="{att.blob_url}" controls style="max-width:300px; height:auto;"></video>'
+                        # Fallback to direct video link if no GIF
+                        html_tag = f'<a href="{watch_url}" target="_blank" rel="noopener">Watch Video</a>'
                 # Replace [Placeholder] and [placeholder] (case-insensitive)
                 content = re.sub(rf"\\[{att.placeholder}\\]", html_tag, content, flags=re.IGNORECASE)
                 subject = re.sub(rf"\\[{att.placeholder}\\]", html_tag, subject, flags=re.IGNORECASE)
