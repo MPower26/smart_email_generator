@@ -10,6 +10,7 @@ from datetime import datetime, timezone, timedelta
 from sqlalchemy import or_
 import uuid
 import re
+import urllib.parse
 
 from app.models.models import GeneratedEmail, User, EmailTemplate, EmailGenerationProgress, Attachment
 
@@ -346,9 +347,11 @@ class EmailGenerator:
                         html_tag = f'<img src="{att.blob_url}" style="max-width:300px; height:auto;" alt="Attachment" />'
                         logger.info(f"🖼️  Image placeholder: [{att.placeholder}] -> {html_tag[:100]}...")
                     elif att.file_type.lower().startswith("video"):
-                        # Use the watch page URL for videos instead of direct blob URL
-                        frontend_url = FRONTEND_URL or "https://jolly-bush-0bae83703.6.azurestaticapps.net"
-                        watch_url = f"{frontend_url}/watch?src={att.blob_url}&title={att.placeholder}"
+                        # Use the proxy endpoint to avoid CORS issues
+                        backend_url = "https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net"
+                        proxy_url = f"{backend_url}/api/video-proxy/{urllib.parse.quote(att.blob_url)}"
+                        watch_url = f"{frontend_url}/watch?src={urllib.parse.quote(proxy_url)}&title={att.placeholder}"
+                        logger.info(f"🎬 Video placeholder: [{att.placeholder}] -> proxy_url: {proxy_url}")
                         logger.info(f"🎬 Video placeholder: [{att.placeholder}] -> watch_url: {watch_url}")
                         
                         if getattr(att, 'gif_url', None):
@@ -604,9 +607,11 @@ class EmailGenerator:
                     html_tag = f'<img src="{att.blob_url}" style="max-width:300px; height:auto;" alt="Attachment" />'
                     logger.info(f"🖼️  Image placeholder: [{att.placeholder}] -> {html_tag[:100]}...")
                 elif att.file_type.lower().startswith("video"):
-                    # Use the watch page URL for videos instead of direct blob URL
-                    frontend_url = FRONTEND_URL or "https://jolly-bush-0bae83703.6.azurestaticapps.net"
-                    watch_url = f"{frontend_url}/watch?src={att.blob_url}&title={att.placeholder}"
+                    # Use the proxy endpoint to avoid CORS issues
+                    backend_url = "https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net"
+                    proxy_url = f"{backend_url}/api/video-proxy/{urllib.parse.quote(att.blob_url)}"
+                    watch_url = f"{frontend_url}/watch?src={urllib.parse.quote(proxy_url)}&title={att.placeholder}"
+                    logger.info(f"🎬 Video placeholder: [{att.placeholder}] -> proxy_url: {proxy_url}")
                     logger.info(f"🎬 Video placeholder: [{att.placeholder}] -> watch_url: {watch_url}")
                     
                     if getattr(att, 'gif_url', None):
@@ -823,9 +828,11 @@ class EmailGenerator:
                     html_tag = f'<img src="{att.blob_url}" style="max-width:300px; height:auto;" alt="Attachment" />'
                     logger.info(f"🖼️  Image placeholder: [{att.placeholder}] -> {html_tag[:100]}...")
                 elif att.file_type.lower().startswith("video"):
-                    # Use the watch page URL for videos instead of direct blob URL
-                    frontend_url = FRONTEND_URL or "https://jolly-bush-0bae83703.6.azurestaticapps.net"
-                    watch_url = f"{frontend_url}/watch?src={att.blob_url}&title={att.placeholder}"
+                    # Use the proxy endpoint to avoid CORS issues
+                    backend_url = "https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net"
+                    proxy_url = f"{backend_url}/api/video-proxy/{urllib.parse.quote(att.blob_url)}"
+                    watch_url = f"{frontend_url}/watch?src={urllib.parse.quote(proxy_url)}&title={att.placeholder}"
+                    logger.info(f"🎬 Video placeholder: [{att.placeholder}] -> proxy_url: {proxy_url}")
                     logger.info(f"🎬 Video placeholder: [{att.placeholder}] -> watch_url: {watch_url}")
                     
                     if getattr(att, 'gif_url', None):
@@ -1013,3 +1020,5 @@ class EmailGenerator:
             except Exception as e:
                 logger.error(f"Error re-generating last chance email for ID {email.id}: {e}")
                 raise Exception(f"Failed to re-generate last chance email: {str(e)}")
+        # Fallback for other stages (original logic)
+        # ... existing code for other stages ...
