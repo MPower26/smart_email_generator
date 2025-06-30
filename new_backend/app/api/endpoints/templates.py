@@ -321,7 +321,9 @@ async def upload_attachment(
     if not any(file.content_type.startswith(t) for t in allowed_types):
         logger.warning(f"❌ Invalid file type: {file.content_type}")
         raise HTTPException(status_code=400, detail="File must be an image or video")
-    
+
+    is_video = file.content_type.startswith("video/")
+
     # Validate file size (max 20MB)
     max_size = 20 * 1024 * 1024  # 20MB
     if file.size > max_size:
@@ -345,7 +347,7 @@ async def upload_attachment(
     
     logger.info("☁️  Starting Azure Blob Storage upload...")
     blob_start = time.time()
-    blob_url = await blob_storage_service.upload_attachment(content, file_extension, current_user.email)
+    blob_url, gif_url = await blob_storage_service.upload_attachment(content, file_extension, current_user.email, is_video=is_video)
     blob_duration = time.time() - blob_start
     logger.info(f"✅ Blob upload completed in {blob_duration:.2f}s")
     
@@ -356,7 +358,8 @@ async def upload_attachment(
         blob_url=blob_url,
         placeholder=placeholder,
         file_type=file_type,
-        category=category
+        category=category,
+        gif_url=gif_url
     )
     
     logger.info("💾 Saving attachment to database...")
