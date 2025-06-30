@@ -14,7 +14,6 @@ const EnhancedTemplateEditor = ({
   const [attachments, setAttachments] = useState([]);
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [autocompletePosition, setAutocompletePosition] = useState({ top: 0, left: 0 });
-  const [currentInput, setCurrentInput] = useState('');
   const [cursorPosition, setCursorPosition] = useState(0);
   const [filteredAttachments, setFilteredAttachments] = useState([]);
   const textareaRef = useRef(null);
@@ -38,7 +37,8 @@ const EnhancedTemplateEditor = ({
     const newValue = e.target.value;
     const cursorPos = e.target.selectionStart;
     
-    setCurrentInput(newValue);
+    console.log('EnhancedTemplateEditor handleChange:', { newValue, cursorPos, value: e.target.value });
+    
     setCursorPosition(cursorPos);
     
     // Check if we should show autocomplete
@@ -75,7 +75,10 @@ const EnhancedTemplateEditor = ({
       setShowAutocomplete(false);
     }
     
-    onChange(e);
+    // Always call the parent's onChange handler
+    if (onChange) {
+      onChange(e);
+    }
   };
 
   // Handle autocomplete selection
@@ -90,7 +93,6 @@ const EnhancedTemplateEditor = ({
                       `[${attachment.placeholder}]` + 
                       afterCursor;
       
-      setCurrentInput(newValue);
       setShowAutocomplete(false);
       
       // Trigger onChange with the new value
@@ -174,6 +176,7 @@ const EnhancedTemplateEditor = ({
           <Form.Control
             ref={textareaRef}
             as="textarea"
+            name="content"
             value={value}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
