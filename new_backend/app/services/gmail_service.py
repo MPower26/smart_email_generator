@@ -41,15 +41,20 @@ def send_gmail_email(user, to_email, subject, body):
     
     # Query all attachments for the user and replace [Placeholder] with the correct HTML tag
     attachments = db.query(Attachment).filter_by(user_id=user.id).all()
+    print(f"🔍 Found {len(attachments)} attachments for user {user.email}")
+    
     for att in attachments:
         if att.placeholder:
+            print(f"🎯 Processing attachment: {att.placeholder} (type: {att.file_type})")
             html_tag = att.blob_url
             if att.file_type.lower().startswith("image"):
                 html_tag = f'<img src="{att.blob_url}" style="max-width:300px; height:auto;" alt="Attachment" />'
+                print(f"🖼️  Image placeholder: [{att.placeholder}] -> {html_tag[:100]}...")
             elif att.file_type.lower().startswith("video"):
                 # Use the watch page URL for videos instead of direct blob URL
                 frontend_url = os.getenv("FRONTEND_URL", "https://jolly-bush-0bae83703.6.azurestaticapps.net")
                 watch_url = f"{frontend_url}/watch?src={att.blob_url}&title={att.placeholder}"
+                print(f"🎬 Video placeholder: [{att.placeholder}] -> watch_url: {watch_url}")
                 
                 if getattr(att, 'gif_url', None):
                     html_tag = (
@@ -58,13 +63,24 @@ def send_gmail_email(user, to_email, subject, body):
                         f'       style="max-width:300px; height:auto; display:block; margin:0 auto;" />'
                         f'</a>'
                     )
+                    print(f"🎬 Video with GIF: [{att.placeholder}] -> {html_tag[:100]}...")
                 else:
                     # Fallback to direct video link if no GIF
                     html_tag = f'<a href="{watch_url}" target="_blank" rel="noopener">Watch Video</a>'
+                    print(f"🎬 Video without GIF: [{att.placeholder}] -> {html_tag}")
             
-            # Replace [Placeholder] and [placeholder] (case-insensitive)
-            body = re.sub(rf"\\[{att.placeholder}\\]", html_tag, body, flags=re.IGNORECASE)
-            subject = re.sub(rf"\\[{att.placeholder}\\]", html_tag, subject, flags=re.IGNORECASE)
+            # Check if placeholder exists in body
+            if re.search(rf"\[{att.placeholder}\]", body, flags=re.IGNORECASE):
+                print(f"✅ Found placeholder [{att.placeholder}] in body, replacing...")
+                body = re.sub(rf"\[{att.placeholder}\]", html_tag, body, flags=re.IGNORECASE)
+                subject = re.sub(rf"\[{att.placeholder}\]", html_tag, subject, flags=re.IGNORECASE)
+                print(f"✅ Replacement completed for [{att.placeholder}]")
+            else:
+                print(f"⚠️  Placeholder [{att.placeholder}] not found in body")
+                print(f"📧 Body content: {body}")
+    
+    print(f"📧 Final body length: {len(body)} characters")
+    print(f"📧 Body preview: {body[:200]}...")
     
     # Debug: print signature image URL
     print("User signature image URL:", getattr(user, 'signature_image_url', None))
