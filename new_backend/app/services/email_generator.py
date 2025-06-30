@@ -285,10 +285,8 @@ class EmailGenerator:
                                 break
                     
                     if not restored:
-                        # If no corrupted pattern found, try to insert the marker back
-                        logger.warning(f"⚠️  Could not find corrupted marker for {marker}, attempting to restore")
-                        # Add the marker at the end of the content as a fallback
-                        generated_content += f"\n\n{marker}"
+                        # If no corrupted pattern found, log a warning but don't add the marker
+                        logger.warning(f"⚠️  Could not find corrupted marker for {marker}, skipping this attachment")
             
             # Extract subject from first line of content and remove "Subject: " prefix if present
             content_lines = generated_content.split('\n')
@@ -339,9 +337,16 @@ class EmailGenerator:
             logger.info(f"🔍 Content after markdown removal: {content}")
             
             # Now replace placeholders with actual HTML content
+            # Only process attachments that have placeholders in the content
             for att in attachments:
                 if att.placeholder:
                     logger.info(f"🎯 Processing attachment: {att.placeholder} (type: {att.file_type})")
+                    
+                    # Check if placeholder exists in content before processing
+                    if not re.search(rf"\[{att.placeholder}\]", content, flags=re.IGNORECASE):
+                        logger.info(f"⏭️  Skipping attachment {att.placeholder} - placeholder not found in content")
+                        continue
+                    
                     html_tag = att.blob_url
                     if att.file_type.lower().startswith("image"):
                         html_tag = f'<img src="{att.blob_url}" style="max-width:300px; height:auto;" alt="Attachment" />'
@@ -367,14 +372,11 @@ class EmailGenerator:
                             html_tag = f'<a href="{watch_url}" target="_blank" rel="noopener">Watch Video</a>'
                             logger.info(f"🎬 Video without GIF: [{att.placeholder}] -> {html_tag}")
                     
-                    # Check if placeholder exists in content
-                    if re.search(rf"\[{att.placeholder}\]", content, flags=re.IGNORECASE):
-                        logger.info(f"✅ Found placeholder [{att.placeholder}] in content, replacing...")
-                        content = re.sub(rf"\[{att.placeholder}\]", html_tag, content, flags=re.IGNORECASE)
-                        subject = re.sub(rf"\[{att.placeholder}\]", html_tag, subject, flags=re.IGNORECASE)
-                        logger.info(f"✅ Replacement completed for [{att.placeholder}]")
-                    else:
-                        logger.warning(f"⚠️  Placeholder [{att.placeholder}] not found in content")
+                    # Replace the placeholder with HTML
+                    logger.info(f"✅ Found placeholder [{att.placeholder}] in content, replacing...")
+                    content = re.sub(rf"\[{att.placeholder}\]", html_tag, content, flags=re.IGNORECASE)
+                    subject = re.sub(rf"\[{att.placeholder}\]", html_tag, subject, flags=re.IGNORECASE)
+                    logger.info(f"✅ Replacement completed for [{att.placeholder}]")
             
             logger.info(f"📧 Final content length: {len(content)} characters")
             logger.info(f"📧 Content preview: {content[:200]}...")
@@ -642,7 +644,7 @@ class EmailGenerator:
                     subject = re.sub(rf"\[{att.placeholder}\]", html_tag, subject, flags=re.IGNORECASE)
                     logger.info(f"✅ Replacement completed for [{att.placeholder}]")
                 else:
-                    logger.warning(f"⚠️  Placeholder [{att.placeholder}] not found in content")
+                    logger.info(f"⏭️  Skipping attachment {att.placeholder} - placeholder not found in content")
         
         # Get user's interval settings for scheduling
         now = datetime.now(timezone.utc)
@@ -863,7 +865,7 @@ class EmailGenerator:
                     subject = re.sub(rf"\[{att.placeholder}\]", html_tag, subject, flags=re.IGNORECASE)
                     logger.info(f"✅ Replacement completed for [{att.placeholder}]")
                 else:
-                    logger.warning(f"⚠️  Placeholder [{att.placeholder}] not found in content")
+                    logger.info(f"⏭️  Skipping attachment {att.placeholder} - placeholder not found in content")
         
         # Get user's interval settings for scheduling
         now = datetime.now(timezone.utc)
