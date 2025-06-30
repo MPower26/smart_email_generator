@@ -260,15 +260,25 @@ async def video_proxy(video_path: str, request: Request):
         # Decode the video path (it's URL-encoded)
         decoded_path = urllib.parse.unquote(video_path)
         
+        # Fix double-encoded URLs (sometimes : becomes %3A)
+        if decoded_path.startswith("https%3A"):
+            decoded_path = decoded_path.replace("https%3A", "https:")
+        elif decoded_path.startswith("https:/"):
+            decoded_path = decoded_path.replace("https:/", "https://")
+        
         # Validate that it's a blob storage URL
         if not decoded_path.startswith("https://smartemailsignatures.blob.core.windows.net/"):
+            logger.error(f"Invalid video URL: {decoded_path}")
             raise HTTPException(status_code=400, detail="Invalid video URL")
+        
+        logger.info(f"🔗 Proxying video from: {decoded_path}")
         
         # Stream the video from Azure Blob Storage
         async with httpx.AsyncClient() as client:
             response = await client.get(decoded_path, stream=True)
             
             if response.status_code != 200:
+                logger.error(f"Video not found: {decoded_path}, status: {response.status_code}")
                 raise HTTPException(status_code=response.status_code, detail="Video not found")
             
             # Return the video as a streaming response
