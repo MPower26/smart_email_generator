@@ -2,6 +2,7 @@ import requests
 import base64
 import re
 import os
+import urllib.parse
 
 class GmailTokenError(Exception):
     """Custom exception for Gmail token-related errors."""
@@ -88,9 +89,12 @@ def send_gmail_email(user, to_email, subject, body):
                 html_tag = f'<img src="{att.blob_url}" style="max-width:300px; height:auto;" alt="Attachment" />'
                 print(f"🖼️  Image placeholder: [{att.placeholder}] -> {html_tag[:100]}...")
             elif att.file_type.lower().startswith("video"):
-                # Use the watch page URL for videos instead of direct blob URL
+                # Use the proxy endpoint to avoid CORS issues
+                backend_url = "https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net"
+                proxy_url = f"{backend_url}/api/video-proxy/{urllib.parse.quote(att.blob_url)}"
                 frontend_url = os.getenv("FRONTEND_URL", "https://jolly-bush-0bae83703.6.azurestaticapps.net")
-                watch_url = f"{frontend_url}/watch?src={att.blob_url}&title={att.placeholder}"
+                watch_url = f"{frontend_url}/watch?src={urllib.parse.quote(proxy_url)}&title={att.placeholder}"
+                print(f"🎬 Video placeholder: [{att.placeholder}] -> proxy_url: {proxy_url}")
                 print(f"🎬 Video placeholder: [{att.placeholder}] -> watch_url: {watch_url}")
                 
                 if getattr(att, 'gif_url', None):
@@ -204,3 +208,4 @@ def check_reply(user, generated_email):
         if from_email and recipient_email.lower() in from_email:
             return True
     return False
+
