@@ -380,7 +380,16 @@ class EmailGenerator:
                         logger.info(f"🎬 Video placeholder: [{att.placeholder}] -> proxy_url: {proxy_url}")
                         logger.info(f"🎬 Video placeholder: [{att.placeholder}] -> watch_url: {watch_url}")
                         
-                        if getattr(att, 'gif_url', None):
+                        # Priority: custom thumbnail > auto-generated GIF > simple link
+                        if getattr(att, 'custom_thumbnail_url', None):
+                            html_tag = (
+                                f'<a href="{watch_url}" target="_blank" rel="noopener">'
+                                f'  <img src="{att.custom_thumbnail_url}" alt="\u25B6\ufe0f Watch video" '
+                                f'       style="max-width:300px; height:auto; display:block; margin:0 auto;" />'
+                                f'</a>'
+                            )
+                            logger.info(f"🎬 Video with custom thumbnail: [{att.placeholder}] -> {html_tag[:100]}...")
+                        elif getattr(att, 'gif_url', None):
                             html_tag = (
                                 f'<a href="{watch_url}" target="_blank" rel="noopener">'
                                 f'  <img src="{att.gif_url}" alt="\u25B6\ufe0f Watch video" '
@@ -389,9 +398,9 @@ class EmailGenerator:
                             )
                             logger.info(f"🎬 Video with GIF: [{att.placeholder}] -> {html_tag[:100]}...")
                         else:
-                            # Fallback to direct video link if no GIF
+                            # Fallback to direct video link if no thumbnail
                             html_tag = f'<a href="{watch_url}" target="_blank" rel="noopener">Watch Video</a>'
-                            logger.info(f"🎬 Video without GIF: [{att.placeholder}] -> {html_tag}")
+                            logger.info(f"🎬 Video without thumbnail: [{att.placeholder}] -> {html_tag}")
                     
                     # Replace the placeholder with HTML
                     logger.info(f"✅ Found placeholder [{att.placeholder}] in content, replacing...")
@@ -666,7 +675,16 @@ class EmailGenerator:
                     logger.info(f"🎬 Video placeholder: [{att.placeholder}] -> proxy_url: {proxy_url}")
                     logger.info(f"🎬 Video placeholder: [{att.placeholder}] -> watch_url: {watch_url}")
                     
-                    if getattr(att, 'gif_url', None):
+                    # Priority: custom thumbnail > auto-generated GIF > simple link
+                    if getattr(att, 'custom_thumbnail_url', None):
+                        html_tag = (
+                            f'<a href="{watch_url}" target="_blank" rel="noopener">'
+                            f'  <img src="{att.custom_thumbnail_url}" alt="\u25B6\ufe0f Watch video" '
+                            f'       style="max-width:300px; height:auto; display:block; margin:0 auto;" />'
+                            f'</a>'
+                        )
+                        logger.info(f"🎬 Video with custom thumbnail: [{att.placeholder}] -> {html_tag[:100]}...")
+                    elif getattr(att, 'gif_url', None):
                         html_tag = (
                             f'<a href="{watch_url}" target="_blank" rel="noopener">'
                             f'  <img src="{att.gif_url}" alt="\u25B6\ufe0f Watch video" '
@@ -675,9 +693,9 @@ class EmailGenerator:
                         )
                         logger.info(f"🎬 Video with GIF: [{att.placeholder}] -> {html_tag[:100]}...")
                     else:
-                        # Fallback to direct video link if no GIF
+                        # Fallback to direct video link if no thumbnail
                         html_tag = f'<a href="{watch_url}" target="_blank" rel="noopener">Watch Video</a>'
-                        logger.info(f"🎬 Video without GIF: [{att.placeholder}] -> {html_tag}")
+                        logger.info(f"🎬 Video without thumbnail: [{att.placeholder}] -> {html_tag}")
                 
                 # Check if placeholder exists in content
                 if re.search(rf"\[{att.placeholder}\]", content, flags=re.IGNORECASE):
@@ -908,7 +926,16 @@ class EmailGenerator:
                     logger.info(f"🎬 Video placeholder: [{att.placeholder}] -> proxy_url: {proxy_url}")
                     logger.info(f"🎬 Video placeholder: [{att.placeholder}] -> watch_url: {watch_url}")
                     
-                    if getattr(att, 'gif_url', None):
+                    # Priority: custom thumbnail > auto-generated GIF > simple link
+                    if getattr(att, 'custom_thumbnail_url', None):
+                        html_tag = (
+                            f'<a href="{watch_url}" target="_blank" rel="noopener">'
+                            f'  <img src="{att.custom_thumbnail_url}" alt="\u25B6\ufe0f Watch video" '
+                            f'       style="max-width:300px; height:auto; display:block; margin:0 auto;" />'
+                            f'</a>'
+                        )
+                        logger.info(f"🎬 Video with custom thumbnail: [{att.placeholder}] -> {html_tag[:100]}...")
+                    elif getattr(att, 'gif_url', None):
                         html_tag = (
                             f'<a href="{watch_url}" target="_blank" rel="noopener">'
                             f'  <img src="{att.gif_url}" alt="\u25B6\ufe0f Watch video" '
@@ -917,9 +944,9 @@ class EmailGenerator:
                         )
                         logger.info(f"🎬 Video with GIF: [{att.placeholder}] -> {html_tag[:100]}...")
                     else:
-                        # Fallback to direct video link if no GIF
+                        # Fallback to direct video link if no thumbnail
                         html_tag = f'<a href="{watch_url}" target="_blank" rel="noopener">Watch Video</a>'
-                        logger.info(f"🎬 Video without GIF: [{att.placeholder}] -> {html_tag}")
+                        logger.info(f"🎬 Video without thumbnail: [{att.placeholder}] -> {html_tag}")
                 
                 # Check if placeholder exists in content
                 if re.search(rf"\[{att.placeholder}\]", content, flags=re.IGNORECASE):
