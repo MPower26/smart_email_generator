@@ -5,6 +5,7 @@ import { UserContext } from '../contexts/UserContext';
 import UploadProgressBar from '../components/UploadProgressBar';
 import { useFileUpload } from '../hooks/useFileUpload';
 import EnhancedTemplateEditor from '../components/EnhancedTemplateEditor';
+import api, { API_BASE_URL } from '../services/api';
 
 const TemplatesPage = () => {
   const { userProfile, updateUserProfile } = useContext(UserContext);
@@ -394,7 +395,7 @@ const TemplatesPage = () => {
         if (attachmentId) {
           const formData = new FormData();
           formData.append('thumbnail', attachmentThumbnail);
-          await fetch(`/api/templates/attachments/${attachmentId}/thumbnail`, {
+          await fetch(`${API_BASE_URL}/api/templates/attachments/${attachmentId}/thumbnail`, {
             method: 'POST',
             body: formData,
             headers: {
@@ -444,7 +445,7 @@ const TemplatesPage = () => {
     try {
       const formData = new FormData();
       formData.append('thumbnail', file);
-      const res = await fetch(`/api/templates/attachments/${attachmentId}/thumbnail`, {
+      const res = await fetch(`${API_BASE_URL}/api/templates/attachments/${attachmentId}/thumbnail`, {
         method: 'POST',
         body: formData,
         headers: {
@@ -466,7 +467,7 @@ const TemplatesPage = () => {
     setThumbnailMessage('');
     setThumbnailError('');
     try {
-      const res = await fetch(`/api/templates/attachments/${attachmentId}/thumbnail`, {
+      const res = await fetch(`${API_BASE_URL}/api/templates/attachments/${attachmentId}/thumbnail`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`
