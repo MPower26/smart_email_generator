@@ -55,6 +55,7 @@ const TemplatesPage = () => {
   const [attachmentCategory, setAttachmentCategory] = useState('');
   const [attachmentError, setAttachmentError] = useState('');
   const [attachmentSuccess, setAttachmentSuccess] = useState('');
+  const [attachmentThumbnail, setAttachmentThumbnail] = useState(null);
   
   // Use the file upload hook
   const { 
@@ -368,21 +369,47 @@ const TemplatesPage = () => {
     setAttachmentFile(e.target.files[0]);
   };
 
+  // Handle thumbnail select
+  const handleAttachmentThumbnail = (e) => {
+    setAttachmentThumbnail(e.target.files[0]);
+  };
+
   // Handle upload
   const handleUploadAttachment = async (e) => {
     e.preventDefault();
-    
     if (!attachmentFile || !attachmentPlaceholder) {
       setAttachmentError('File and placeholder are required.');
       return;
     }
-    
-    // Reset any previous errors/success messages
     setAttachmentError('');
     setAttachmentSuccess('');
-    
-    // Use the hook's upload function
-    await uploadAttachmentFile(attachmentFile, attachmentPlaceholder, attachmentCategory);
+    try {
+      // Upload attachment (image or video)
+      const res = await uploadAttachmentFile(attachmentFile, attachmentPlaceholder, attachmentCategory);
+      // Si c'est une vidéo et qu'un thumbnail est sélectionné, upload du thumbnail
+      if (res && res.data && attachmentFile.type.startsWith('video') && attachmentThumbnail) {
+        const attachmentId = res.data.id || (res.data.attachment_id || res.data.attachmentId);
+        if (attachmentId) {
+          const formData = new FormData();
+          formData.append('thumbnail', attachmentThumbnail);
+          await fetch(`/api/templates/attachments/${attachmentId}/thumbnail`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+        }
+      }
+      setAttachmentSuccess('Attachment uploaded successfully.');
+      setAttachmentFile(null);
+      setAttachmentThumbnail(null);
+      setAttachmentPlaceholder('');
+      setAttachmentCategory('');
+      await loadAttachments();
+    } catch (err) {
+      setAttachmentError('Failed to upload attachment.');
+    }
   };
 
   // Handle delete
@@ -657,6 +684,11 @@ Your signature text here..."
               <Form.Group className="mb-2">
                 <Form.Label>File</Form.Label>
                 <Form.Control type="file" accept="image/*,video/*" onChange={handleAttachmentFile} />
+              </Form.Group>
+              <Form.Group className="mb-2">
+                <Form.Label>Thumbnail (optional, for videos)</Form.Label>
+                <Form.Control type="file" accept="image/*" onChange={handleAttachmentThumbnail} />
+                <Form.Text className="text-muted">If you upload a video, you can add a custom thumbnail (JPG, PNG, GIF, WEBP).</Form.Text>
               </Form.Group>
               <Form.Group className="mb-2">
                 <Form.Label>Placeholder</Form.Label>
