@@ -5,6 +5,7 @@ from typing import Optional
 from azure.storage.blob import BlobServiceClient, ContentSettings
 from fastapi import HTTPException
 import logging
+import subprocess
 
 logger = logging.getLogger(__name__)
 
@@ -149,63 +150,62 @@ class BlobStorageService:
                 detail=f"Failed to upload image: {str(e)}"
             )
     
-    async def upload_attachment(self, file_content: bytes, file_extension: str, user_email: str) -> Optional[str]:
+    def _generate_gif_from_video(self, video_path: str, gif_path: str, duration: int = 2) -> bool:
+        """Generate a GIF from the first few seconds of a video using FFmpeg."""
+        try:
+            cmd = [
+                "ffmpeg", "-y", "-ss", "0", "-t", str(duration), "-i", video_path,
+                "-vf", "fps=10,scale=320:-1:flags=lanczos", "-gifflags", "+transdiff", gif_path
+            ]
+            subprocess.run(cmd, check=True)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to generate GIF preview: {e}")
+            return False
+
+    async def upload_attachment(self, file_content: bytes, file_extension: str, user_email: str, is_video: bool = False) -> (str, str):
         """
-        Upload an attachment (image or video) to Azure Blob Storage with ETA
+        Upload an attachment (image or video) to Azure Blob Storage with ETA. If video, also generate and upload GIF preview.
+        Returns (blob_url, gif_url)
         """
         if not self.client:
             raise HTTPException(
                 status_code=500,
                 detail="Blob storage not configured. Please set AZURE_STORAGE_CONNECTION_STRING environment variable."
             )
-        
         file_size = len(file_content)
         start_time = time.time()
-        
+        gif_url = None
         try:
             logger.info(f"🚀 Starting attachment upload for user: {user_email}")
             logger.info(f"📁 File size: {format_file_size(file_size)}")
-            
-            # Calculate estimated upload time and ETA
             estimated_upload_time = self._estimate_upload_time_seconds(file_size)
             eta_time = time.time() + estimated_upload_time
             eta_str = time.strftime("%H:%M:%S", time.localtime(eta_time))
-            
             logger.info(f"📊 Estimated upload time: {format_time(estimated_upload_time)}")
             logger.info(f"⏰ Expected completion: {eta_str}")
-            
             filename = f"{user_email}_{uuid.uuid4()}{file_extension}"
             blob_name = f"attachments/{filename}"
-            
             logger.info(f"📝 Generated blob name: {blob_name}")
-            
             blob_client = self.client.get_blob_client(
                 container=self.container_name,
                 blob=blob_name
             )
-            
             content_type = self._get_content_type(file_extension)
             logger.info(f"🎯 Content type: {content_type}")
-            
-            # Upload with extended timeout and progress logging
             logger.info("⏳ Starting blob upload to Azure...")
             upload_start = time.time()
-            
-            # Use a more generous timeout for large files
-            timeout_seconds = max(600, estimated_upload_time * 2)  # At least 10 minutes, or 2x estimated time
+            timeout_seconds = max(600, estimated_upload_time * 2)
             logger.info(f"⏱️ Upload timeout set to: {format_time(timeout_seconds)}")
-            
             blob_client.upload_blob(
                 file_content,
                 content_settings=ContentSettings(content_type=content_type),
                 overwrite=True,
                 timeout=timeout_seconds
             )
-            
             upload_duration = time.time() - upload_start
             total_duration = time.time() - start_time
             speed = file_size / upload_duration if upload_duration > 0 else 0
-            
             logger.info(f"✅ Upload completed successfully!")
             logger.info(f"📈 Upload statistics:")
             logger.info(f"   • Duration: {format_time(upload_duration)}")
@@ -213,27 +213,42 @@ class BlobStorageService:
             logger.info(f"   • Total time: {format_time(total_duration)}")
             logger.info(f"   • Estimated vs Actual: {format_time(estimated_upload_time)} vs {format_time(upload_duration)}")
             logger.info(f"🔗 URL: {blob_client.url}")
-            
-            return blob_client.url
-            
+            blob_url = blob_client.url
+            # If video, generate GIF preview
+            if is_video:
+                import tempfile
+                with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as tmp_video:
+                    tmp_video.write(file_content)
+                    tmp_video.flush()
+                    gif_path = tmp_video.name.replace(file_extension, ".gif")
+                    if self._generate_gif_from_video(tmp_video.name, gif_path):
+                        # Upload GIF to blob storage
+                        gif_filename = f"{user_email}_{uuid.uuid4()}.gif"
+                        gif_blob_name = f"attachments/{gif_filename}"
+                        gif_blob_client = self.client.get_blob_client(
+                            container=self.container_name,
+                            blob=gif_blob_name
+                        )
+                        with open(gif_path, "rb") as gif_file:
+                            gif_blob_client.upload_blob(
+                                gif_file.read(),
+                                content_settings=ContentSettings(content_type="image/gif"),
+                                overwrite=True
+                            )
+                        gif_url = gif_blob_client.url
+                        logger.info(f"✅ GIF preview uploaded: {gif_url}")
+                    else:
+                        logger.warning("GIF preview generation failed; no GIF will be attached.")
+            return blob_url, gif_url
         except Exception as e:
             elapsed_time = time.time() - start_time
             logger.error(f"❌ Failed to upload attachment for user {user_email}")
             logger.error(f"📊 Upload failed after {format_time(elapsed_time)}")
             logger.error(f"📁 File size: {format_file_size(file_size)}, extension: {file_extension}")
             logger.error(f"💥 Error: {str(e)}")
-            
-            # Provide more specific error messages
-            if "timeout" in str(e).lower():
-                error_msg = f"Upload timeout after {format_time(elapsed_time)}. File may be too large or connection too slow."
-            elif "connection" in str(e).lower():
-                error_msg = f"Connection error during upload: {str(e)}"
-            else:
-                error_msg = f"Upload failed: {str(e)}"
-                
             raise HTTPException(
                 status_code=500,
-                detail=error_msg
+                detail=f"Upload failed: {str(e)}"
             )
     
     def _estimate_upload_time_seconds(self, file_size: int) -> float:
