@@ -45,15 +45,26 @@ const EnhancedTemplateEditor = ({
     const beforeCursor = newValue.substring(0, cursorPos);
     const lastBracketIndex = beforeCursor.lastIndexOf('[');
     
+    console.log('Autocomplete check:', { 
+      beforeCursor, 
+      lastBracketIndex, 
+      cursorPos, 
+      attachmentsCount: attachments.length,
+      searchTerm: lastBracketIndex !== -1 ? beforeCursor.substring(lastBracketIndex + 1).toLowerCase() : null
+    });
+    
     if (lastBracketIndex !== -1 && lastBracketIndex < cursorPos) {
       const searchTerm = beforeCursor.substring(lastBracketIndex + 1).toLowerCase();
       const filtered = attachments.filter(att => 
         att.placeholder.toLowerCase().includes(searchTerm)
       );
       
+      console.log('Filtered attachments:', filtered);
+      
       if (filtered.length > 0) {
         setFilteredAttachments(filtered);
         setShowAutocomplete(true);
+        console.log('Showing autocomplete with', filtered.length, 'items');
         
         // Calculate position for autocomplete dropdown
         const textarea = e.target;
@@ -70,9 +81,11 @@ const EnhancedTemplateEditor = ({
         setAutocompletePosition({ top, left });
       } else {
         setShowAutocomplete(false);
+        console.log('No filtered attachments, hiding autocomplete');
       }
     } else {
       setShowAutocomplete(false);
+      console.log('No [ found or cursor position issue, hiding autocomplete');
     }
     
     // Always call the parent's onChange handler
@@ -189,42 +202,58 @@ const EnhancedTemplateEditor = ({
           {showAutocomplete && (
             <div
               ref={autocompleteRef}
-              className="position-absolute bg-white border rounded shadow-sm"
+              className="position-absolute bg-white border rounded shadow-lg"
               style={{
-                top: `${autocompletePosition.top + 40}px`,
-                left: `${autocompletePosition.left}px`,
-                zIndex: 1000,
-                minWidth: '200px',
+                top: '100%',
+                left: '0px',
+                zIndex: 9999,
+                minWidth: '300px',
                 maxHeight: '200px',
-                overflowY: 'auto'
+                overflowY: 'auto',
+                border: '1px solid #dee2e6',
+                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
               }}
             >
+              <div className="p-2 border-bottom bg-light">
+                <small className="text-muted">Select an attachment:</small>
+              </div>
               {filteredAttachments.map((attachment, index) => (
                 <div
                   key={attachment.id}
-                  className="p-2 border-bottom cursor-pointer hover-bg-light"
-                  style={{ cursor: 'pointer' }}
+                  className="p-3 border-bottom cursor-pointer"
+                  style={{ 
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s'
+                  }}
                   onClick={() => handleAttachmentSelect(attachment)}
                   onMouseEnter={(e) => e.target.style.backgroundColor = '#f8f9fa'}
                   onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                 >
                   <div className="d-flex align-items-center">
-                    <div className="me-2">
+                    <div className="me-3">
                       {attachment.file_type?.toLowerCase().startsWith('image') ? (
-                        <i className="bi bi-image text-primary"></i>
+                        <i className="bi bi-image text-primary fs-5"></i>
                       ) : attachment.file_type?.toLowerCase().startsWith('video') ? (
-                        <i className="bi bi-camera-video text-danger"></i>
+                        <i className="bi bi-camera-video text-danger fs-5"></i>
                       ) : (
-                        <i className="bi bi-file-earmark text-secondary"></i>
+                        <i className="bi bi-file-earmark text-secondary fs-5"></i>
                       )}
                     </div>
-                    <div>
-                      <div className="fw-bold">[{attachment.placeholder}]</div>
-                      <small className="text-muted">{attachment.file_type}</small>
+                    <div className="flex-grow-1">
+                      <div className="fw-bold text-primary">[{attachment.placeholder}]</div>
+                      <small className="text-muted d-block">{attachment.file_type}</small>
+                    </div>
+                    <div className="ms-2">
+                      <small className="text-muted">Click to insert</small>
                     </div>
                   </div>
                 </div>
               ))}
+              {filteredAttachments.length === 0 && (
+                <div className="p-3 text-muted text-center">
+                  <small>No attachments found</small>
+                </div>
+              )}
             </div>
           )}
         </div>
