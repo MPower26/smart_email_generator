@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Play, Pause, Volume2, VolumeX, Maximize2, Settings } from 'react-bootstrap-icons';
+import { ArrowLeft, Play, Pause, Volume2, VolumeMute, Maximize2, Settings } from 'react-bootstrap-icons';
 import './WatchPage.css';
 
 function useQuery() {
@@ -232,7 +232,7 @@ function WatchPage() {
                 </div>
                 <div className="controls-right">
                   <button className="control-button" onClick={toggleMute}>
-                    {isMuted ? <VolumeX /> : <Volume2 />}
+                    {isMuted ? <VolumeMute /> : <Volume2 />}
                   </button>
                   <button className="control-button" onClick={toggleFullscreen}>
                     <Maximize2 />
