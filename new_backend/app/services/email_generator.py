@@ -247,6 +247,10 @@ class EmailGenerator:
                     if "ATTACHMENT" in generated_content:
                         logger.warning(f"⚠️  Found corrupted marker in content: {generated_content}")
             
+            # Debug: Log the content at each step
+            logger.info(f"🔍 Generated content length: {len(generated_content)}")
+            logger.info(f"🔍 Generated content contains markers: {[marker for marker in attachment_placeholders.keys() if marker in generated_content]}")
+            
             # Fallback: Try to restore corrupted markers
             for marker, attachment in attachment_placeholders.items():
                 if marker not in generated_content:
@@ -306,42 +310,32 @@ class EmailGenerator:
             # Join the content and add the correct signature
             content = '\n'.join(content).strip()
             
-            # Remove any markdown formatting (more robustly)
-            content = content.replace("**", "").replace("_", "").replace("*", "")
-            
-            # Replace placeholders with user information if available
-            content = content.replace("[Your Name]", user.full_name if user.full_name else "[Your Name]")
-            content = content.replace("[Your Position]", user.position if user.position else "[Your Position]")
-            content = content.replace("[Your Company]", user.company_name if user.company_name else "[Your Company]")
-            
-            # Remove any existing signature lines after "Best regards" or similar phrases
-            content_lines = content.split('\n')
-            new_content = []
-            signature_indicators = ["best regards", "sincerely", "kind regards", "warm regards", "looking forward", "thank you"]
-            
-            for line in content_lines:
-                line_lower = line.strip().lower()
-                if any(indicator in line_lower for indicator in signature_indicators):
-                    break
-                new_content.append(line)
-            
-            content = '\n'.join(new_content).strip()
-            
-            # Set status based on stage (applies for all code paths)
-            status = "outreach_pending"
-            if stage == "followup":
-                status = "followup_due"
-            elif stage == "lastchance":
-                status = "lastchance_due"
+            # Debug: Log content after joining
+            logger.info(f"🔍 Content after joining lines: {content}")
             
             # --- Restore attachment placeholders and replace with HTML ---
             logger.info(f"🔍 Found {len(attachments)} attachments for user {user.email}")
             
+            # Debug: Log the content before marker restoration
+            logger.info(f"🔍 Content before marker restoration: {content}")
+            
             # First, restore the original placeholders from markers
             for marker, attachment in attachment_placeholders.items():
                 logger.info(f"🔄 Restoring placeholder [{attachment.placeholder}] from marker {marker}")
+                logger.info(f"🔍 Looking for marker: {marker}")
+                logger.info(f"🔍 Marker found in content: {marker in content}")
                 content = content.replace(marker, f"[{attachment.placeholder}]")
                 subject = subject.replace(marker, f"[{attachment.placeholder}]")
+                logger.info(f"🔍 Content after marker restoration: {content}")
+            
+            # Debug: Log the content after marker restoration
+            logger.info(f"🔍 Content after all marker restoration: {content}")
+            
+            # Now remove any markdown formatting (more robustly)
+            content = content.replace("**", "").replace("_", "").replace("*", "")
+            
+            # Debug: Log content after markdown removal
+            logger.info(f"🔍 Content after markdown removal: {content}")
             
             # Now replace placeholders with actual HTML content
             for att in attachments:
