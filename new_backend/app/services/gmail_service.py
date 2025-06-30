@@ -97,7 +97,16 @@ def send_gmail_email(user, to_email, subject, body):
                 print(f"🎬 Video placeholder: [{att.placeholder}] -> proxy_url: {proxy_url}")
                 print(f"🎬 Video placeholder: [{att.placeholder}] -> watch_url: {watch_url}")
                 
-                if getattr(att, 'gif_url', None):
+                # Priority: custom thumbnail > auto-generated GIF > simple link
+                if getattr(att, 'custom_thumbnail_url', None):
+                    html_tag = (
+                        f'<a href="{watch_url}" target="_blank" rel="noopener">'
+                        f'  <img src="{att.custom_thumbnail_url}" alt="\u25B6\ufe0f Watch video" '
+                        f'       style="max-width:300px; height:auto; display:block; margin:0 auto;" />'
+                        f'</a>'
+                    )
+                    print(f"🎬 Video with custom thumbnail: [{att.placeholder}] -> {html_tag[:100]}...")
+                elif getattr(att, 'gif_url', None):
                     html_tag = (
                         f'<a href="{watch_url}" target="_blank" rel="noopener">'
                         f'  <img src="{att.gif_url}" alt="\u25B6\ufe0f Watch video" '
@@ -106,9 +115,9 @@ def send_gmail_email(user, to_email, subject, body):
                     )
                     print(f"🎬 Video with GIF: [{att.placeholder}] -> {html_tag[:100]}...")
                 else:
-                    # Fallback to direct video link if no GIF
+                    # Fallback to direct video link if no thumbnail
                     html_tag = f'<a href="{watch_url}" target="_blank" rel="noopener">Watch Video</a>'
-                    print(f"🎬 Video without GIF: [{att.placeholder}] -> {html_tag}")
+                    print(f"🎬 Video without thumbnail: [{att.placeholder}] -> {html_tag}")
             
             # Check if placeholder exists in body
             if re.search(rf"\[{att.placeholder}\]", body, flags=re.IGNORECASE):
@@ -208,4 +217,3 @@ def check_reply(user, generated_email):
         if from_email and recipient_email.lower() in from_email:
             return True
     return False
-
