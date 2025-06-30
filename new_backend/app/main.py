@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 import logging
 from sqlalchemy.orm import Session
 import json
@@ -9,6 +9,8 @@ import asyncio
 from datetime import datetime
 import os
 import time
+import httpx
+import urllib.parse
 
 from app.api.endpoints import emails, friends, auth_gmail, user_settings, templates
 from app.api import auth
@@ -245,4 +247,41 @@ async def cors_test(request: Request):
 @app.options("/cors-test")
 async def cors_test_options():
     """Handle OPTIONS request for CORS test"""
-    return {"message": "CORS preflight successful"} 
+    return {"message": "CORS preflight successful"}
+
+# Add video proxy endpoint
+@app.get("/api/video-proxy/{video_path:path}")
+async def video_proxy(video_path: str, request: Request):
+    """
+    Proxy endpoint to serve videos from Azure Blob Storage without CORS issues.
+    The video_path should be the full blob URL encoded.
+    """
+    try:
+        # Decode the video path (it's URL-encoded)
+        decoded_path = urllib.parse.unquote(video_path)
+        
+        # Validate that it's a blob storage URL
+        if not decoded_path.startswith("https://smartemailsignatures.blob.core.windows.net/"):
+            raise HTTPException(status_code=400, detail="Invalid video URL")
+        
+        # Stream the video from Azure Blob Storage
+        async with httpx.AsyncClient() as client:
+            response = await client.get(decoded_path, stream=True)
+            
+            if response.status_code != 200:
+                raise HTTPException(status_code=response.status_code, detail="Video not found")
+            
+            # Return the video as a streaming response
+            return StreamingResponse(
+                response.aiter_bytes(),
+                media_type=response.headers.get("content-type", "video/mp4"),
+                headers={
+                    "Content-Length": response.headers.get("content-length", ""),
+                    "Accept-Ranges": "bytes",
+                    "Cache-Control": "public, max-age=3600"
+                }
+            )
+            
+    except Exception as e:
+        logger.error(f"Error serving video {video_path}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error serving video") 
