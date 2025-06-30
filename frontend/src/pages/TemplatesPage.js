@@ -1,287 +1,843 @@
-import React, { useState, useEffect, useRef, useContext } from 'react';
-import { Form, Dropdown, Badge, Card, Row, Col } from 'react-bootstrap';
-import { attachmentService } from '../services/api';
+import React, { useState, useEffect, useContext } from 'react';
+import { Container, Card, Form, Button, Alert, Modal, Tabs, Tab, Accordion, Badge, OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { templateService, userService, attachmentService } from '../services/api';
 import { UserContext } from '../contexts/UserContext';
+import UploadProgressBar from '../components/UploadProgressBar';
+import { useFileUpload } from '../hooks/useFileUpload';
+import EnhancedTemplateEditor from '../components/EnhancedTemplateEditor';
 
-const EnhancedTemplateEditor = ({ 
-  value, 
-  onChange, 
-  placeholder = "Write your email template here...",
-  rows = 12,
-  showPreview = true 
-}) => {
-  const { userProfile } = useContext(UserContext);
+const TemplatesPage = () => {
+  const { userProfile, updateUserProfile } = useContext(UserContext);
+  const [templatesByCategory, setTemplatesByCategory] = useState({
+    outreach: [],
+    followup: [],
+    lastchance: []
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  
+  // Signature state
+  const [signatureData, setSignatureData] = useState({
+    email_signature: '',
+    signature_image: null
+  });
+  const [signatureLoading, setSignatureLoading] = useState(false);
+  const [signatureError, setSignatureError] = useState('');
+  const [signatureSuccess, setSignatureSuccess] = useState('');
+  
+  // Modal state
+  const [showModal, setShowModal] = useState(false);
+  const [currentTemplate, setCurrentTemplate] = useState({
+    id: null,
+    name: '',
+    content: '',
+    category: 'outreach',
+    is_default: false
+  });
+  const [isEditing, setIsEditing] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('outreach');
+  
+  // Variables pour l'aperçu des placeholders
+  const [activeTab, setActiveTab] = useState('editor');
+  const placeholderData = {
+    'Recipient Name': 'John Smith',
+    'Company Name': 'Acme Corporation',
+    'Your Name': 'Jane Doe',
+    'Your Position': 'Sales Manager',
+    'Your Company': 'Tech Solutions Inc.'
+  };
+
+  // Attachment state
   const [attachments, setAttachments] = useState([]);
-  const [showAutocomplete, setShowAutocomplete] = useState(false);
-  const [autocompletePosition, setAutocompletePosition] = useState({ top: 0, left: 0 });
-  const [cursorPosition, setCursorPosition] = useState(0);
-  const [filteredAttachments, setFilteredAttachments] = useState([]);
-  const textareaRef = useRef(null);
-  const autocompleteRef = useRef(null);
+  const [attachmentFile, setAttachmentFile] = useState(null);
+  const [attachmentPlaceholder, setAttachmentPlaceholder] = useState('');
+  const [attachmentCategory, setAttachmentCategory] = useState('');
+  const [attachmentError, setAttachmentError] = useState('');
+  const [attachmentSuccess, setAttachmentSuccess] = useState('');
+  
+  // Use the file upload hook
+  const { 
+    uploading: attachmentLoading, 
+    progress: uploadProgress, 
+    error: uploadError, 
+    success: uploadSuccess,
+    fileSize,
+    uploadSpeed,
+    eta,
+    uploadMode,
+    uploadFile: uploadAttachmentFile,
+    reset: resetUpload
+  } = useFileUpload(
+    () => {
+      // onSuccess callback
+      setAttachmentSuccess('Attachment uploaded successfully!');
+      loadAttachments(); // Reload attachments list
+      setAttachmentFile(null);
+      setAttachmentPlaceholder('');
+      setAttachmentCategory('');
+    },
+    (err) => {
+      // onError callback
+      setAttachmentError(err.response?.data?.detail || 'Failed to upload attachment.');
+    }
+  );
 
-  // Load user's attachments
+  // Charger les templates au chargement de la page
   useEffect(() => {
-    const loadAttachments = async () => {
-      try {
-        const response = await attachmentService.getAttachments();
-        setAttachments(response.data || []);
-      } catch (error) {
-        console.error('Failed to load attachments:', error);
-      }
-    };
+    loadTemplates();
+    loadSignature();
     loadAttachments();
   }, []);
 
-  // Handle textarea changes
-  const handleChange = (e) => {
-    const newValue = e.target.value;
-    const cursorPos = e.target.selectionStart;
-    
-    console.log('EnhancedTemplateEditor handleChange:', { newValue, cursorPos, value: e.target.value });
-    
-    setCursorPosition(cursorPos);
-    
-    // Check if we should show autocomplete
-    const beforeCursor = newValue.substring(0, cursorPos);
-    const lastBracketIndex = beforeCursor.lastIndexOf('[');
-    
-    if (lastBracketIndex !== -1 && lastBracketIndex < cursorPos) {
-      const searchTerm = beforeCursor.substring(lastBracketIndex + 1).toLowerCase();
-      const filtered = attachments.filter(att => 
-        att.placeholder.toLowerCase().includes(searchTerm)
-      );
-      
-      if (filtered.length > 0) {
-        setFilteredAttachments(filtered);
-        setShowAutocomplete(true);
-        
-        // Calculate position for autocomplete dropdown
-        const textarea = e.target;
-        const textBeforeCursor = beforeCursor.substring(0, lastBracketIndex);
-        const lines = textBeforeCursor.split('\n');
-        const currentLine = lines[lines.length - 1];
-        
-        // Estimate position (this is approximate)
-        const charWidth = 8; // Approximate character width
-        const lineHeight = 20; // Approximate line height
-        const left = (currentLine.length * charWidth) % textarea.offsetWidth;
-        const top = (lines.length - 1) * lineHeight;
-        
-        setAutocompletePosition({ top, left });
-      } else {
-        setShowAutocomplete(false);
-      }
-    } else {
-      setShowAutocomplete(false);
-    }
-    
-    // Always call the parent's onChange handler
-    if (onChange) {
-      onChange(e);
+  // Load user signature
+  const loadSignature = () => {
+    if (userProfile) {
+      setSignatureData({
+        email_signature: userProfile.email_signature || '',
+        signature_image: null
+      });
     }
   };
 
-  // Handle autocomplete selection
-  const handleAttachmentSelect = (attachment) => {
-    const beforeCursor = value.substring(0, cursorPosition);
-    const afterCursor = value.substring(cursorPosition);
-    
-    // Find the last opening bracket
-    const lastBracketIndex = beforeCursor.lastIndexOf('[');
-    if (lastBracketIndex !== -1) {
-      const newValue = beforeCursor.substring(0, lastBracketIndex) + 
-                      `[${attachment.placeholder}]` + 
-                      afterCursor;
-      
-      setShowAutocomplete(false);
-      
-      // Trigger onChange with the new value
-      const syntheticEvent = {
-        target: { value: newValue, selectionStart: lastBracketIndex + attachment.placeholder.length + 2 }
-      };
-      onChange(syntheticEvent);
-      
-      // Set cursor position after the placeholder
-      setTimeout(() => {
-        if (textareaRef.current) {
-          textareaRef.current.setSelectionRange(
-            lastBracketIndex + attachment.placeholder.length + 2,
-            lastBracketIndex + attachment.placeholder.length + 2
-          );
-        }
-      }, 0);
+  // Update signature data when userProfile changes
+  useEffect(() => {
+    loadSignature();
+  }, [userProfile]);
+
+  // Load attachments on mount
+  const loadAttachments = async () => {
+    try {
+      const res = await attachmentService.listAttachments();
+      setAttachments(res.data);
+    } catch (err) {
+      setAttachmentError('Failed to load attachments.');
     }
   };
 
-  // Handle keyboard navigation in autocomplete
-  const handleKeyDown = (e) => {
-    if (showAutocomplete && filteredAttachments.length > 0) {
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter') {
-        e.preventDefault();
-        // Simple implementation - just select the first item
-        if (e.key === 'Enter') {
-          handleAttachmentSelect(filteredAttachments[0]);
-        }
-      }
+  // Fonction pour charger les templates
+  const loadTemplates = async () => {
+    setLoading(true);
+    setError('');
+    
+    try {
+      const response = await templateService.getTemplatesByCategory();
+      setTemplatesByCategory(response.data);
+    } catch (err) {
+      setError('Failed to load templates. Please try again later.');
+      console.error('Error loading templates:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Generate preview with highlighted placeholders and actual content
-  const generatePreview = () => {
-    if (!value) return '';
-    
-    let preview = value;
-    
-    // Replace placeholders with actual content
-    attachments.forEach(attachment => {
-      const placeholderRegex = new RegExp(`\\[${attachment.placeholder}\\]`, 'gi');
-      
-      if (attachment.file_type?.toLowerCase().startsWith('image')) {
-        preview = preview.replace(placeholderRegex, 
-          `<img src="${attachment.blob_url}" style="max-width:300px; height:auto; border: 2px solid #007bff; border-radius: 4px;" alt="${attachment.placeholder}" />`
-        );
-      } else if (attachment.file_type?.toLowerCase().startsWith('video')) {
-        const watchUrl = `${window.location.origin}/watch?src=${encodeURIComponent(attachment.blob_url)}&title=${encodeURIComponent(attachment.placeholder)}`;
-        
-        if (attachment.gif_url) {
-          preview = preview.replace(placeholderRegex,
-            `<a href="${watchUrl}" target="_blank" rel="noopener" style="display: inline-block; border: 2px solid #007bff; border-radius: 4px; text-decoration: none;">
-              <img src="${attachment.gif_url}" alt="▶️ Watch ${attachment.placeholder}" style="max-width:300px; height:auto; display:block;" />
-              <div style="text-align: center; padding: 4px; background: #007bff; color: white; font-size: 12px;">Click to watch video</div>
-            </a>`
-          );
-        } else {
-          preview = preview.replace(placeholderRegex,
-            `<a href="${watchUrl}" target="_blank" rel="noopener" style="display: inline-block; padding: 8px 16px; background: #007bff; color: white; text-decoration: none; border-radius: 4px;">
-              ▶️ Watch ${attachment.placeholder}
-            </a>`
-          );
-        }
-      }
+  // Ouvrir le modal de création de template
+  const handleNewTemplate = (category) => {
+    setSelectedCategory(category);
+    setCurrentTemplate({
+      id: null,
+      name: '',
+      content: '',
+      category: category,
+      is_default: false
     });
+    setIsEditing(false);
+    setShowModal(true);
+    setActiveTab('editor');
+  };
+
+  // Ouvrir le modal d'édition avec un template existant
+  const handleEditTemplate = (template) => {
+    setCurrentTemplate({
+      id: template.id,
+      name: template.name,
+      content: template.content,
+      category: template.category,
+      is_default: template.is_default
+    });
+    setSelectedCategory(template.category);
+    setIsEditing(true);
+    setShowModal(true);
+    setActiveTab('editor');
+  };
+
+  // Mettre à jour les champs du formulaire
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setCurrentTemplate({
+      ...currentTemplate,
+      [name]: type === 'checkbox' ? checked : value
+    });
+  };
+
+  // Specific handler for content field from EnhancedTemplateEditor
+  const handleContentChange = (e) => {
+    console.log('TemplatesPage handleContentChange:', { value: e.target.value, name: e.target.name });
+    setCurrentTemplate({
+      ...currentTemplate,
+      content: e.target.value
+    });
+  };
+
+  // Sauvegarder un template (création ou modification)
+  const handleSaveTemplate = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
     
-    // Highlight remaining placeholders in blue
-    preview = preview.replace(/\[([^\]]+)\]/g, 
-      '<span style="background-color: #007bff; color: white; padding: 2px 4px; border-radius: 3px; font-weight: bold;">[$1]</span>'
-    );
+    try {
+      let response;
+      
+      if (isEditing) {
+        // Mettre à jour un template existant
+        response = await templateService.updateTemplate(currentTemplate.id, currentTemplate);
+        setSuccess('Template updated successfully!');
+      } else {
+        // Créer un nouveau template
+        response = await templateService.createTemplate(currentTemplate);
+        setSuccess('New template created successfully!');
+      }
+      
+      // Recharger la liste des templates
+      await loadTemplates();
+      setShowModal(false);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to save template. Please try again.');
+      console.error('Error saving template:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Supprimer un template
+  const handleDeleteTemplate = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this template?')) return;
+    
+    setLoading(true);
+    setError('');
+    
+    try {
+      await templateService.deleteTemplate(id);
+      setSuccess('Template deleted successfully!');
+      // Recharger la liste des templates
+      await loadTemplates();
+    } catch (err) {
+      setError('Failed to delete template. Please try again.');
+      console.error('Error deleting template:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Set template as default
+  const handleSetDefault = async (templateId) => {
+    setLoading(true);
+    setError('');
+    
+    try {
+      await templateService.setDefaultTemplate(templateId);
+      setSuccess('Default template updated successfully!');
+      await loadTemplates();
+    } catch (err) {
+      setError('Failed to set default template. Please try again.');
+      console.error('Error setting default template:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fonction pour afficher l'aperçu avec les placeholders remplacés
+  const getPreviewContent = (content) => {
+    if (!content) return '';
+    
+    let preview = content;
+    
+    // Remplacer les placeholders par les valeurs d'exemple
+    Object.entries(placeholderData).forEach(([key, value]) => {
+      const regex = new RegExp(`\\[${key}\\]`, 'gi');
+      preview = preview.replace(regex, value);
+    });
     
     return preview;
   };
 
-  return (
-    <div className="enhanced-template-editor">
-      <Form.Group className="mb-3">
-        <Form.Label>Email Content</Form.Label>
-        <div className="position-relative">
-          <Form.Control
-            ref={textareaRef}
-            as="textarea"
-            name="content"
-            value={value}
-            onChange={handleChange}
-            onKeyDown={handleKeyDown}
-            rows={rows}
-            placeholder={placeholder}
-            style={{ fontFamily: 'monospace', fontSize: '14px' }}
-          />
-          
-          {/* Autocomplete dropdown */}
-          {showAutocomplete && (
-            <div
-              ref={autocompleteRef}
-              className="position-absolute bg-white border rounded shadow-sm"
-              style={{
-                top: `${autocompletePosition.top + 40}px`,
-                left: `${autocompletePosition.left}px`,
-                zIndex: 1000,
-                minWidth: '200px',
-                maxHeight: '200px',
-                overflowY: 'auto'
-              }}
-            >
-              {filteredAttachments.map((attachment, index) => (
-                <div
-                  key={attachment.id}
-                  className="p-2 border-bottom cursor-pointer hover-bg-light"
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => handleAttachmentSelect(attachment)}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = '#f8f9fa'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                >
-                  <div className="d-flex align-items-center">
-                    <div className="me-2">
-                      {attachment.file_type?.toLowerCase().startsWith('image') ? (
-                        <i className="bi bi-image text-primary"></i>
-                      ) : attachment.file_type?.toLowerCase().startsWith('video') ? (
-                        <i className="bi bi-camera-video text-danger"></i>
-                      ) : (
-                        <i className="bi bi-file-earmark text-secondary"></i>
-                      )}
-                    </div>
-                    <div>
-                      <div className="fw-bold">[{attachment.placeholder}]</div>
-                      <small className="text-muted">{attachment.file_type}</small>
-                    </div>
-                  </div>
-                </div>
-              ))}
+  // Get category display name
+  const getCategoryDisplayName = (category) => {
+    switch (category) {
+      case 'outreach': return 'Initial Outreach';
+      case 'followup': return 'Follow Up';
+      case 'lastchance': return 'Last Chance';
+      default: return category;
+    }
+  };
+
+  // Get category description
+  const getCategoryDescription = (category) => {
+    switch (category) {
+      case 'outreach': return 'Templates for initial contact emails';
+      case 'followup': return 'Templates for follow-up emails after no response';
+      case 'lastchance': return 'Templates for final follow-up attempts';
+      default: return '';
+    }
+  };
+
+  // Handle signature input changes
+  const handleSignatureChange = (e) => {
+    const { name, value } = e.target;
+    setSignatureData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // Handle signature image upload
+  const handleSignatureImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSignatureData(prev => ({
+        ...prev,
+        signature_image: file
+      }));
+    }
+  };
+
+  // Save signature
+  const handleSaveSignature = async (e) => {
+    e.preventDefault();
+    setSignatureLoading(true);
+    setSignatureError('');
+    setSignatureSuccess('');
+    
+    try {
+      // First upload image if provided
+      let imageUrl = null;
+      if (signatureData.signature_image) {
+        const uploadResponse = await userService.uploadSignatureImage(signatureData.signature_image);
+        imageUrl = uploadResponse.data.image_url;
+      }
+      
+      // Update signature
+      const updateData = {
+        email_signature: signatureData.email_signature
+      };
+      
+      if (imageUrl) {
+        updateData.signature_image_url = imageUrl;
+      }
+      
+      await userService.updateSignature(updateData);
+      setSignatureSuccess('Signature updated successfully!');
+      
+      // Refresh user profile
+      await updateUserProfile(updateData);
+      
+      // Clear the file input
+      setSignatureData(prev => ({
+        ...prev,
+        signature_image: null
+      }));
+      
+    } catch (err) {
+      setSignatureError(err.response?.data?.detail || 'Failed to update signature. Please try again.');
+      console.error('Error updating signature:', err);
+    } finally {
+      setSignatureLoading(false);
+    }
+  };
+
+  // Preview signature with image
+  const getSignaturePreview = () => {
+    let preview = signatureData.email_signature;
+    
+    // Replace placeholders
+    Object.entries(placeholderData).forEach(([key, value]) => {
+      const regex = new RegExp(`\\[${key}\\]`, 'gi');
+      preview = preview.replace(regex, value);
+    });
+    
+    // Add image if exists
+    if (userProfile?.signature_image_url) {
+      preview += `\n\n<img src="${userProfile.signature_image_url}" alt="Signature" style="max-width: 300px; height: auto;" />`;
+    }
+    
+    return preview;
+  };
+
+  // Handle file select
+  const handleAttachmentFile = (e) => {
+    setAttachmentFile(e.target.files[0]);
+  };
+
+  // Handle upload
+  const handleUploadAttachment = async (e) => {
+    e.preventDefault();
+    
+    if (!attachmentFile || !attachmentPlaceholder) {
+      setAttachmentError('File and placeholder are required.');
+      return;
+    }
+    
+    // Reset any previous errors/success messages
+    setAttachmentError('');
+    setAttachmentSuccess('');
+    
+    // Use the hook's upload function
+    await uploadAttachmentFile(attachmentFile, attachmentPlaceholder, attachmentCategory);
+  };
+
+  // Handle delete
+  const handleDeleteAttachment = async (id) => {
+    if (!window.confirm('Delete this attachment?')) return;
+    try {
+      await attachmentService.deleteAttachment(id);
+      await loadAttachments();
+    } catch (err) {
+      setAttachmentError('Failed to delete attachment.');
+    }
+  };
+
+  // Render template card
+  const renderTemplateCard = (template) => (
+    <Card key={template.id} className="mb-3">
+      <Card.Body>
+        <div className="d-flex justify-content-between align-items-start">
+          <div className="flex-grow-1">
+            <div className="d-flex align-items-center mb-2">
+              <h6 className="mb-0 me-2">{template.name}</h6>
+              {template.is_default && (
+                <Badge bg="success">Default</Badge>
+              )}
             </div>
-          )}
-        </div>
-        
-        <Form.Text className="text-muted">
-          <div className="d-flex align-items-center gap-2 mb-2">
-            <span>Available placeholders:</span>
-            <Badge bg="primary">[Recipient Name]</Badge>
-            <Badge bg="primary">[Company Name]</Badge>
-            <Badge bg="primary">[Your Name]</Badge>
-            <Badge bg="primary">[Your Position]</Badge>
-            <Badge bg="primary">[Your Company]</Badge>
-          </div>
-          
-          {attachments.length > 0 && (
-            <div className="d-flex align-items-center gap-2">
-              <span>Your attachments:</span>
-              {attachments.map(attachment => (
-                <Badge 
-                  key={attachment.id} 
-                  bg={attachment.file_type?.toLowerCase().startsWith('video') ? 'danger' : 'success'}
-                >
-                  [{attachment.placeholder}]
-                </Badge>
-              ))}
-            </div>
-          )}
-          
-          <div className="mt-2">
-            <small>
-              💡 Type <code>[</code> to see attachment suggestions. Placeholders are highlighted in blue.
+            <p className="text-muted small mb-2">
+              {template.content.substring(0, 150)}...
+            </p>
+            <small className="text-muted">
+              Created: {new Date(template.created_at).toLocaleDateString()}
             </small>
           </div>
-        </Form.Text>
-      </Form.Group>
+          <div className="d-flex flex-column gap-1">
+            {!template.is_default && (
+              <Button 
+                variant="outline-success" 
+                size="sm"
+                onClick={() => handleSetDefault(template.id)}
+                disabled={loading}
+                title="Set as default template for this category"
+              >
+                Set Default
+                <OverlayTrigger
+                  placement="top"
+                  overlay={
+                    <Tooltip id={`set-default-tooltip-${template.id}`}>
+                      <strong>Set as Default:</strong><br/>
+                      This template will be automatically used when generating emails for this stage if no specific template is selected.
+                    </Tooltip>
+                  }
+                >
+                  <i className="bi bi-info-circle ms-1" style={{ cursor: 'help', fontSize: '0.8rem' }}></i>
+                </OverlayTrigger>
+              </Button>
+            )}
+            <Button 
+              variant="outline-primary" 
+              size="sm"
+              onClick={() => handleEditTemplate(template)}
+            >
+              Edit
+            </Button>
+            <Button 
+              variant="outline-danger" 
+              size="sm"
+              onClick={() => handleDeleteTemplate(template.id)}
+            >
+              Delete
+            </Button>
+          </div>
+        </div>
+      </Card.Body>
+    </Card>
+  );
 
-      {/* Live Preview */}
-      {showPreview && value && (
-        <Card className="mt-3">
-          <Card.Header>
-            <h6 className="mb-0">Live Preview</h6>
-          </Card.Header>
-          <Card.Body>
-            <div 
-              dangerouslySetInnerHTML={{ __html: generatePreview() }}
-              style={{ 
-                whiteSpace: 'pre-wrap',
-                fontFamily: 'Arial, sans-serif',
-                fontSize: '14px',
-                lineHeight: '1.5'
-              }}
-            />
-          </Card.Body>
-        </Card>
+  return (
+    <Container className="templates-page">
+      <h1 className="mb-4">Email Templates</h1>
+      
+      {error && <Alert variant="danger">{error}</Alert>}
+      {success && <Alert variant="success" onClose={() => setSuccess('')} dismissible>{success}</Alert>}
+      
+      {loading && (
+        <div className="text-center mb-4">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+        </div>
       )}
-    </div>
+      
+      <Accordion defaultActiveKey="outreach">
+        {['outreach', 'followup', 'lastchance'].map((category) => (
+          <Accordion.Item key={category} eventKey={category}>
+            <Accordion.Header>
+              <div className="d-flex justify-content-between align-items-center w-100 me-3">
+                <span>{getCategoryDisplayName(category)}</span>
+                <div className="d-flex align-items-center">
+                  <Badge bg="secondary" className="me-2">
+                    {templatesByCategory[category]?.length || 0}/3
+                  </Badge>
+                  <Button
+                    variant="outline-primary"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleNewTemplate(category);
+                    }}
+                    disabled={(templatesByCategory[category]?.length || 0) >= 3}
+                  >
+                    Add Template
+                  </Button>
+                </div>
+              </div>
+            </Accordion.Header>
+            <Accordion.Body>
+              <p className="text-muted mb-3">{getCategoryDescription(category)}</p>
+              
+              {templatesByCategory[category]?.length > 0 ? (
+                <div>
+                  {templatesByCategory[category].map(template => renderTemplateCard(template))}
+                </div>
+              ) : (
+                <Alert variant="info">
+                  No templates in this category. Create your first {getCategoryDisplayName(category).toLowerCase()} template to get started.
+                </Alert>
+              )}
+            </Accordion.Body>
+          </Accordion.Item>
+        ))}
+      </Accordion>
+      
+      {/* Email Signature Section */}
+      <Accordion className="mt-4">
+        <Accordion.Item eventKey="signature">
+          <Accordion.Header>
+            <div className="d-flex justify-content-between align-items-center w-100 me-3">
+              <span>Email Signature</span>
+              <Badge bg="info">Auto-appended to all emails</Badge>
+            </div>
+          </Accordion.Header>
+          <Accordion.Body>
+            <p className="text-muted mb-3">
+              Your email signature will be automatically added to all outgoing emails. 
+              You can include text and upload a banner image.
+            </p>
+            
+            {signatureError && <Alert variant="danger">{signatureError}</Alert>}
+            {signatureSuccess && <Alert variant="success" onClose={() => setSignatureSuccess('')} dismissible>{signatureSuccess}</Alert>}
+            
+            <Form onSubmit={handleSaveSignature}>
+              <Form.Group className="mb-3">
+                <Form.Label>Signature Text</Form.Label>
+                <Form.Control
+                  as="textarea"
+                  name="email_signature"
+                  value={signatureData.email_signature}
+                  onChange={handleSignatureChange}
+                  rows={4}
+                  placeholder="Best regards,
+[Your Name]
+[Your Position]
+[Your Company]
+
+Your signature text here..."
+                />
+                <Form.Text className="text-muted">
+                  Available placeholders: [Your Name], [Your Position], [Your Company]
+                  <OverlayTrigger
+                    placement="top"
+                    overlay={
+                      <Tooltip id="signature-placeholders-tooltip">
+                        <strong>Signature Placeholders:</strong><br/>
+                        Use these placeholders in your signature and they'll be automatically replaced with your actual information.<br/><br/>
+                        • [Your Name] - Your full name<br/>
+                        • [Your Position] - Your job title<br/>
+                        • [Your Company] - Your company name
+                      </Tooltip>
+                    }
+                  >
+                    <i className="bi bi-info-circle ms-2" style={{ cursor: 'help' }}></i>
+                  </OverlayTrigger>
+                </Form.Text>
+              </Form.Group>
+              
+              <Form.Group className="mb-3">
+                <Form.Label>Banner Image (Optional)</Form.Label>
+                <Form.Control
+                  type="file"
+                  accept="image/*"
+                  onChange={handleSignatureImageUpload}
+                  className="mb-2"
+                />
+                <Form.Text className="text-muted">
+                  Upload a banner image (JPG, PNG, GIF) that will be displayed below your signature text. 
+                  Recommended size: 300px wide or less.
+                </Form.Text>
+                {signatureData.signature_image && (
+                  <div className="mt-2">
+                    <small className="text-success">
+                      ✓ {signatureData.signature_image.name} selected
+                    </small>
+                  </div>
+                )}
+                {userProfile?.signature_image_url && !signatureData.signature_image && (
+                  <div className="mt-2">
+                    <small className="text-info">
+                      Current image: <img src={userProfile.signature_image_url} alt="Current signature" style={{ maxWidth: '100px', height: 'auto' }} />
+                    </small>
+                  </div>
+                )}
+              </Form.Group>
+              
+              <div className="d-flex gap-2">
+                <Button 
+                  type="submit" 
+                  variant="primary"
+                  disabled={signatureLoading}
+                >
+                  {signatureLoading ? 'Saving...' : 'Save Signature'}
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="outline-secondary"
+                  onClick={() => {
+                    setSignatureData({
+                      email_signature: userProfile?.email_signature || '',
+                      signature_image: null
+                    });
+                    setSignatureError('');
+                    setSignatureSuccess('');
+                  }}
+                >
+                  Reset
+                </Button>
+              </div>
+            </Form>
+            
+            {/* Signature Preview */}
+            {signatureData.email_signature && (
+              <Card className="mt-4">
+                <Card.Header>
+                  <h6 className="mb-0">Signature Preview</h6>
+                </Card.Header>
+                <Card.Body>
+                  <div style={{ whiteSpace: 'pre-wrap' }}>
+                    {getSignaturePreview()}
+                  </div>
+                </Card.Body>
+              </Card>
+            )}
+          </Accordion.Body>
+        </Accordion.Item>
+      </Accordion>
+      
+      {/* Attachment Section */}
+      <Accordion className="mt-4">
+        <Accordion.Item eventKey="attachments">
+          <Accordion.Header>
+            <div className="d-flex justify-content-between align-items-center w-100 me-3">
+              <span>Attachments</span>
+              <Badge bg="info">Images & Videos for Templates</Badge>
+            </div>
+          </Accordion.Header>
+          <Accordion.Body>
+            <p className="text-muted mb-3">
+              Upload images or videos and assign a placeholder name. In your template, use <code>[YourPlaceholder]</code> to insert the file. E.g., <code>[LogoImage]</code>.<br/>
+              <strong>Accepted:</strong> JPG, PNG, GIF, MP4, MOV, AVI, WMV, MKV, WEBM. Max 20MB each.
+            </p>
+            {attachmentError && <Alert variant="danger">{attachmentError}</Alert>}
+            {attachmentSuccess && <Alert variant="success" onClose={() => setAttachmentSuccess('')} dismissible>{attachmentSuccess}</Alert>}
+            <Form onSubmit={handleUploadAttachment} className="mb-3">
+              <Form.Group className="mb-2">
+                <Form.Label>File</Form.Label>
+                <Form.Control type="file" accept="image/*,video/*" onChange={handleAttachmentFile} />
+              </Form.Group>
+              <Form.Group className="mb-2">
+                <Form.Label>Placeholder</Form.Label>
+                <Form.Control type="text" value={attachmentPlaceholder} onChange={e => setAttachmentPlaceholder(e.target.value)} placeholder="e.g. LogoImage" required />
+                <Form.Text className="text-muted">Use this placeholder in your template: <code>[{attachmentPlaceholder || 'YourPlaceholder'}]</code></Form.Text>
+              </Form.Group>
+              <Form.Group className="mb-2">
+                <Form.Label>Category (optional)</Form.Label>
+                <Form.Control type="text" value={attachmentCategory} onChange={e => setAttachmentCategory(e.target.value)} placeholder="e.g. branding" />
+              </Form.Group>
+              <Button type="submit" variant="primary" disabled={attachmentLoading}>{attachmentLoading ? 'Uploading...' : 'Upload Attachment'}</Button>
+            </Form>
+            
+            {/* Error and Success Messages */}
+            {uploadError && <Alert variant="danger" className="mt-2">{uploadError}</Alert>}
+            {uploadSuccess && <Alert variant="success" className="mt-2">{uploadSuccess}</Alert>}
+            {attachmentError && <Alert variant="danger" className="mt-2">{attachmentError}</Alert>}
+            {attachmentSuccess && <Alert variant="success" className="mt-2">{attachmentSuccess}</Alert>}
+            
+            {/* Upload Progress Bar with ETA */}
+            <UploadProgressBar 
+              progress={uploadProgress}
+              show={attachmentLoading}
+              filename={attachmentFile?.name}
+              variant="primary"
+              fileSize={fileSize}
+              uploadSpeed={uploadSpeed}
+              eta={eta}
+              uploadMode={uploadMode}
+            />
+            
+            {/* List attachments */}
+            <div className="mt-3">
+              {attachments.length === 0 ? (
+                <Alert variant="info">No attachments uploaded yet.</Alert>
+              ) : (
+                <div className="row">
+                  {attachments.map(att => (
+                    <div className="col-md-4 mb-3" key={att.id}>
+                      <Card>
+                        <Card.Body>
+                          <div className="mb-2">
+                            {att.file_type === 'image' ? (
+                              <img src={att.blob_url} alt={att.placeholder} style={{ maxWidth: '100%', maxHeight: 120 }} />
+                            ) : (
+                              <video src={att.blob_url} controls style={{ maxWidth: '100%', maxHeight: 120 }} />
+                            )}
+                          </div>
+                          <div><strong>Placeholder:</strong> <code>[{att.placeholder}]</code></div>
+                          {att.category && <div><strong>Category:</strong> {att.category}</div>}
+                          <Button variant="outline-danger" size="sm" className="mt-2" onClick={() => handleDeleteAttachment(att.id)}>Delete</Button>
+                        </Card.Body>
+                      </Card>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </Accordion.Body>
+        </Accordion.Item>
+      </Accordion>
+      
+      {/* Modal pour créer/éditer un template */}
+      <Modal 
+        show={showModal} 
+        onHide={() => setShowModal(false)}
+        size="lg"
+        backdrop="static"
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>
+            {isEditing ? 'Edit Template' : 'Create Template'} - {getCategoryDisplayName(selectedCategory)}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Tabs
+            activeKey={activeTab}
+            onSelect={(k) => setActiveTab(k)}
+            className="mb-3"
+          >
+            <Tab eventKey="editor" title="Editor">
+              <Form onSubmit={handleSaveTemplate}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Template Name</Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="name"
+                    value={currentTemplate.name}
+                    onChange={handleInputChange}
+                    required
+                  />
+                </Form.Group>
+                
+                <Form.Group className="mb-3">
+                  <Form.Label>Category</Form.Label>
+                  <Form.Select
+                    name="category"
+                    value={currentTemplate.category}
+                    onChange={handleInputChange}
+                    disabled={isEditing} // Don't allow changing category when editing
+                  >
+                    <option value="outreach">Initial Outreach</option>
+                    <option value="followup">Follow Up</option>
+                    <option value="lastchance">Last Chance</option>
+                  </Form.Select>
+                </Form.Group>
+                
+                <Form.Group className="mb-3">
+                  <Form.Label>Email Content</Form.Label>
+                  <EnhancedTemplateEditor
+                    value={currentTemplate.content}
+                    onChange={handleContentChange}
+                    placeholder="Subject: Your Subject Here
+
+Dear [Recipient Name],
+
+Your email content here...
+
+Best regards,
+[Your Name]
+[Your Position]
+[Your Company]"
+                    rows={12}
+                    showPreview={false}
+                  />
+                </Form.Group>
+                
+                <Form.Group className="mb-3">
+                  <Form.Check
+                    type="checkbox"
+                    label={
+                      <span>
+                        Set as default template for this category
+                        <OverlayTrigger
+                          placement="top"
+                          overlay={
+                            <Tooltip id="default-template-tooltip">
+                              <strong>Default Templates:</strong><br/>
+                              When enabled, this template will be automatically used when generating emails for this stage if no specific template is selected. 
+                              Only one template per category can be set as default.
+                            </Tooltip>
+                          }
+                        >
+                          <i className="bi bi-info-circle ms-2 text-muted" style={{ cursor: 'help' }}></i>
+                        </OverlayTrigger>
+                      </span>
+                    }
+                    name="is_default"
+                    checked={currentTemplate.is_default}
+                    onChange={handleInputChange}
+                  />
+                </Form.Group>
+              </Form>
+            </Tab>
+            
+            <Tab eventKey="preview" title="Preview">
+              <Card className="bg-light">
+                <Card.Body>
+                  <div style={{ whiteSpace: 'pre-wrap' }}>
+                    {getPreviewContent(currentTemplate.content)}
+                  </div>
+                </Card.Body>
+              </Card>
+            </Tab>
+          </Tabs>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowModal(false)}>
+            Cancel
+          </Button>
+          <Button 
+            variant="primary" 
+            onClick={handleSaveTemplate}
+            disabled={loading}
+          >
+            {loading ? 'Saving...' : 'Save Template'}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+    </Container>
   );
 };
 
-export default EnhancedTemplateEditor; 
+export default TemplatesPage; 
