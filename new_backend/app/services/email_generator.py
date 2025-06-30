@@ -265,14 +265,21 @@ class EmailGenerator:
             # --- Attachment placeholder replacement ---
             # Query all attachments for the user and replace [Placeholder] with the correct HTML tag
             attachments = self.db.query(Attachment).filter_by(user_id=user.id).all()
+            logger.info(f"🔍 Found {len(attachments)} attachments for user {user.email}")
+            
             for att in attachments:
                 if att.placeholder:
+                    logger.info(f"🎯 Processing attachment: {att.placeholder} (type: {att.file_type})")
                     html_tag = att.blob_url
                     if att.file_type.lower().startswith("image"):
                         html_tag = f'<img src="{att.blob_url}" style="max-width:300px; height:auto;" alt="Attachment" />'
+                        logger.info(f"🖼️  Image placeholder: [{att.placeholder}] -> {html_tag[:100]}...")
                     elif att.file_type.lower().startswith("video"):
                         # Use the watch page URL for videos instead of direct blob URL
-                        watch_url = f"{FRONTEND_URL}/watch?src={att.blob_url}&title={att.placeholder}"
+                        frontend_url = FRONTEND_URL or "https://jolly-bush-0bae83703.6.azurestaticapps.net"
+                        watch_url = f"{frontend_url}/watch?src={att.blob_url}&title={att.placeholder}"
+                        logger.info(f"🎬 Video placeholder: [{att.placeholder}] -> watch_url: {watch_url}")
+                        
                         if getattr(att, 'gif_url', None):
                             html_tag = (
                                 f'<a href="{watch_url}" target="_blank" rel="noopener">'
@@ -280,12 +287,23 @@ class EmailGenerator:
                                 f'       style="max-width:300px; height:auto; display:block; margin:0 auto;" />'
                                 f'</a>'
                             )
+                            logger.info(f"🎬 Video with GIF: [{att.placeholder}] -> {html_tag[:100]}...")
                         else:
                             # Fallback to direct video link if no GIF
                             html_tag = f'<a href="{watch_url}" target="_blank" rel="noopener">Watch Video</a>'
-                    # Replace [Placeholder] and [placeholder] (case-insensitive)
-                    content = re.sub(rf"\\[{att.placeholder}\\]", html_tag, content, flags=re.IGNORECASE)
-                    subject = re.sub(rf"\\[{att.placeholder}\\]", html_tag, subject, flags=re.IGNORECASE)
+                            logger.info(f"🎬 Video without GIF: [{att.placeholder}] -> {html_tag}")
+                    
+                    # Check if placeholder exists in content
+                    if re.search(rf"\\[{att.placeholder}\\]", content, flags=re.IGNORECASE):
+                        logger.info(f"✅ Found placeholder [{att.placeholder}] in content, replacing...")
+                        content = re.sub(rf"\\[{att.placeholder}\\]", html_tag, content, flags=re.IGNORECASE)
+                        subject = re.sub(rf"\\[{att.placeholder}\\]", html_tag, subject, flags=re.IGNORECASE)
+                        logger.info(f"✅ Replacement completed for [{att.placeholder}]")
+                    else:
+                        logger.warning(f"⚠️  Placeholder [{att.placeholder}] not found in content")
+            
+            logger.info(f"📧 Final content length: {len(content)} characters")
+            logger.info(f"📧 Content preview: {content[:200]}...")
             
             # Create and save the generated email
             email = GeneratedEmail(
@@ -480,7 +498,8 @@ class EmailGenerator:
                     html_tag = f'<img src="{att.blob_url}" style="max-width:300px; height:auto;" alt="Attachment" />'
                 elif att.file_type.lower().startswith("video"):
                     # Use the watch page URL for videos instead of direct blob URL
-                    watch_url = f"{FRONTEND_URL}/watch?src={att.blob_url}&title={att.placeholder}"
+                    frontend_url = FRONTEND_URL or "https://jolly-bush-0bae83703.6.azurestaticapps.net"
+                    watch_url = f"{frontend_url}/watch?src={att.blob_url}&title={att.placeholder}"
                     if getattr(att, 'gif_url', None):
                         html_tag = (
                             f'<a href="{watch_url}" target="_blank" rel="noopener">'
@@ -666,7 +685,8 @@ class EmailGenerator:
                     html_tag = f'<img src="{att.blob_url}" style="max-width:300px; height:auto;" alt="Attachment" />'
                 elif att.file_type.lower().startswith("video"):
                     # Use the watch page URL for videos instead of direct blob URL
-                    watch_url = f"{FRONTEND_URL}/watch?src={att.blob_url}&title={att.placeholder}"
+                    frontend_url = FRONTEND_URL or "https://jolly-bush-0bae83703.6.azurestaticapps.net"
+                    watch_url = f"{frontend_url}/watch?src={att.blob_url}&title={att.placeholder}"
                     if getattr(att, 'gif_url', None):
                         html_tag = (
                             f'<a href="{watch_url}" target="_blank" rel="noopener">'
