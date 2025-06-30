@@ -379,6 +379,14 @@ class EmailGenerator:
             logger.info(f"📧 Final content length: {len(content)} characters")
             logger.info(f"📧 Content preview: {content[:200]}...")
             
+            # Set status based on stage
+            if stage == "followup":
+                status = "followup_due"
+            elif stage == "lastchance":
+                status = "lastchance_due"
+            else:
+                status = "outreach_pending"
+            
             # Create and save the generated email
             email = GeneratedEmail(
                 recipient_email=contact_data.get("Email", ""),
