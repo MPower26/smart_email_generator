@@ -4,6 +4,7 @@ import { templateService, userService, attachmentService } from '../services/api
 import { UserContext } from '../contexts/UserContext';
 import UploadProgressBar from '../components/UploadProgressBar';
 import { useFileUpload } from '../hooks/useFileUpload';
+import EnhancedTemplateEditor from '../components/EnhancedTemplateEditor';
 
 const TemplatesPage = () => {
   const { userProfile, updateUserProfile } = useContext(UserContext);
@@ -756,13 +757,9 @@ Your signature text here..."
                 
                 <Form.Group className="mb-3">
                   <Form.Label>Email Content</Form.Label>
-                  <Form.Control
-                    as="textarea"
-                    name="content"
+                  <EnhancedTemplateEditor
                     value={currentTemplate.content}
-                    onChange={handleInputChange}
-                    rows={12}
-                    required
+                    onChange={(e) => handleInputChange(e)}
                     placeholder="Subject: Your Subject Here
 
 Dear [Recipient Name],
@@ -773,26 +770,9 @@ Best regards,
 [Your Name]
 [Your Position]
 [Your Company]"
+                    rows={12}
+                    showPreview={false}
                   />
-                  <Form.Text className="text-muted">
-                    Available placeholders: [Recipient Name], [Company Name], [Your Name], [Your Position], [Your Company]
-                    <OverlayTrigger
-                      placement="top"
-                      overlay={
-                        <Tooltip id="placeholders-tooltip">
-                          <strong>Placeholders:</strong><br/>
-                          Use these placeholders in your templates and they'll be automatically replaced with actual data when generating emails.<br/><br/>
-                          • [Recipient Name] - Contact's first and last name<br/>
-                          • [Company Name] - Contact's company name<br/>
-                          • [Your Name] - Your full name<br/>
-                          • [Your Position] - Your job title<br/>
-                          • [Your Company] - Your company name
-                        </Tooltip>
-                      }
-                    >
-                      <i className="bi bi-info-circle ms-2" style={{ cursor: 'help' }}></i>
-                    </OverlayTrigger>
-                  </Form.Text>
                 </Form.Group>
                 
                 <Form.Group className="mb-3">
