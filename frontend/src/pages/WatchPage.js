@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Container, Row, Col, Card, Button, Alert, Spinner } from 'react-bootstrap';
-import { ArrowLeft, BoxArrowUpRight } from 'react-bootstrap-icons';
+import { ArrowLeft, Play, Pause, Volume2, VolumeX, Maximize2, Settings } from 'react-bootstrap-icons';
 import './WatchPage.css';
 
 function useQuery() {
@@ -14,6 +13,11 @@ function WatchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [videoInfo, setVideoInfo] = useState(null);
+  const [userInfo, setUserInfo] = useState(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [showControls, setShowControls] = useState(true);
+  const [videoRef, setVideoRef] = useState(null);
 
   const src = query.get('src');
   const title = query.get('title') || 'Video';
@@ -31,10 +35,34 @@ function WatchPage() {
       return;
     }
 
+    // Fetch user information
+    fetchUserInfo();
+    
     const videoData = extractVideoInfo(src);
     setVideoInfo(videoData);
     setLoading(false);
   }, [src]);
+
+  const fetchUserInfo = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const response = await fetch('https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net/api/users/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const userData = await response.json();
+        setUserInfo(userData);
+      }
+    } catch (error) {
+      console.error('Error fetching user info:', error);
+    }
+  };
 
   const extractVideoInfo = (url) => {
     // YouTube detection
@@ -73,109 +101,166 @@ function WatchPage() {
     };
   };
 
+  const togglePlay = () => {
+    if (videoRef) {
+      if (isPlaying) {
+        videoRef.pause();
+      } else {
+        videoRef.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const toggleMute = () => {
+    if (videoRef) {
+      videoRef.muted = !isMuted;
+      setIsMuted(!isMuted);
+    }
+  };
+
+  const toggleFullscreen = () => {
+    if (videoRef) {
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+      } else {
+        videoRef.requestFullscreen();
+      }
+    }
+  };
+
+  const handleVideoClick = () => {
+    togglePlay();
+  };
+
+  const handleMouseMove = () => {
+    setShowControls(true);
+    setTimeout(() => setShowControls(false), 3000);
+  };
+
   if (loading) {
     return (
-      <Container className="watch-page-container">
-        <Row className="justify-content-center">
-          <Col md={8}>
-            <div className="text-center p-5">
-              <Spinner animation="border" />
-              <p className="mt-3">Loading video...</p>
-            </div>
-          </Col>
-        </Row>
-      </Container>
+      <div className="watch-page-container">
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p className="loading-text">Loading your video experience...</p>
+        </div>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <Container className="watch-page-container">
-        <Row className="justify-content-center">
-          <Col md={8}>
-            <Card className="error-card">
-              <Card.Body className="text-center">
-                <Alert variant="danger">
-                  <h4>⚠️ Error</h4>
-                  <p>{error}</p>
-                </Alert>
-                <Button variant="outline-primary" onClick={() => navigate(-1)}>
-                  <ArrowLeft /> Go Back
-                </Button>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-      </Container>
+      <div className="watch-page-container">
+        <div className="error-container">
+          <div className="error-content">
+            <div className="error-icon">⚠️</div>
+            <h2>Error</h2>
+            <p>{error}</p>
+            <button className="back-button" onClick={() => navigate(-1)}>
+              <ArrowLeft /> Go Back
+            </button>
+          </div>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Container className="watch-page-container">
-      <Row className="justify-content-center">
-        <Col lg={10}>
-          <div className="d-flex justify-content-between align-items-center mb-4">
-            <Button variant="outline-secondary" onClick={() => navigate(-1)} className="back-button">
-              <ArrowLeft /> Back
-            </Button>
-            <h1 className="video-title">{title}</h1>
-            {videoInfo?.originalUrl && (
-              <Button variant="outline-primary" onClick={() => window.open(videoInfo.originalUrl, '_blank')} className="original-link-button">
-                <BoxArrowUpRight /> Open Original
-              </Button>
+    <div className="watch-page-container" onMouseMove={handleMouseMove}>
+      {/* Header */}
+      <div className="video-header">
+        <button className="back-button" onClick={() => navigate(-1)}>
+          <ArrowLeft />
+        </button>
+        <div className="company-info">
+          {userInfo?.company_name && (
+            <span className="company-name">{userInfo.company_name}</span>
+          )}
+        </div>
+        <div className="video-title">{title}</div>
+      </div>
+
+      {/* Video Player */}
+      <div className="video-player-container">
+        <div className="video-wrapper">
+          {videoInfo?.type === 'youtube' && (
+            <iframe
+              src={videoInfo.embedUrl}
+              title="YouTube video player"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              className="video-element"
+            />
+          )}
+          
+          {videoInfo?.type === 'vimeo' && (
+            <iframe
+              src={videoInfo.embedUrl}
+              title="Vimeo video player"
+              frameBorder="0"
+              allow="autoplay; fullscreen; picture-in-picture"
+              allowFullScreen
+              className="video-element"
+            />
+          )}
+          
+          {videoInfo?.type === 'direct' && (
+            <video
+              ref={setVideoRef}
+              controls={false}
+              crossOrigin="anonymous"
+              className="video-element"
+              onClick={handleVideoClick}
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
+            >
+              <source src={videoInfo.url} type="video/mp4" />
+              <source src={videoInfo.url} type="video/webm" />
+              Your browser doesn't support HTML5 video.
+            </video>
+          )}
+
+          {/* Custom Controls Overlay */}
+          {videoInfo?.type === 'direct' && (
+            <div className={`video-controls ${showControls ? 'show' : ''}`}>
+              <div className="controls-background"></div>
+              <div className="controls-content">
+                <div className="play-button" onClick={togglePlay}>
+                  {isPlaying ? <Pause /> : <Play />}
+                </div>
+                <div className="controls-right">
+                  <button className="control-button" onClick={toggleMute}>
+                    {isMuted ? <VolumeX /> : <Volume2 />}
+                  </button>
+                  <button className="control-button" onClick={toggleFullscreen}>
+                    <Maximize2 />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="video-footer">
+        <div className="footer-content">
+          <div className="video-info">
+            <h3>{title}</h3>
+            {userInfo?.company_name && (
+              <p className="company-description">
+                Presented by {userInfo.company_name}
+                {userInfo?.company_description && (
+                  <span className="company-desc"> • {userInfo.company_description}</span>
+                )}
+              </p>
             )}
           </div>
-
-          <Card className="video-card">
-            <Card.Body className="p-0">
-              <div className="video-container">
-                {videoInfo?.type === 'youtube' && (
-                  <iframe
-                    src={videoInfo.embedUrl}
-                    title="YouTube video player"
-                    frameBorder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
-                )}
-                
-                {videoInfo?.type === 'vimeo' && (
-                  <iframe
-                    src={videoInfo.embedUrl}
-                    title="Vimeo video player"
-                    frameBorder="0"
-                    allow="autoplay; fullscreen; picture-in-picture"
-                    allowFullScreen
-                  />
-                )}
-                
-                {videoInfo?.type === 'direct' && (
-                  <video
-                    controls
-                    crossOrigin="anonymous"
-                  >
-                    <source src={videoInfo.url} type="video/mp4" />
-                    <source src={videoInfo.url} type="video/webm" />
-                    Your browser doesn't support HTML5 video.
-                  </video>
-                )}
-              </div>
-            </Card.Body>
-          </Card>
-
-          <Card className="mt-4">
-            <Card.Body>
-              <h5>Video Information</h5>
-              <p><strong>Type:</strong> {videoInfo?.type === 'youtube' ? 'YouTube Video' : 
-                                        videoInfo?.type === 'vimeo' ? 'Vimeo Video' : 'Direct Video File'}</p>
-              <p><strong>Source:</strong> <a href={videoInfo?.originalUrl} target="_blank" rel="noopener noreferrer">
-                {videoInfo?.originalUrl}
-              </a></p>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-    </Container>
+        </div>
+      </div>
+    </div>
   );
 }
 
