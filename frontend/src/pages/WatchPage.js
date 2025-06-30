@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Container, Row, Col, Card, Button, Alert, Spinner } from 'react-bootstrap';
-import { ArrowLeft, ExternalLink } from 'react-bootstrap-icons';
+import { ArrowLeft, BoxArrowUpRight } from 'react-bootstrap-icons';
 import './WatchPage.css';
 
 function useQuery() {
@@ -121,7 +121,7 @@ function WatchPage() {
             <h1 className="video-title">{title}</h1>
             {videoInfo?.originalUrl && (
               <Button variant="outline-primary" onClick={() => window.open(videoInfo.originalUrl, '_blank')} className="original-link-button">
-                <ExternalLink /> Open Original
+                <BoxArrowUpRight /> Open Original
               </Button>
             )}
           </div>
