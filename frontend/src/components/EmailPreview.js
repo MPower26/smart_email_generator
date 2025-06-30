@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Card, Button, Badge, Collapse, Alert, Spinner, Form, Modal } from 'react-bootstrap';
 import { UserContext } from '../contexts/UserContext';
 import { emailService } from '../services/api';
+import EnhancedTemplateEditor from './EnhancedTemplateEditor';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net';
 
@@ -592,29 +593,26 @@ const EmailPreview = ({ email, onSend, onUnmarkSent, onDelete, isCollapsed = fal
           <Modal.Title>Edit Email</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <Form>
-            <Form.Group className="mb-3">
-              <Form.Label>Subject</Form.Label>
-              <Form.Control
-                type="text"
-                value={editedSubject}
-                onChange={(e) => setEditedSubject(e.target.value)}
-                placeholder="Email subject"
-              />
-            </Form.Group>
-            
-            <Form.Group className="mb-3">
-              <Form.Label>Content</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={15}
-                value={editedContent}
-                onChange={(e) => setEditedContent(e.target.value)}
-                placeholder="Email content"
-                style={{ fontFamily: 'monospace' }}
-              />
-            </Form.Group>
-          </Form>
+          <Form.Group className="mb-3">
+            <Form.Label>Subject</Form.Label>
+            <Form.Control
+              type="text"
+              value={editedSubject}
+              onChange={(e) => setEditedSubject(e.target.value)}
+              placeholder="Email subject"
+            />
+          </Form.Group>
+          
+          <Form.Group className="mb-3">
+            <Form.Label>Content</Form.Label>
+            <EnhancedTemplateEditor
+              value={editedContent}
+              onChange={(e) => setEditedContent(e.target.value)}
+              placeholder="Email content"
+              rows={15}
+              showPreview={false}
+            />
+          </Form.Group>
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={handleCancelEdit}>
