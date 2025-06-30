@@ -629,6 +629,27 @@ class EmailGenerator:
             content = content.replace(marker, f"[{attachment.placeholder}]")
             subject = subject.replace(marker, f"[{attachment.placeholder}]")
         
+        # Clean up any ATTACHMENT placeholders that don't correspond to real attachments
+        # Get list of valid attachment placeholders
+        valid_placeholders = [att.placeholder for att in attachments if att.placeholder]
+        logger.info(f"🔍 Valid attachment placeholders: {valid_placeholders}")
+        
+        # Remove any ATTACHMENT placeholders that don't match real attachments
+        attachment_pattern = r'ATTACHMENT\d+'
+        matches = re.findall(attachment_pattern, content)
+        for match in matches:
+            if match not in valid_placeholders:
+                logger.info(f"🧹 Removing invalid attachment placeholder: {match}")
+                content = re.sub(rf'\b{match}\b', '', content, flags=re.IGNORECASE)
+                subject = re.sub(rf'\b{match}\b', '', subject, flags=re.IGNORECASE)
+        
+        # Clean up any extra whitespace or empty lines
+        content = re.sub(r'\n\s*\n\s*\n', '\n\n', content)  # Remove multiple empty lines
+        content = content.strip()
+        
+        # Debug: Log content after cleanup
+        logger.info(f"🔍 Content after cleanup: {content}")
+        
         # Now replace placeholders with actual HTML content
         for att in attachments:
             if att.placeholder:
@@ -849,6 +870,27 @@ class EmailGenerator:
             logger.info(f"🔄 Restoring placeholder [{attachment.placeholder}] from marker {marker}")
             content = content.replace(marker, f"[{attachment.placeholder}]")
             subject = subject.replace(marker, f"[{attachment.placeholder}]")
+        
+        # Clean up any ATTACHMENT placeholders that don't correspond to real attachments
+        # Get list of valid attachment placeholders
+        valid_placeholders = [att.placeholder for att in attachments if att.placeholder]
+        logger.info(f"🔍 Valid attachment placeholders: {valid_placeholders}")
+        
+        # Remove any ATTACHMENT placeholders that don't match real attachments
+        attachment_pattern = r'ATTACHMENT\d+'
+        matches = re.findall(attachment_pattern, content)
+        for match in matches:
+            if match not in valid_placeholders:
+                logger.info(f"🧹 Removing invalid attachment placeholder: {match}")
+                content = re.sub(rf'\b{match}\b', '', content, flags=re.IGNORECASE)
+                subject = re.sub(rf'\b{match}\b', '', subject, flags=re.IGNORECASE)
+        
+        # Clean up any extra whitespace or empty lines
+        content = re.sub(r'\n\s*\n\s*\n', '\n\n', content)  # Remove multiple empty lines
+        content = content.strip()
+        
+        # Debug: Log content after cleanup
+        logger.info(f"🔍 Content after cleanup: {content}")
         
         # Now replace placeholders with actual HTML content
         for att in attachments:
