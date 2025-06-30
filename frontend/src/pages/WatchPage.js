@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Container, Row, Col, Card, Button, Alert, Spinner } from 'react-bootstrap';
 import { ArrowLeft, ExternalLink } from 'react-bootstrap-icons';
+import './WatchPage.css';
 
 function useQuery() {
   return new URLSearchParams(useLocation().search);
@@ -74,7 +75,7 @@ function WatchPage() {
 
   if (loading) {
     return (
-      <Container className="mt-5">
+      <Container className="watch-page-container">
         <Row className="justify-content-center">
           <Col md={8}>
             <div className="text-center p-5">
@@ -89,10 +90,10 @@ function WatchPage() {
 
   if (error) {
     return (
-      <Container className="mt-5">
+      <Container className="watch-page-container">
         <Row className="justify-content-center">
           <Col md={8}>
-            <Card>
+            <Card className="error-card">
               <Card.Body className="text-center">
                 <Alert variant="danger">
                   <h4>⚠️ Error</h4>
@@ -110,27 +111,26 @@ function WatchPage() {
   }
 
   return (
-    <Container className="mt-5">
+    <Container className="watch-page-container">
       <Row className="justify-content-center">
         <Col lg={10}>
           <div className="d-flex justify-content-between align-items-center mb-4">
-            <Button variant="outline-secondary" onClick={() => navigate(-1)}>
+            <Button variant="outline-secondary" onClick={() => navigate(-1)} className="back-button">
               <ArrowLeft /> Back
             </Button>
-            <h1>{title}</h1>
+            <h1 className="video-title">{title}</h1>
             {videoInfo?.originalUrl && (
-              <Button variant="outline-primary" onClick={() => window.open(videoInfo.originalUrl, '_blank')}>
+              <Button variant="outline-primary" onClick={() => window.open(videoInfo.originalUrl, '_blank')} className="original-link-button">
                 <ExternalLink /> Open Original
               </Button>
             )}
           </div>
 
-          <Card>
+          <Card className="video-card">
             <Card.Body className="p-0">
-              <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0 }}>
+              <div className="video-container">
                 {videoInfo?.type === 'youtube' && (
                   <iframe
-                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
                     src={videoInfo.embedUrl}
                     title="YouTube video player"
                     frameBorder="0"
@@ -141,7 +141,6 @@ function WatchPage() {
                 
                 {videoInfo?.type === 'vimeo' && (
                   <iframe
-                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
                     src={videoInfo.embedUrl}
                     title="Vimeo video player"
                     frameBorder="0"
@@ -152,7 +151,6 @@ function WatchPage() {
                 
                 {videoInfo?.type === 'direct' && (
                   <video
-                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
                     controls
                     crossOrigin="anonymous"
                   >
