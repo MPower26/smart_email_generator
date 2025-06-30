@@ -193,13 +193,23 @@ class BlobStorageService:
             )
             content_type = self._get_content_type(file_extension)
             logger.info(f"🎯 Content type: {content_type}")
+            
+            # For videos, ensure they can be played in-browser
+            content_settings = ContentSettings(content_type=content_type)
+            if is_video:
+                content_settings = ContentSettings(
+                    content_type=content_type,
+                    content_disposition="inline"
+                )
+                logger.info("🎬 Video detected - setting Content-Disposition: inline for in-browser playback")
+            
             logger.info("⏳ Starting blob upload to Azure...")
             upload_start = time.time()
             timeout_seconds = max(600, estimated_upload_time * 2)
             logger.info(f"⏱️ Upload timeout set to: {format_time(timeout_seconds)}")
             blob_client.upload_blob(
                 file_content,
-                content_settings=ContentSettings(content_type=content_type),
+                content_settings=content_settings,
                 overwrite=True,
                 timeout=timeout_seconds
             )
@@ -270,12 +280,22 @@ class BlobStorageService:
             '.png': 'image/png',
             '.gif': 'image/gif',
             '.webp': 'image/webp',
+            '.bmp': 'image/bmp',
+            '.svg': 'image/svg+xml',
+            # Video formats with proper MIME types for in-browser playback
             '.mp4': 'video/mp4',
             '.mov': 'video/quicktime',
             '.avi': 'video/x-msvideo',
             '.wmv': 'video/x-ms-wmv',
             '.mkv': 'video/x-matroska',
             '.webm': 'video/webm',
+            '.flv': 'video/x-flv',
+            '.m4v': 'video/x-m4v',
+            '.3gp': 'video/3gpp',
+            '.ogv': 'video/ogg',
+            '.ts': 'video/mp2t',
+            '.mts': 'video/mp2t',
+            '.m2ts': 'video/mp2t',
         }
         return content_types.get(file_extension.lower(), 'application/octet-stream')
     
