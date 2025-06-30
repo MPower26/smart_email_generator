@@ -425,6 +425,10 @@ const TemplatesPage = () => {
     }
   };
 
+  const [thumbnailLoading, setThumbnailLoading] = useState(false);
+  const [thumbnailMessage, setThumbnailMessage] = useState('');
+  const [thumbnailError, setThumbnailError] = useState('');
+
   const handleAddOrReplaceThumbnail = (attachmentId) => {
     if (thumbnailInputRefs.current[attachmentId]) {
       thumbnailInputRefs.current[attachmentId].click();
@@ -434,26 +438,48 @@ const TemplatesPage = () => {
   const handleThumbnailFileChange = async (e, attachmentId) => {
     const file = e.target.files[0];
     if (!file) return;
-    const formData = new FormData();
-    formData.append('thumbnail', file);
-    await fetch(`/api/templates/attachments/${attachmentId}/thumbnail`, {
-      method: 'POST',
-      body: formData,
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('token')}`
-      }
-    });
-    await loadAttachments();
+    setThumbnailLoading(true);
+    setThumbnailMessage('');
+    setThumbnailError('');
+    try {
+      const formData = new FormData();
+      formData.append('thumbnail', file);
+      const res = await fetch(`/api/templates/attachments/${attachmentId}/thumbnail`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (!res.ok) throw new Error('Failed to upload thumbnail');
+      setThumbnailMessage('Thumbnail uploaded successfully!');
+      await loadAttachments();
+    } catch (err) {
+      setThumbnailError('Failed to upload thumbnail.');
+    } finally {
+      setThumbnailLoading(false);
+    }
   };
 
   const handleDeleteThumbnail = async (attachmentId) => {
-    await fetch(`/api/templates/attachments/${attachmentId}/thumbnail`, {
-      method: 'DELETE',
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('token')}`
-      }
-    });
-    await loadAttachments();
+    setThumbnailLoading(true);
+    setThumbnailMessage('');
+    setThumbnailError('');
+    try {
+      const res = await fetch(`/api/templates/attachments/${attachmentId}/thumbnail`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (!res.ok) throw new Error('Failed to delete thumbnail');
+      setThumbnailMessage('Thumbnail deleted.');
+      await loadAttachments();
+    } catch (err) {
+      setThumbnailError('Failed to delete thumbnail.');
+    } finally {
+      setThumbnailLoading(false);
+    }
   };
 
   // Render template card
@@ -753,6 +779,11 @@ Your signature text here..."
               uploadMode={uploadMode}
             />
             
+            {/* Thumbnail upload/delete messages */}
+            {thumbnailLoading && <Alert variant="info" className="mt-2">Processing thumbnail...</Alert>}
+            {thumbnailMessage && <Alert variant="success" className="mt-2" onClose={() => setThumbnailMessage('')} dismissible>{thumbnailMessage}</Alert>}
+            {thumbnailError && <Alert variant="danger" className="mt-2" onClose={() => setThumbnailError('')} dismissible>{thumbnailError}</Alert>}
+            
             {/* List attachments */}
             <div className="mt-3">
               {attachments.length === 0 ? (
@@ -779,10 +810,10 @@ Your signature text here..."
                               {att.custom_thumbnail_url ? (
                                 <div className="d-flex align-items-center gap-2">
                                   <img src={att.custom_thumbnail_url} alt="Custom thumbnail" style={{ maxWidth: 80, maxHeight: 60, borderRadius: 4, border: '1px solid #ccc' }} />
-                                  <Button variant="outline-secondary" size="sm" onClick={() => handleAddOrReplaceThumbnail(att.id)}>
+                                  <Button variant="outline-secondary" size="sm" onClick={() => handleAddOrReplaceThumbnail(att.id)} disabled={thumbnailLoading}>
                                     Replace
                                   </Button>
-                                  <Button variant="outline-danger" size="sm" onClick={() => handleDeleteThumbnail(att.id)}>
+                                  <Button variant="outline-danger" size="sm" onClick={() => handleDeleteThumbnail(att.id)} disabled={thumbnailLoading}>
                                     Delete
                                   </Button>
                                   <input
@@ -795,7 +826,7 @@ Your signature text here..."
                                 </div>
                               ) : (
                                 <div className="d-flex align-items-center gap-2">
-                                  <Button variant="outline-primary" size="sm" onClick={() => handleAddOrReplaceThumbnail(att.id)}>
+                                  <Button variant="outline-primary" size="sm" onClick={() => handleAddOrReplaceThumbnail(att.id)} disabled={thumbnailLoading}>
                                     Add Thumbnail
                                   </Button>
                                   <input
