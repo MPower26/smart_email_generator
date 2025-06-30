@@ -11,6 +11,18 @@ export PYTHONPATH=/home/site/wwwroot
 export WEBSITES_CONTAINER_START_TIME_LIMIT=1800  # 30 minutes
 export WEBSITES_ENABLE_APP_SERVICE_STORAGE=true
 
+# Install FFmpeg for video thumbnail generation
+echo "Installing FFmpeg for video thumbnail generation..."
+apt-get update
+apt-get install -y ffmpeg
+
+# Verify FFmpeg installation
+if command -v ffmpeg &> /dev/null; then
+    echo "✅ FFmpeg installed successfully: $(ffmpeg -version | head -n1)"
+else
+    echo "❌ FFmpeg installation failed"
+fi
+
 # Print diagnostic information
 echo "Current directory: $(pwd)"
 echo "Directory contents: $(ls -la)"
