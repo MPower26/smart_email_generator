@@ -270,7 +270,15 @@ class EmailGenerator:
                     if att.file_type.lower().startswith("image"):
                         html_tag = f'<img src="{att.blob_url}" style="max-width:300px; height:auto;" alt="Attachment" />'
                     elif att.file_type.lower().startswith("video"):
-                        html_tag = f'<video src="{att.blob_url}" controls style="max-width:300px; height:auto;"></video>'
+                        if getattr(att, 'gif_url', None):
+                            html_tag = (
+                                f'<a href="{att.blob_url}" target="_blank" rel="noopener">'
+                                f'  <img src="{att.gif_url}" alt="\u25B6\ufe0f Watch video" '
+                                f'       style="max-width:300px; height:auto; display:block; margin:0 auto;" />'
+                                f'</a>'
+                            )
+                        else:
+                            html_tag = f'<video src="{att.blob_url}" controls style="max-width:300px; height:auto;"></video>'
                     # Replace [Placeholder] and [placeholder] (case-insensitive)
                     content = re.sub(rf"\\[{att.placeholder}\\]", html_tag, content, flags=re.IGNORECASE)
                     subject = re.sub(rf"\\[{att.placeholder}\\]", html_tag, subject, flags=re.IGNORECASE)
@@ -467,7 +475,15 @@ class EmailGenerator:
                 if att.file_type.lower().startswith("image"):
                     html_tag = f'<img src="{att.blob_url}" style="max-width:300px; height:auto;" alt="Attachment" />'
                 elif att.file_type.lower().startswith("video"):
-                    html_tag = f'<video src="{att.blob_url}" controls style="max-width:300px; height:auto;"></video>'
+                    if getattr(att, 'gif_url', None):
+                        html_tag = (
+                            f'<a href="{att.blob_url}" target="_blank" rel="noopener">'
+                            f'  <img src="{att.gif_url}" alt="\u25B6\ufe0f Watch video" '
+                            f'       style="max-width:300px; height:auto; display:block; margin:0 auto;" />'
+                            f'</a>'
+                        )
+                    else:
+                        html_tag = f'<video src="{att.blob_url}" controls style="max-width:300px; height:auto;"></video>'
                 # Log before replacement
                 if re.search(rf"\\[{att.placeholder}\\]", content, flags=re.IGNORECASE):
                     logger.info(f"Replacing placeholder [{att.placeholder}] with HTML tag in follow-up email.")
@@ -642,7 +658,15 @@ class EmailGenerator:
                 if att.file_type.lower().startswith("image"):
                     html_tag = f'<img src="{att.blob_url}" style="max-width:300px; height:auto;" alt="Attachment" />'
                 elif att.file_type.lower().startswith("video"):
-                    html_tag = f'<video src="{att.blob_url}" controls style="max-width:300px; height:auto;"></video>'
+                    if getattr(att, 'gif_url', None):
+                        html_tag = (
+                            f'<a href="{att.blob_url}" target="_blank" rel="noopener">'
+                            f'  <img src="{att.gif_url}" alt="\u25B6\ufe0f Watch video" '
+                            f'       style="max-width:300px; height:auto; display:block; margin:0 auto;" />'
+                            f'</a>'
+                        )
+                    else:
+                        html_tag = f'<video src="{att.blob_url}" controls style="max-width:300px; height:auto;"></video>'
                 # Replace [Placeholder] and [placeholder] (case-insensitive)
                 content = re.sub(rf"\\[{att.placeholder}\\]", html_tag, content, flags=re.IGNORECASE)
                 subject = re.sub(rf"\\[{att.placeholder}\\]", html_tag, subject, flags=re.IGNORECASE)
@@ -810,5 +834,3 @@ class EmailGenerator:
             except Exception as e:
                 logger.error(f"Error re-generating last chance email for ID {email.id}: {e}")
                 raise Exception(f"Failed to re-generate last chance email: {str(e)}")
-        # Fallback for other stages (original logic)
-        # ... existing code for other stages ...
