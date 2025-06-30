@@ -106,11 +106,26 @@ class EmailGenerator:
         # Extract information from company website
         website_info = self.scraper.extract_info(contact_data.get("Website", ""))
         
+        # Get user attachments to preserve placeholders
+        attachments = self.db.query(Attachment).filter_by(user_id=user.id).all()
+        attachment_placeholders = {}
+        
+        # Extract and store attachment placeholders before AI processing
+        if template:
+            template_content = template.content
+            for att in attachments:
+                if att.placeholder:
+                    # Create a unique marker for each attachment placeholder
+                    marker = f"__ATTACHMENT_{att.placeholder.upper()}__"
+                    attachment_placeholders[marker] = att
+                    # Replace the placeholder with the marker
+                    template_content = re.sub(rf"\[{att.placeholder}\]", marker, template_content, flags=re.IGNORECASE)
+        else:
+            template_content = ""
+        
         # Build context for OpenAI API
         if template:
             # Use template as a prompt for ChatGPT
-            template_content = template.content
-            
             # Replace placeholders in template with actual data for the prompt
             template_content = template_content.replace("[Recipient Name]", contact_data.get('First Name', '') + ' ' + contact_data.get('Last Name', ''))
             template_content = template_content.replace("[Company Name]", contact_data.get('Company', ''))
@@ -120,6 +135,8 @@ class EmailGenerator:
             
             prompt = f"""
             Rewrite this email template in the same style without syntax or grammatical mistakes, using the web scraping knowledge and names in the list given to you. Personalize it based on the recipient's information and company details.
+            
+            IMPORTANT: Preserve all __ATTACHMENT_*__ markers exactly as they appear. Do not modify, remove, or change these markers in any way.
             
             Template to rewrite:
             {template_content}
@@ -155,6 +172,7 @@ class EmailGenerator:
             8. Avoid using em dashes (—) - use regular dashes (-) or other appropriate punctuation instead
             9. DO NOT let variables like [Your Name] or [Your Position] be in the email content. Always use the data given to you about sender and recipient.
             10. DO NOT add a written signature to the email if not present in the given prompt.
+            11. CRITICAL: Keep all __ATTACHMENT_*__ markers exactly where they are in the template.
             """
         else:
             # Use hardcoded prompt as fallback
@@ -195,7 +213,7 @@ class EmailGenerator:
             response = self.client.chat.completions.create(
                 model=AZURE_DEPLOYMENT_NAME,
                 messages=[
-                    {"role": "system", "content": "You are an expert email writer specializing in professional outreach. When a company description is provided, use it to explain how the sender's offerings align with the recipient's needs. Do not use any markdown formatting (like ** or *) in the email content."},
+                    {"role": "system", "content": "You are an expert email writer specializing in professional outreach. When a company description is provided, use it to explain how the sender's offerings align with the recipient's needs. Do not use any markdown formatting (like ** or *) in the email content. IMPORTANT: Preserve all __ATTACHMENT_*__ markers exactly as they appear."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,
@@ -262,11 +280,16 @@ class EmailGenerator:
             elif stage == "lastchance":
                 status = "lastchance_due"
             
-            # --- Attachment placeholder replacement ---
-            # Query all attachments for the user and replace [Placeholder] with the correct HTML tag
-            attachments = self.db.query(Attachment).filter_by(user_id=user.id).all()
+            # --- Restore attachment placeholders and replace with HTML ---
             logger.info(f"🔍 Found {len(attachments)} attachments for user {user.email}")
             
+            # First, restore the original placeholders from markers
+            for marker, attachment in attachment_placeholders.items():
+                logger.info(f"🔄 Restoring placeholder [{attachment.placeholder}] from marker {marker}")
+                content = content.replace(marker, f"[{attachment.placeholder}]")
+                subject = subject.replace(marker, f"[{attachment.placeholder}]")
+            
+            # Now replace placeholders with actual HTML content
             for att in attachments:
                 if att.placeholder:
                     logger.info(f"🎯 Processing attachment: {att.placeholder} (type: {att.file_type})")
@@ -294,10 +317,10 @@ class EmailGenerator:
                             logger.info(f"🎬 Video without GIF: [{att.placeholder}] -> {html_tag}")
                     
                     # Check if placeholder exists in content
-                    if re.search(rf"\\[{att.placeholder}\\]", content, flags=re.IGNORECASE):
+                    if re.search(rf"\[{att.placeholder}\]", content, flags=re.IGNORECASE):
                         logger.info(f"✅ Found placeholder [{att.placeholder}] in content, replacing...")
-                        content = re.sub(rf"\\[{att.placeholder}\\]", html_tag, content, flags=re.IGNORECASE)
-                        subject = re.sub(rf"\\[{att.placeholder}\\]", html_tag, subject, flags=re.IGNORECASE)
+                        content = re.sub(rf"\[{att.placeholder}\]", html_tag, content, flags=re.IGNORECASE)
+                        subject = re.sub(rf"\[{att.placeholder}\]", html_tag, subject, flags=re.IGNORECASE)
                         logger.info(f"✅ Replacement completed for [{att.placeholder}]")
                     else:
                         logger.warning(f"⚠️  Placeholder [{att.placeholder}] not found in content")
@@ -409,33 +432,56 @@ class EmailGenerator:
             ).first()
         if not template:
             raise ValueError("Cannot generate follow-up: No default follow-up template found.")
+        
+        # Get user attachments to preserve placeholders
+        attachments = self.db.query(Attachment).filter_by(user_id=user.id).all()
+        attachment_placeholders = {}
+        
+        # Extract and store attachment placeholders before AI processing
+        template_content = template.content
+        for att in attachments:
+            if att.placeholder:
+                # Create a unique marker for each attachment placeholder
+                marker = f"__ATTACHMENT_{att.placeholder.upper()}__"
+                attachment_placeholders[marker] = att
+                # Replace the placeholder with the marker
+                template_content = re.sub(rf"\[{att.placeholder}\]", marker, template_content, flags=re.IGNORECASE)
+        
         # Extract information from the original email
         recipient_name = original_email.recipient_name
         recipient_company = original_email.recipient_company
         recipient_email = original_email.recipient_email
+        
         # Always use AI rewriting, using the template as a base
-        template_content = template.content
         template_content = template_content.replace("[Recipient Name]", recipient_name)
         template_content = template_content.replace("[Company Name]", recipient_company)
         template_content = template_content.replace("[Your Name]", user.full_name if user.full_name else "[Your Name]")
         template_content = template_content.replace("[Your Position]", user.position if user.position else "[Your Position]")
         template_content = template_content.replace("[Your Company]", user.company_name if user.company_name else "[Your Company]")
+        
         prompt = f"""
         Rewrite this follow-up email template in the same style without syntax or grammatical mistakes, using the information and names in the list given to you. Personalize it based on the recipient's information and company details.
+        
+        IMPORTANT: Preserve all __ATTACHMENT_*__ markers exactly as they appear. Do not modify, remove, or change these markers in any way.
+        
         Template to rewrite:
         {template_content}
+        
         Recipient Information:
         Name: {recipient_name}
         Company: {recipient_company}
         Email: {recipient_email}
         Original Email Subject: {original_email.subject}
         Original Email Content: {original_email.content}
+        
         Sender Information:
         Name: {user.full_name if user.full_name else '[Your Name]'}
         Position: {user.position if user.position else '[Your Position]'}
         Company: {user.company_name if user.company_name else '[Your Company]'}
         Company Description: {user.company_description if user.company_description else '[brief description of company]'}
+        
         Stage: followup
+        
         Please:
         1. Maintain the same tone and style as the template
         2. Personalize it with the recipient's specific information
@@ -447,12 +493,14 @@ class EmailGenerator:
         8. Avoid using em dashes (—) - use regular dashes (-) or other appropriate punctuation instead
         9. DO NOT let variables like [Your Name] or [Your Position] be in the email content. Always use the data given to you about sender and recipient.
         10. DO NOT add a written signature to the email if not present in the given prompt.
+        11. CRITICAL: Keep all __ATTACHMENT_*__ markers exactly where they are in the template.
         """
+        
         try:
             response = self.client.chat.completions.create(
                 model=AZURE_DEPLOYMENT_NAME,
                 messages=[
-                    {"role": "system", "content": "You are an expert email writer specializing in professional follow-up emails. Create emails that add value and feel natural, not pushy. Do not use any markdown formatting (like ** or *) in the email content."},
+                    {"role": "system", "content": "You are an expert email writer specializing in professional follow-up emails. Create emails that add value and feel natural, not pushy. Do not use any markdown formatting (like ** or *) in the email content. IMPORTANT: Preserve all __ATTACHMENT_*__ markers exactly as they appear."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,
@@ -489,17 +537,30 @@ class EmailGenerator:
             content = '\n'.join(new_content).strip()
         except Exception as e:
             raise Exception(f"Failed to generate follow-up email: {str(e)}")
-        # --- Attachment placeholder replacement with logging ---
-        attachments = self.db.query(Attachment).filter_by(user_id=user.id).all()
+        
+        # --- Restore attachment placeholders and replace with HTML ---
+        logger.info(f"🔍 Found {len(attachments)} attachments for user {user.email}")
+        
+        # First, restore the original placeholders from markers
+        for marker, attachment in attachment_placeholders.items():
+            logger.info(f"🔄 Restoring placeholder [{attachment.placeholder}] from marker {marker}")
+            content = content.replace(marker, f"[{attachment.placeholder}]")
+            subject = subject.replace(marker, f"[{attachment.placeholder}]")
+        
+        # Now replace placeholders with actual HTML content
         for att in attachments:
             if att.placeholder:
+                logger.info(f"🎯 Processing attachment: {att.placeholder} (type: {att.file_type})")
                 html_tag = att.blob_url
                 if att.file_type.lower().startswith("image"):
                     html_tag = f'<img src="{att.blob_url}" style="max-width:300px; height:auto;" alt="Attachment" />'
+                    logger.info(f"🖼️  Image placeholder: [{att.placeholder}] -> {html_tag[:100]}...")
                 elif att.file_type.lower().startswith("video"):
                     # Use the watch page URL for videos instead of direct blob URL
                     frontend_url = FRONTEND_URL or "https://jolly-bush-0bae83703.6.azurestaticapps.net"
                     watch_url = f"{frontend_url}/watch?src={att.blob_url}&title={att.placeholder}"
+                    logger.info(f"🎬 Video placeholder: [{att.placeholder}] -> watch_url: {watch_url}")
+                    
                     if getattr(att, 'gif_url', None):
                         html_tag = (
                             f'<a href="{watch_url}" target="_blank" rel="noopener">'
@@ -507,16 +568,21 @@ class EmailGenerator:
                             f'       style="max-width:300px; height:auto; display:block; margin:0 auto;" />'
                             f'</a>'
                         )
+                        logger.info(f"🎬 Video with GIF: [{att.placeholder}] -> {html_tag[:100]}...")
                     else:
                         # Fallback to direct video link if no GIF
                         html_tag = f'<a href="{watch_url}" target="_blank" rel="noopener">Watch Video</a>'
-                # Log before replacement
-                if re.search(rf"\\[{att.placeholder}\\]", content, flags=re.IGNORECASE):
-                    logger.info(f"Replacing placeholder [{att.placeholder}] with HTML tag in follow-up email.")
+                        logger.info(f"🎬 Video without GIF: [{att.placeholder}] -> {html_tag}")
+                
+                # Check if placeholder exists in content
+                if re.search(rf"\[{att.placeholder}\]", content, flags=re.IGNORECASE):
+                    logger.info(f"✅ Found placeholder [{att.placeholder}] in content, replacing...")
+                    content = re.sub(rf"\[{att.placeholder}\]", html_tag, content, flags=re.IGNORECASE)
+                    subject = re.sub(rf"\[{att.placeholder}\]", html_tag, subject, flags=re.IGNORECASE)
+                    logger.info(f"✅ Replacement completed for [{att.placeholder}]")
                 else:
-                    logger.warning(f"Placeholder [{att.placeholder}] not found in follow-up email content.")
-                content = re.sub(rf"\\[{att.placeholder}\\]", html_tag, content, flags=re.IGNORECASE)
-                subject = re.sub(rf"\\[{att.placeholder}\\]", html_tag, subject, flags=re.IGNORECASE)
+                    logger.warning(f"⚠️  Placeholder [{att.placeholder}] not found in content")
+        
         # Get user's interval settings for scheduling
         now = datetime.now(timezone.utc)
         followup_days = user.followup_interval_days or 3
@@ -566,6 +632,20 @@ class EmailGenerator:
                 EmailTemplate.is_default == True
             ).first()
 
+        # Get user attachments to preserve placeholders
+        attachments = self.db.query(Attachment).filter_by(user_id=user.id).all()
+        attachment_placeholders = {}
+        
+        # Extract and store attachment placeholders before AI processing
+        template_content = template.content if template else ""
+        for att in attachments:
+            if att.placeholder:
+                # Create a unique marker for each attachment placeholder
+                marker = f"__ATTACHMENT_{att.placeholder.upper()}__"
+                attachment_placeholders[marker] = att
+                # Replace the placeholder with the marker
+                template_content = re.sub(rf"\[{att.placeholder}\]", marker, template_content, flags=re.IGNORECASE)
+
         # Extract information from the original email
         recipient_name = original_email.recipient_name
         recipient_company = original_email.recipient_company
@@ -584,7 +664,6 @@ class EmailGenerator:
             website_info_str = f"Failed to extract information: {website_info.get('error', 'Unknown error')}" if website_info else "No company info available."
 
         # Prepare the template content with placeholders replaced
-        template_content = template.content if template else ""
         if template_content:
             template_content = template_content.replace("[Recipient Name]", recipient_name or "")
             template_content = template_content.replace("[Company Name]", recipient_company or "")
@@ -595,6 +674,8 @@ class EmailGenerator:
         # Build the AI prompt (always use AI, even if template exists)
         prompt = f"""
         Rewrite this last chance email template in the same style without syntax or grammatical mistakes, using the web scraping knowledge and names in the list given to you. Personalize it based on the recipient's information and company details.
+        
+        IMPORTANT: Preserve all __ATTACHMENT_*__ markers exactly as they appear. Do not modify, remove, or change these markers in any way.
         
         Template to rewrite:
         {template_content if template_content else '[No template provided]'}
@@ -630,13 +711,14 @@ class EmailGenerator:
         9. DO NOT let variables like [Your Name] or [Your Position] be in the email content. Always use the data given to you about sender and recipient.
         10. DO NOT add a written signature to the email if not present in the given prompt.
         11. Make it clear this is the final follow-up attempt, but remain polite and professional.
+        12. CRITICAL: Keep all __ATTACHMENT_*__ markers exactly where they are in the template.
         """
 
         try:
             response = self.client.chat.completions.create(
                 model=AZURE_DEPLOYMENT_NAME,
                 messages=[
-                    {"role": "system", "content": "You are an expert email writer specializing in professional final follow-up emails. When a company description is provided, use it to explain how the sender's offerings align with the recipient's needs. Do not use any markdown formatting (like ** or *) in the email content."},
+                    {"role": "system", "content": "You are an expert email writer specializing in professional final follow-up emails. When a company description is provided, use it to explain how the sender's offerings align with the recipient's needs. Do not use any markdown formatting (like ** or *) in the email content. IMPORTANT: Preserve all __ATTACHMENT_*__ markers exactly as they appear."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,
@@ -675,18 +757,29 @@ class EmailGenerator:
         except Exception as e:
             raise Exception(f"Failed to generate last chance email: {str(e)}")
 
-        # --- Attachment placeholder replacement ---
-        # Query all attachments for the user and replace [Placeholder] with the correct HTML tag
-        attachments = self.db.query(Attachment).filter_by(user_id=user.id).all()
+        # --- Restore attachment placeholders and replace with HTML ---
+        logger.info(f"🔍 Found {len(attachments)} attachments for user {user.email}")
+        
+        # First, restore the original placeholders from markers
+        for marker, attachment in attachment_placeholders.items():
+            logger.info(f"🔄 Restoring placeholder [{attachment.placeholder}] from marker {marker}")
+            content = content.replace(marker, f"[{attachment.placeholder}]")
+            subject = subject.replace(marker, f"[{attachment.placeholder}]")
+        
+        # Now replace placeholders with actual HTML content
         for att in attachments:
             if att.placeholder:
+                logger.info(f"🎯 Processing attachment: {att.placeholder} (type: {att.file_type})")
                 html_tag = att.blob_url
                 if att.file_type.lower().startswith("image"):
                     html_tag = f'<img src="{att.blob_url}" style="max-width:300px; height:auto;" alt="Attachment" />'
+                    logger.info(f"🖼️  Image placeholder: [{att.placeholder}] -> {html_tag[:100]}...")
                 elif att.file_type.lower().startswith("video"):
                     # Use the watch page URL for videos instead of direct blob URL
                     frontend_url = FRONTEND_URL or "https://jolly-bush-0bae83703.6.azurestaticapps.net"
                     watch_url = f"{frontend_url}/watch?src={att.blob_url}&title={att.placeholder}"
+                    logger.info(f"🎬 Video placeholder: [{att.placeholder}] -> watch_url: {watch_url}")
+                    
                     if getattr(att, 'gif_url', None):
                         html_tag = (
                             f'<a href="{watch_url}" target="_blank" rel="noopener">'
@@ -694,12 +787,20 @@ class EmailGenerator:
                             f'       style="max-width:300px; height:auto; display:block; margin:0 auto;" />'
                             f'</a>'
                         )
+                        logger.info(f"🎬 Video with GIF: [{att.placeholder}] -> {html_tag[:100]}...")
                     else:
                         # Fallback to direct video link if no GIF
                         html_tag = f'<a href="{watch_url}" target="_blank" rel="noopener">Watch Video</a>'
-                # Replace [Placeholder] and [placeholder] (case-insensitive)
-                content = re.sub(rf"\\[{att.placeholder}\\]", html_tag, content, flags=re.IGNORECASE)
-                subject = re.sub(rf"\\[{att.placeholder}\\]", html_tag, subject, flags=re.IGNORECASE)
+                        logger.info(f"🎬 Video without GIF: [{att.placeholder}] -> {html_tag}")
+                
+                # Check if placeholder exists in content
+                if re.search(rf"\[{att.placeholder}\]", content, flags=re.IGNORECASE):
+                    logger.info(f"✅ Found placeholder [{att.placeholder}] in content, replacing...")
+                    content = re.sub(rf"\[{att.placeholder}\]", html_tag, content, flags=re.IGNORECASE)
+                    subject = re.sub(rf"\[{att.placeholder}\]", html_tag, subject, flags=re.IGNORECASE)
+                    logger.info(f"✅ Replacement completed for [{att.placeholder}]")
+                else:
+                    logger.warning(f"⚠️  Placeholder [{att.placeholder}] not found in content")
         
         # Get user's interval settings for scheduling
         now = datetime.now(timezone.utc)
