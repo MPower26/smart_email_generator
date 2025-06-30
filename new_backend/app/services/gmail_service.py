@@ -1,5 +1,7 @@
 import requests
 import base64
+import re
+import os
 
 class GmailTokenError(Exception):
     """Custom exception for Gmail token-related errors."""
@@ -28,6 +30,41 @@ def send_gmail_email(user, to_email, subject, body):
     
     # Convert newlines to <br> for HTML formatting
     body = body.replace('\n', '<br>')
+    
+    # --- Attachment placeholder replacement ---
+    # Import here to avoid circular imports
+    from app.db.database import get_db
+    from app.models.models import Attachment
+    
+    # Get database session
+    db = next(get_db())
+    
+    # Query all attachments for the user and replace [Placeholder] with the correct HTML tag
+    attachments = db.query(Attachment).filter_by(user_id=user.id).all()
+    for att in attachments:
+        if att.placeholder:
+            html_tag = att.blob_url
+            if att.file_type.lower().startswith("image"):
+                html_tag = f'<img src="{att.blob_url}" style="max-width:300px; height:auto;" alt="Attachment" />'
+            elif att.file_type.lower().startswith("video"):
+                # Use the watch page URL for videos instead of direct blob URL
+                frontend_url = os.getenv("FRONTEND_URL", "https://jolly-bush-0bae83703.6.azurestaticapps.net")
+                watch_url = f"{frontend_url}/watch?src={att.blob_url}&title={att.placeholder}"
+                
+                if getattr(att, 'gif_url', None):
+                    html_tag = (
+                        f'<a href="{watch_url}" target="_blank" rel="noopener">'
+                        f'  <img src="{att.gif_url}" alt="\u25B6\ufe0f Watch video" '
+                        f'       style="max-width:300px; height:auto; display:block; margin:0 auto;" />'
+                        f'</a>'
+                    )
+                else:
+                    # Fallback to direct video link if no GIF
+                    html_tag = f'<a href="{watch_url}" target="_blank" rel="noopener">Watch Video</a>'
+            
+            # Replace [Placeholder] and [placeholder] (case-insensitive)
+            body = re.sub(rf"\\[{att.placeholder}\\]", html_tag, body, flags=re.IGNORECASE)
+            subject = re.sub(rf"\\[{att.placeholder}\\]", html_tag, subject, flags=re.IGNORECASE)
     
     # Debug: print signature image URL
     print("User signature image URL:", getattr(user, 'signature_image_url', None))
