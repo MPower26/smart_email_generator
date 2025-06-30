@@ -275,7 +275,7 @@ async def video_proxy(video_path: str, request: Request):
         
         # Stream the video from Azure Blob Storage
         async with httpx.AsyncClient() as client:
-            response = await client.get(decoded_path, stream=True)
+            response = await client.get(decoded_path)
             
             if response.status_code != 200:
                 logger.error(f"Video not found: {decoded_path}, status: {response.status_code}")
