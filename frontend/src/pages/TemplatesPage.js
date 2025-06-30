@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import { Container, Card, Form, Button, Alert, Modal, Tabs, Tab, Accordion, Badge, OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { templateService, userService, attachmentService } from '../services/api';
 import { UserContext } from '../contexts/UserContext';
@@ -83,6 +83,8 @@ const TemplatesPage = () => {
       setAttachmentError(err.response?.data?.detail || 'Failed to upload attachment.');
     }
   );
+
+  const thumbnailInputRefs = useRef({});
 
   // Charger les templates au chargement de la page
   useEffect(() => {
@@ -423,6 +425,37 @@ const TemplatesPage = () => {
     }
   };
 
+  const handleAddOrReplaceThumbnail = (attachmentId) => {
+    if (thumbnailInputRefs.current[attachmentId]) {
+      thumbnailInputRefs.current[attachmentId].click();
+    }
+  };
+
+  const handleThumbnailFileChange = async (e, attachmentId) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('thumbnail', file);
+    await fetch(`/api/templates/attachments/${attachmentId}/thumbnail`, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    await loadAttachments();
+  };
+
+  const handleDeleteThumbnail = async (attachmentId) => {
+    await fetch(`/api/templates/attachments/${attachmentId}/thumbnail`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    await loadAttachments();
+  };
+
   // Render template card
   const renderTemplateCard = (template) => (
     <Card key={template.id} className="mb-3">
@@ -739,6 +772,43 @@ Your signature text here..."
                           </div>
                           <div><strong>Placeholder:</strong> <code>[{att.placeholder}]</code></div>
                           {att.category && <div><strong>Category:</strong> {att.category}</div>}
+                          {/* Thumbnail controls for videos only */}
+                          {att.file_type === 'video' && (
+                            <div className="mt-2">
+                              <div><strong>Thumbnail:</strong></div>
+                              {att.custom_thumbnail_url ? (
+                                <div className="d-flex align-items-center gap-2">
+                                  <img src={att.custom_thumbnail_url} alt="Custom thumbnail" style={{ maxWidth: 80, maxHeight: 60, borderRadius: 4, border: '1px solid #ccc' }} />
+                                  <Button variant="outline-secondary" size="sm" onClick={() => handleAddOrReplaceThumbnail(att.id)}>
+                                    Replace
+                                  </Button>
+                                  <Button variant="outline-danger" size="sm" onClick={() => handleDeleteThumbnail(att.id)}>
+                                    Delete
+                                  </Button>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    style={{ display: 'none' }}
+                                    ref={el => (thumbnailInputRefs.current[att.id] = el)}
+                                    onChange={e => handleThumbnailFileChange(e, att.id)}
+                                  />
+                                </div>
+                              ) : (
+                                <div className="d-flex align-items-center gap-2">
+                                  <Button variant="outline-primary" size="sm" onClick={() => handleAddOrReplaceThumbnail(att.id)}>
+                                    Add Thumbnail
+                                  </Button>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    style={{ display: 'none' }}
+                                    ref={el => (thumbnailInputRefs.current[att.id] = el)}
+                                    onChange={e => handleThumbnailFileChange(e, att.id)}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          )}
                           <Button variant="outline-danger" size="sm" className="mt-2" onClick={() => handleDeleteAttachment(att.id)}>Delete</Button>
                         </Card.Body>
                       </Card>
