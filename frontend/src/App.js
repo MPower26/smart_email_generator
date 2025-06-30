@@ -6,6 +6,7 @@ import HomePage from './pages/HomePage';
 import GenerateEmailsPage from './pages/GenerateEmailsPage';
 import TemplatesPage from './pages/TemplatesPage';
 import SettingsPage from './pages/SettingsPage';
+import WatchPage from './pages/WatchPage';
 import FriendsButton from './components/FriendsButton';
 import AuthScreen from './components/AuthScreen';
 import { UserProvider, useUser } from './contexts/UserContext';
@@ -51,6 +52,7 @@ function App() {
         <div className="App d-flex flex-column min-vh-100">
           <Routes>
             <Route path="/gmail/success" element={<GmailSuccess />} />
+            <Route path="/watch" element={<WatchPage />} />
             <Route path="/*" element={<ProtectedRoutes />} />
           </Routes>
         </div>
@@ -60,3 +62,4 @@ function App() {
 }
 
 export default App; 
+
