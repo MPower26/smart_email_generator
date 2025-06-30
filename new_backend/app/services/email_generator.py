@@ -350,7 +350,7 @@ class EmailGenerator:
                         # Use the proxy endpoint to avoid CORS issues
                         backend_url = "https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net"
                         proxy_url = f"{backend_url}/api/video-proxy/{urllib.parse.quote(att.blob_url)}"
-                        watch_url = f"{frontend_url}/watch?src={urllib.parse.quote(proxy_url)}&title={att.placeholder}"
+                        watch_url = f"{FRONTEND_URL}/watch?src={urllib.parse.quote(proxy_url)}&title={att.placeholder}"
                         logger.info(f"🎬 Video placeholder: [{att.placeholder}] -> proxy_url: {proxy_url}")
                         logger.info(f"🎬 Video placeholder: [{att.placeholder}] -> watch_url: {watch_url}")
                         
@@ -610,7 +610,7 @@ class EmailGenerator:
                     # Use the proxy endpoint to avoid CORS issues
                     backend_url = "https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net"
                     proxy_url = f"{backend_url}/api/video-proxy/{urllib.parse.quote(att.blob_url)}"
-                    watch_url = f"{frontend_url}/watch?src={urllib.parse.quote(proxy_url)}&title={att.placeholder}"
+                    watch_url = f"{FRONTEND_URL}/watch?src={urllib.parse.quote(proxy_url)}&title={att.placeholder}"
                     logger.info(f"🎬 Video placeholder: [{att.placeholder}] -> proxy_url: {proxy_url}")
                     logger.info(f"🎬 Video placeholder: [{att.placeholder}] -> watch_url: {watch_url}")
                     
@@ -831,7 +831,7 @@ class EmailGenerator:
                     # Use the proxy endpoint to avoid CORS issues
                     backend_url = "https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net"
                     proxy_url = f"{backend_url}/api/video-proxy/{urllib.parse.quote(att.blob_url)}"
-                    watch_url = f"{frontend_url}/watch?src={urllib.parse.quote(proxy_url)}&title={att.placeholder}"
+                    watch_url = f"{FRONTEND_URL}/watch?src={urllib.parse.quote(proxy_url)}&title={att.placeholder}"
                     logger.info(f"🎬 Video placeholder: [{att.placeholder}] -> proxy_url: {proxy_url}")
                     logger.info(f"🎬 Video placeholder: [{att.placeholder}] -> watch_url: {watch_url}")
                     
@@ -1020,5 +1020,3 @@ class EmailGenerator:
             except Exception as e:
                 logger.error(f"Error re-generating last chance email for ID {email.id}: {e}")
                 raise Exception(f"Failed to re-generate last chance email: {str(e)}")
-        # Fallback for other stages (original logic)
-        # ... existing code for other stages ...
