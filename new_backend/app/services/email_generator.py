@@ -133,10 +133,14 @@ class EmailGenerator:
             template_content = template_content.replace("[Your Position]", user.position if user.position else "[Your Position]")
             template_content = template_content.replace("[Your Company]", user.company_name if user.company_name else "[Your Company]")
             
+            # Log the markers for debugging
+            logger.info(f"🔍 Attachment markers before AI processing: {list(attachment_placeholders.keys())}")
+            logger.info(f"📝 Template content with markers: {template_content}")
+            
             prompt = f"""
             Rewrite this email template in the same style without syntax or grammatical mistakes, using the web scraping knowledge and names in the list given to you. Personalize it based on the recipient's information and company details.
             
-            IMPORTANT: Preserve all __ATTACHMENT_*__ markers exactly as they appear. Do not modify, remove, or change these markers in any way.
+            CRITICAL INSTRUCTION: You MUST preserve all __ATTACHMENT_*__ markers EXACTLY as they appear. Do not modify, remove, change, or corrupt these markers in any way. These markers are essential for the email system to work properly.
             
             Template to rewrite:
             {template_content}
@@ -172,7 +176,8 @@ class EmailGenerator:
             8. Avoid using em dashes (—) - use regular dashes (-) or other appropriate punctuation instead
             9. DO NOT let variables like [Your Name] or [Your Position] be in the email content. Always use the data given to you about sender and recipient.
             10. DO NOT add a written signature to the email if not present in the given prompt.
-            11. CRITICAL: Keep all __ATTACHMENT_*__ markers exactly where they are in the template.
+            11. CRITICAL: Keep all __ATTACHMENT_*__ markers exactly where they are in the template. Do not change them at all.
+            12. Before responding, verify that all __ATTACHMENT_*__ markers from the original template are present in your response.
             """
         else:
             # Use hardcoded prompt as fallback
@@ -213,7 +218,7 @@ class EmailGenerator:
             response = self.client.chat.completions.create(
                 model=AZURE_DEPLOYMENT_NAME,
                 messages=[
-                    {"role": "system", "content": "You are an expert email writer specializing in professional outreach. When a company description is provided, use it to explain how the sender's offerings align with the recipient's needs. Do not use any markdown formatting (like ** or *) in the email content. IMPORTANT: Preserve all __ATTACHMENT_*__ markers exactly as they appear."},
+                    {"role": "system", "content": "You are an expert email writer specializing in professional outreach. When a company description is provided, use it to explain how the sender's offerings align with the recipient's needs. Do not use any markdown formatting (like ** or *) in the email content. CRITICAL: You MUST preserve all __ATTACHMENT_*__ markers exactly as they appear. Do not modify, remove, change, or corrupt these markers in any way."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,
@@ -230,6 +235,55 @@ class EmailGenerator:
                     self.db.commit()
             
             generated_content = response.choices[0].message.content
+            
+            # Log the generated content for debugging
+            logger.info(f"🤖 AI generated content: {generated_content}")
+            
+            # Verify that all markers are preserved
+            for marker in attachment_placeholders.keys():
+                if marker not in generated_content:
+                    logger.warning(f"⚠️  Marker {marker} was lost during AI processing!")
+                    # Try to restore it by finding similar patterns
+                    if "ATTACHMENT" in generated_content:
+                        logger.warning(f"⚠️  Found corrupted marker in content: {generated_content}")
+            
+            # Fallback: Try to restore corrupted markers
+            for marker, attachment in attachment_placeholders.items():
+                if marker not in generated_content:
+                    # Look for corrupted versions of the marker
+                    corrupted_patterns = [
+                        f"ATTACHMENT{attachment.placeholder.upper()}",
+                        f"ATTACHMENT_{attachment.placeholder.upper()}",
+                        f"__ATTACHMENT{attachment.placeholder.upper()}",
+                        f"ATTACHMENT{attachment.placeholder.upper()}ET",
+                        f"ATTACHMENT{attachment.placeholder.upper()}T"
+                    ]
+                    
+                    restored = False
+                    for corrupted_pattern in corrupted_patterns:
+                        if corrupted_pattern in generated_content:
+                            logger.info(f"🔧 Restoring corrupted marker: {corrupted_pattern} -> {marker}")
+                            generated_content = generated_content.replace(corrupted_pattern, marker)
+                            restored = True
+                            break
+                    
+                    # If no exact match, try to find patterns with extra characters
+                    if not restored:
+                        # Look for patterns that start with ATTACHMENT and contain the placeholder
+                        pattern = rf"ATTACHMENT{attachment.placeholder.upper()}[A-Z]*"
+                        matches = re.findall(pattern, generated_content)
+                        if matches:
+                            for match in matches:
+                                logger.info(f"🔧 Restoring corrupted marker with extra chars: {match} -> {marker}")
+                                generated_content = generated_content.replace(match, marker)
+                                restored = True
+                                break
+                    
+                    if not restored:
+                        # If no corrupted pattern found, try to insert the marker back
+                        logger.warning(f"⚠️  Could not find corrupted marker for {marker}, attempting to restore")
+                        # Add the marker at the end of the content as a fallback
+                        generated_content += f"\n\n{marker}"
             
             # Extract subject from first line of content and remove "Subject: " prefix if present
             content_lines = generated_content.split('\n')
