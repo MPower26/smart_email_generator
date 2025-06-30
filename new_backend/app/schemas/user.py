@@ -10,6 +10,8 @@ class AttachmentBase(BaseModel):
     file_type: str
     category: Optional[str] = None
     created_at: Optional[datetime] = None
+    gif_url: Optional[str] = None
+    custom_thumbnail_url: Optional[str] = None
     
     @field_serializer('created_at')
     def serialize_created_at(self, value: Optional[datetime]) -> Optional[str]:
