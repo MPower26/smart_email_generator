@@ -23,7 +23,7 @@ const EnhancedTemplateEditor = ({
   useEffect(() => {
     const loadAttachments = async () => {
       try {
-        const response = await attachmentService.getAttachments();
+        const response = await attachmentService.listAttachments();
         setAttachments(response.data || []);
       } catch (error) {
         console.error('Failed to load attachments:', error);
