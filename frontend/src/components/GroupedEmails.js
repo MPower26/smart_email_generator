@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { emailService } from '../services/api.js';
 import { Card, Button, Badge, Collapse, Alert, Spinner, Form, Modal } from 'react-bootstrap';
 import websocketService from '../services/websocket';
+import EnhancedTemplateEditor from './EnhancedTemplateEditor';
 
 // This new component will handle the display and actions for a single email
 const EmailRow = ({ email, onUpdate }) => {
@@ -124,11 +125,11 @@ const EmailRow = ({ email, onUpdate }) => {
             </Form.Group>
             <Form.Group>
               <Form.Label>Content</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={15}
+              <EnhancedTemplateEditor
                 value={editedContent}
                 onChange={(e) => setEditedContent(e.target.value)}
+                rows={15}
+                showPreview={false}
               />
             </Form.Group>
           </Form>
