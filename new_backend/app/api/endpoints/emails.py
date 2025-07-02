@@ -1153,3 +1153,54 @@ async def regenerate_group_emails(
         }
         
     return {"message": f"Successfully re-generated {regenerated_count} emails in group {group_id}."} 
+
+@router.post("/send_batch")
+async def send_batch_emails(
+    stage: str = Body(...),
+    limit: int = Body(120),
+    group_id: Optional[str] = Body(None),
+    current_user: User = Depends(get_db),
+    db: Session = Depends(get_db)
+):
+    """
+    Send up to 'limit' unsent emails for the current user and stage.
+    Marks emails as 'sending' before sending, then 'sent' after.
+    Returns progress and prevents duplicates.
+    """
+    # Only select emails with status *_pending
+    query = db.query(GeneratedEmail).filter(
+        GeneratedEmail.user_id == current_user.id,
+        GeneratedEmail.stage == stage,
+        GeneratedEmail.status == f"{stage}_pending"
+    )
+    if group_id:
+        query = query.filter(GeneratedEmail.group_id == group_id)
+    emails_to_send = query.order_by(GeneratedEmail.id).limit(limit).all()
+    total_to_send = query.count()
+    if not emails_to_send:
+        return {"message": "No emails to send.", "sent": 0, "total": total_to_send}
+
+    sent_count = 0
+    for email in emails_to_send:
+        # Mark as sending to prevent duplicates
+        email.status = f"{stage}_sending"
+        db.commit()
+        try:
+            send_email_via_gmail(db, current_user, email)
+            sent_count += 1
+        except Exception as e:
+            email.status = f"{stage}_error"
+            db.commit()
+            continue
+    # After sending, update status to sent
+    for email in emails_to_send:
+        if email.status == f"{stage}_sending":
+            email.status = f"{stage}_sent"
+            email.sent_at = datetime.utcnow()
+    db.commit()
+    return {
+        "message": f"Batch send complete.",
+        "sent": sent_count,
+        "total": total_to_send,
+        "batch_size": len(emails_to_send)
+    } 
