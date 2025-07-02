@@ -1190,12 +1190,6 @@ async def send_batch_emails(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Send up to 'limit' unsent emails for the current user and stage.
-    Marks emails as 'sending' before sending, then 'sent' after.
-    Returns progress and prevents duplicates.
-    """
-    # Only select emails with status *_pending
     query = db.query(GeneratedEmail).filter(
         GeneratedEmail.user_id == current_user.id,
         GeneratedEmail.stage == stage,
@@ -1209,6 +1203,7 @@ async def send_batch_emails(
         return {"message": "No emails to send.", "sent": 0, "total": total_to_send}
 
     sent_count = 0
+    email_generator = EmailGenerator(db)
     for email in emails_to_send:
         # Mark as sending to prevent duplicates
         email.status = f"{stage}_sending"
@@ -1216,6 +1211,49 @@ async def send_batch_emails(
         try:
             send_email_via_gmail(db, current_user, email)
             sent_count += 1
+            # Stage transitions
+            if stage == "outreach":
+                # Generate followup
+                try:
+                    email_generator.generate_followup_email(email, current_user)
+                except Exception as e:
+                    pass
+                email.status = "followup_due"
+            elif stage == "followup":
+                # Generate last chance
+                try:
+                    email_generator.generate_lastchance_email(email, current_user)
+                except Exception as e:
+                    pass
+                email.status = "lastchance_due"
+            elif stage == "lastchance":
+                email.status = "completed"
+                # --- CLEANUP LOGIC START ---
+                recipient = email.recipient_email
+                user_id = current_user.id
+                all_emails = db.query(GeneratedEmail).filter(
+                    GeneratedEmail.user_id == user_id,
+                    GeneratedEmail.recipient_email == recipient
+                ).all()
+                if all(e.status == "completed" for e in all_emails):
+                    existing = db.query(SentHistory).filter(
+                        SentHistory.user_id == user_id,
+                        SentHistory.prospect_email == recipient
+                    ).first()
+                    if not existing:
+                        sent_hist = SentHistory(
+                            user_id=user_id,
+                            prospect_email=recipient,
+                            prospect_name=email.recipient_name
+                        )
+                        db.add(sent_hist)
+                        db.commit()
+                    db.query(GeneratedEmail).filter(
+                        GeneratedEmail.user_id == user_id,
+                        GeneratedEmail.recipient_email == recipient
+                    ).delete(synchronize_session=False)
+                    db.commit()
+                # --- CLEANUP LOGIC END ---
         except Exception as e:
             email.status = f"{stage}_error"
             db.commit()
@@ -1223,7 +1261,12 @@ async def send_batch_emails(
     # After sending, update status to sent
     for email in emails_to_send:
         if email.status == f"{stage}_sending":
-            email.status = f"{stage}_sent"
+            if stage == "outreach":
+                email.status = "followup_due"
+            elif stage == "followup":
+                email.status = "lastchance_due"
+            elif stage == "lastchance":
+                email.status = "completed"
             email.sent_at = datetime.utcnow()
     db.commit()
     return {
