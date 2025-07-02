@@ -1187,7 +1187,7 @@ async def send_batch_emails(
     stage: str = Body(...),
     limit: int = Body(120),
     group_id: Optional[str] = Body(None),
-    current_user: User = Depends(get_db),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
