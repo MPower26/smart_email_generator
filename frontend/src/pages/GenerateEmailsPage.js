@@ -94,6 +94,8 @@ const GenerateEmailsPage = () => {
   const warmingUpIntervalRef = useRef(null);
   const progressSectionRef = useRef(null);
 
+  const pausedRef = useRef(false);
+
   // Load emails by stage - moved before functions that reference it
   const loadEmailsByStage = async () => {
     setLoadingEmails(true);
@@ -540,9 +542,9 @@ const GenerateEmailsPage = () => {
     setError('');
     setIsSending(true);
     setPaused(false);
+    pausedRef.current = false;
     setSendingProgress(prev => ({ ...prev, status: 'sending', current: 0, total: 0 }));
 
-    // Determine which emails to send based on stage
     let emailsToSend = [];
     if (emailStage === 'outreach') emailsToSend = outreachEmails;
     else if (emailStage === 'followup') emailsToSend = followupEmails;
@@ -554,15 +556,15 @@ const GenerateEmailsPage = () => {
 
     let sent = 0;
     while (sent < totalToSend) {
-      if (paused) break;
+      if (pausedRef.current) break;
       const sendCount = Math.min(batchLimit, totalToSend - sent);
       try {
         const res = await emailService.sendBatch(emailStage, sendCount);
         sent += res.data.sent;
         setSendingProgress(prev => ({ ...prev, current: sent, total: totalToSend }));
         await loadEmailsByStage();
-        if (res.data.sent === 0) break; // No more to send
-        if (batchLimit === totalToSend) break; // For followup/lastchance, send all at once
+        if (res.data.sent === 0) break;
+        if (batchLimit === totalToSend) break;
       } catch (err) {
         setError('An error occurred while sending emails.');
         setSendingProgress(prev => ({ ...prev, status: 'error' }));
@@ -570,15 +572,17 @@ const GenerateEmailsPage = () => {
       }
     }
     setIsSending(false);
-    if (!paused) setSendingProgress(prev => ({ ...prev, status: 'complete' }));
+    if (!pausedRef.current) setSendingProgress(prev => ({ ...prev, status: 'complete' }));
   };
 
   const handlePause = () => {
     setPaused(true);
+    pausedRef.current = true;
   };
 
   const handleResume = async () => {
     setPaused(false);
+    pausedRef.current = false;
     setIsSending(true);
     await handleSendAll();
   };
