@@ -304,3 +304,4 @@ export const attachmentService = {
 };
 
 export default api;
+export { API_BASE_URL };
