@@ -150,6 +150,15 @@ export const emailService = {
   deleteEmail: (emailId) => api.delete(`/api/emails/${emailId}`),
 
   sendEmail: (emailId) => api.post(`/api/emails/send/${emailId}`),
+
+  // Batch send emails (new endpoint)
+  sendBatch: (stage, limit = 120, groupId = null) => {
+    return api.post('/api/emails/send_batch', {
+      stage,
+      limit,
+      group_id: groupId
+    });
+  },
 };
 
 // Template API - Fixed to match backend routes exactly
@@ -295,4 +304,3 @@ export const attachmentService = {
 };
 
 export default api;
-export { API_BASE_URL };
