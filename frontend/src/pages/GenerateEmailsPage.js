@@ -47,6 +47,7 @@ const GenerateEmailsPage = () => {
   const [activeTab, setActiveTab] = useState('generation');
   const [emailStage, setEmailStage] = useState('outreach');
   const [isSending, setIsSending] = useState(false);
+  const [paused, setPaused] = useState(false);
   
   // Stage-specific email arrays
   const [outreachEmails, setOutreachEmails] = useState([]);
@@ -536,32 +537,50 @@ const GenerateEmailsPage = () => {
   
   // Handle send all emails in a stage
   const handleSendAll = async () => {
-    setError(''); // Clear previous errors
+    setError('');
     setIsSending(true);
-    setSendingProgress(prev => ({ ...prev, status: 'sending' }));
+    setPaused(false);
+    setSendingProgress(prev => ({ ...prev, status: 'sending', current: 0, total: 0 }));
 
-    try {
-      const response = await emailService.sendAllViaGmail(emailStage);
-      setSendingProgress(prev => ({ ...prev, status: 'complete', message: response.data.message }));
-      await loadEmailsByStage();
-      setFollowupEmails(prev => prev.filter(email => !['followup_sent', 'lastchance_sent', 'completed'].includes(email.status)));
-    } catch (err) {
-      console.error(`Failed to send all emails for stage ${emailStage}:`, err);
-      let errorMessage = 'An unexpected error occurred while sending emails.';
-      if (err.response && (err.response.status === 401 || err.response.data?.detail?.includes("token"))) {
-        errorMessage = (
-          <span>
-            Your Gmail connection has expired. Please <a href="/settings">reconnect your account</a> to send emails.
-          </span>
-        );
-      } else if (err.response?.data?.detail) {
-        errorMessage = err.response.data.detail;
+    // Determine which emails to send based on stage
+    let emailsToSend = [];
+    if (emailStage === 'outreach') emailsToSend = outreachEmails;
+    else if (emailStage === 'followup') emailsToSend = followupEmails;
+    else if (emailStage === 'lastchance') emailsToSend = lastChanceEmails;
+    const totalToSend = emailsToSend.length;
+    const batchLimit = emailStage === 'outreach' ? 1 : totalToSend;
+
+    setSendingProgress(prev => ({ ...prev, status: 'sending', current: 0, total: totalToSend }));
+
+    let sent = 0;
+    while (sent < totalToSend) {
+      if (paused) break;
+      const sendCount = Math.min(batchLimit, totalToSend - sent);
+      try {
+        const res = await emailService.sendBatch(emailStage, sendCount);
+        sent += res.data.sent;
+        setSendingProgress(prev => ({ ...prev, current: sent, total: totalToSend }));
+        await loadEmailsByStage();
+        if (res.data.sent === 0) break; // No more to send
+        if (batchLimit === totalToSend) break; // For followup/lastchance, send all at once
+      } catch (err) {
+        setError('An error occurred while sending emails.');
+        setSendingProgress(prev => ({ ...prev, status: 'error' }));
+        break;
       }
-      setError(errorMessage);
-      setSendingProgress(prev => ({ ...prev, status: 'error' }));
-    } finally {
-      setIsSending(false);
     }
+    setIsSending(false);
+    if (!paused) setSendingProgress(prev => ({ ...prev, status: 'complete' }));
+  };
+
+  const handlePause = () => {
+    setPaused(true);
+  };
+
+  const handleResume = async () => {
+    setPaused(false);
+    setIsSending(true);
+    await handleSendAll();
   };
 
   const [isGenerating, setIsGenerating] = useState(false);
@@ -941,6 +960,21 @@ const GenerateEmailsPage = () => {
           </Card>
         </Tab>
       </Tabs>
+      {activeTab !== 'generation' && (
+        <div className="mb-3">
+          <Button onClick={handleSendAll} disabled={isSending || (sendingProgress.status === 'sending')} variant="primary">Send All</Button>{' '}
+          <Button onClick={handlePause} disabled={!isSending || paused} variant="warning">Pause</Button>{' '}
+          <Button onClick={handleResume} disabled={!paused} variant="success">Resume</Button>
+          <div style={{ margin: '10px 0', maxWidth: 400 }}>
+            <ProgressTracker
+              type="sending"
+              current={sendingProgress.current}
+              total={sendingProgress.total}
+              status={sendingProgress.status}
+            />
+          </div>
+        </div>
+      )}
       {/* Progress Section Anchor */}
       <div ref={progressSectionRef} id="progress-section"></div>
     </Container>
