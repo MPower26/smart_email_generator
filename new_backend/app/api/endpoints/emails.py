@@ -12,7 +12,7 @@ from fastapi import status
 from sqlalchemy import or_, and_, text
 
 from app.db.database import get_db
-from app.models.models import GeneratedEmail, User, EmailTemplate, EmailGenerationProgress
+from app.models.models import GeneratedEmail, User, EmailTemplate, EmailGenerationProgress, SentHistory
 from app.api.auth import get_current_user, get_user_from_db
 from app.services.email_generator import EmailGenerator
 from app.services.email_service import send_verification_email, EMAIL_CONFIG, send_email_via_gmail
@@ -908,7 +908,35 @@ async def send_all_via_gmail(
             elif stage == "lastchance":
                 email.status = "completed"
                 email.sent_at = datetime.utcnow()
-                # This is the final email, no new email is generated.
+                # --- CLEANUP LOGIC START ---
+                # Check if all emails for this prospect and user are now completed
+                recipient = email.recipient_email
+                user_id = current_user.id
+                all_emails = db.query(GeneratedEmail).filter(
+                    GeneratedEmail.user_id == user_id,
+                    GeneratedEmail.recipient_email == recipient
+                ).all()
+                if all(e.status == "completed" for e in all_emails):
+                    # Add to sent_history if not already present
+                    existing = db.query(SentHistory).filter(
+                        SentHistory.user_id == user_id,
+                        SentHistory.prospect_email == recipient
+                    ).first()
+                    if not existing:
+                        sent_hist = SentHistory(
+                            user_id=user_id,
+                            prospect_email=recipient,
+                            prospect_name=email.recipient_name
+                        )
+                        db.add(sent_hist)
+                        db.commit()
+                    # Delete all GeneratedEmail records for this prospect and user
+                    db.query(GeneratedEmail).filter(
+                        GeneratedEmail.user_id == user_id,
+                        GeneratedEmail.recipient_email == recipient
+                    ).delete(synchronize_session=False)
+                    db.commit()
+                # --- CLEANUP LOGIC END ---
 
             sent_count += 1
             
