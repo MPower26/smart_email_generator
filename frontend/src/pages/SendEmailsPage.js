@@ -1,15 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { emailService } from '../services/api';
+import { Tabs, Tab, Button, ProgressBar } from 'react-bootstrap';
+
+const STAGES = [
+  { key: 'outreach', label: 'Outreach', batchLimit: 120 },
+  { key: 'followup', label: 'Follow Up', batchLimit: null },
+  { key: 'lastchance', label: 'Last Chance', batchLimit: null },
+];
 
 function SendEmailsPage() {
+  const [stage, setStage] = useState('outreach');
   const [emails, setEmails] = useState([]);
   const [sending, setSending] = useState(false);
   const [paused, setPaused] = useState(false);
   const [progress, setProgress] = useState({ sent: 0, total: 0, batch_size: 0 });
-  const [stage, setStage] = useState('outreach'); // or 'followup', etc.
   const [polling, setPolling] = useState(false);
   const pollInterval = useRef(null);
-  const BATCH_LIMIT = 120;
 
   // Fetch emails for the current stage
   const fetchEmails = async () => {
@@ -19,6 +25,10 @@ function SendEmailsPage() {
 
   useEffect(() => {
     fetchEmails();
+    setProgress({ sent: 0, total: 0, batch_size: 0 });
+    setSending(false);
+    setPaused(false);
+    stopPolling();
     // Clean up polling on unmount
     return () => clearInterval(pollInterval.current);
   }, [stage]);
@@ -28,7 +38,6 @@ function SendEmailsPage() {
     setPolling(true);
     pollInterval.current = setInterval(async () => {
       await fetchEmails();
-      // Optionally, fetch progress from backend if you add a progress endpoint
     }, 2000);
   };
   const stopPolling = () => {
@@ -40,15 +49,19 @@ function SendEmailsPage() {
   const handleSendAll = async () => {
     setSending(true);
     setPaused(false);
-    setProgress({ sent: 0, total: emails.length, batch_size: Math.min(BATCH_LIMIT, emails.length) });
+    const batchLimit = STAGES.find(s => s.key === stage).batchLimit;
+    const totalToSend = batchLimit ? Math.min(batchLimit, emails.length) : emails.length;
+    setProgress({ sent: 0, total: emails.length, batch_size: totalToSend });
     startPolling();
     let sent = 0;
-    while (sent < BATCH_LIMIT && !paused) {
-      const res = await emailService.sendBatch(stage, 1); // Send one at a time for live progress
+    while (sent < totalToSend && !paused) {
+      const sendCount = batchLimit ? 1 : Math.max(1, totalToSend - sent); // Outreach: 1 at a time, others: all at once
+      const res = await emailService.sendBatch(stage, sendCount);
       sent += res.data.sent;
       setProgress(prev => ({ ...prev, sent }));
       await fetchEmails();
       if (res.data.sent === 0) break; // No more to send
+      if (batchLimit === null) break; // For followup/lastchance, send all at once
     }
     setSending(false);
     stopPolling();
@@ -71,13 +84,17 @@ function SendEmailsPage() {
 
   return (
     <div>
-      <h2>Send Emails ({stage})</h2>
-      <button onClick={handleSendAll} disabled={sending || emails.length === 0}>Send All</button>
-      <button onClick={handlePause} disabled={!sending || paused}>Pause</button>
-      <button onClick={handleResume} disabled={!paused}>Resume</button>
-      <div style={{ margin: '10px 0' }}>
-        <progress value={progress.sent} max={progress.batch_size} style={{ width: 200 }} />
-        <span> {progress.sent} / {progress.batch_size} sent</span>
+      <h2>Send Emails</h2>
+      <Tabs activeKey={stage} onSelect={setStage} className="mb-3">
+        {STAGES.map(s => (
+          <Tab eventKey={s.key} title={s.label} key={s.key} />
+        ))}
+      </Tabs>
+      <Button onClick={handleSendAll} disabled={sending || emails.length === 0} variant="primary">Send All</Button>{' '}
+      <Button onClick={handlePause} disabled={!sending || paused} variant="warning">Pause</Button>{' '}
+      <Button onClick={handleResume} disabled={!paused} variant="success">Resume</Button>
+      <div style={{ margin: '10px 0', maxWidth: 400 }}>
+        <ProgressBar now={progress.sent} max={progress.batch_size} label={`${progress.sent}/${progress.batch_size} sent`} />
       </div>
       <ul>
         {emails.map(email => (
@@ -87,10 +104,6 @@ function SendEmailsPage() {
         ))}
       </ul>
     </div>
-  );
-}
-export default SendEmailsPage;
-
   );
 }
 export default SendEmailsPage;
