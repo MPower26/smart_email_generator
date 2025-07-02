@@ -186,3 +186,12 @@ class Attachment(Base):
 
     def __repr__(self):
         return f"<Attachment(id={self.id}, user_id={self.user_id}, placeholder={self.placeholder}, file_type={self.file_type}, gif_url={self.gif_url}, custom_thumbnail_url={self.custom_thumbnail_url})>"
+
+class SentHistory(Base):
+    __tablename__ = "sent_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    prospect_email = Column(String(255), nullable=False)
+    prospect_name = Column(String(255), nullable=True)
+    completed_at = Column(DateTime, default=datetime.utcnow)
