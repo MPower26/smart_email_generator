@@ -568,7 +568,18 @@ const GenerateEmailsPage = () => {
         if (res.data.sent === 0) break;
         if (batchLimit === totalToSend) break;
       } catch (err) {
-        setError('An error occurred while sending emails.');
+        // Gmail token error handling
+        let errorMessage = 'An error occurred while sending emails.';
+        if (err?.response?.status === 401 || (err?.response?.data?.detail && err.response.data.detail.toLowerCase().includes('gmail token'))) {
+          errorMessage = (
+            <span>
+              Your Gmail connection has expired. Please <a href="/settings" style={{color:'#007bff',textDecoration:'underline'}}>reconnect your account</a> to send emails.
+            </span>
+          );
+        } else if (err?.response?.data?.detail) {
+          errorMessage = err.response.data.detail;
+        }
+        setError(errorMessage);
         setSendingProgress(prev => ({ ...prev, status: 'error' }));
         break;
       }
