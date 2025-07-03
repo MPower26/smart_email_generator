@@ -8,6 +8,8 @@ import { emailService, templateService } from '../services/api';
 import { UserContext } from '../contexts/UserContext';
 import '../styles/GroupedEmails.css';
 import websocketService from '../services/websocket';
+import { CSSTransition } from 'react-transition-group';
+import './StickyProgressBar.css';
 
 const PreRequisiteError = ({ error, onClear }) => {
     if (!error) return null;
@@ -964,23 +966,33 @@ const GenerateEmailsPage = () => {
           </Card>
         </Tab>
       </Tabs>
-      {activeTab !== 'generation' && (
-        <div className="mb-3">
-          <Button onClick={handleSendAll} disabled={isSending || (sendingProgress.status === 'sending')} variant="primary">Send All</Button>{' '}
-          <Button onClick={handlePause} disabled={!isSending || paused} variant="warning">Pause</Button>{' '}
-          <Button onClick={handleResume} disabled={!paused} variant="success">Resume</Button>
-          <div style={{ margin: '10px 0', maxWidth: 400 }}>
-            <ProgressTracker
-              type="sending"
-              current={sendingProgress.current}
-              total={sendingProgress.total}
-              status={sendingProgress.status}
-            />
-          </div>
-        </div>
-      )}
       {/* Progress Section Anchor */}
       <div ref={progressSectionRef} id="progress-section"></div>
+      {/* Add sticky progress bar overlay */}
+      <CSSTransition
+        in={isSending || sendingProgress.status === 'sending'}
+        timeout={300}
+        classNames="sticky-progress-bar"
+        unmountOnExit
+      >
+        <div className="sticky-progress-bar">
+          <div className="progress-bar-content">
+            <div className="progress-label">
+              <span className="progress-count">{sendingProgress.current}/{sendingProgress.total}</span>
+            </div>
+            <div className="progress-bar-outer">
+              <div
+                className="progress-bar-inner"
+                style={{ width: `${(sendingProgress.total ? (sendingProgress.current / sendingProgress.total) * 100 : 0)}%` }}
+              />
+            </div>
+            <div className="progress-actions">
+              <Button onClick={handlePause} disabled={!isSending || paused} variant="light" size="sm" className="progress-btn">Pause</Button>
+              <Button onClick={handleResume} disabled={!paused} variant="light" size="sm" className="progress-btn">Resume</Button>
+            </div>
+          </div>
+        </div>
+      </CSSTransition>
     </Container>
   );
 };
