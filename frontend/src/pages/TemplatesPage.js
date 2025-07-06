@@ -391,16 +391,20 @@ const TemplatesPage = () => {
       const res = await uploadAttachmentFile(attachmentFile, attachmentPlaceholder, attachmentCategory);
       // Si c'est une vidéo et qu'un thumbnail est sélectionné, upload du thumbnail
       if (res && res.data && attachmentFile.type.startsWith('video') && attachmentThumbnail) {
-        // Use the new 'id' field from the backend response
         const attachmentId = res.data.id;
         if (attachmentId) {
+          const token = localStorage.getItem('token');
+          if (!token) {
+            setAttachmentError('You must be logged in to upload a thumbnail.');
+            return;
+          }
           const formData = new FormData();
           formData.append('thumbnail', attachmentThumbnail);
           await fetch(`${API_BASE_URL}/api/templates/attachments/${attachmentId}/thumbnail`, {
             method: 'POST',
             body: formData,
             headers: {
-              Authorization: `Bearer ${localStorage.getItem('token')}`
+              Authorization: `Bearer ${token}`
             }
           });
         }
