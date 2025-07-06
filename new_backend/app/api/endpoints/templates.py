@@ -1,11 +1,12 @@
 from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File, Form, Header
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import logging
 import time
+import jwt
 
 from app.db.database import get_db
 from app.models.models import EmailTemplate, User, Attachment
@@ -14,6 +15,9 @@ from app.services.blob_storage import blob_storage_service
 from app.schemas.user import AttachmentOut
 
 router = APIRouter()
+
+SECRET_KEY = os.environ.get("THUMBNAIL_JWT_SECRET", "change_this_secret_for_prod")
+ALGORITHM = "HS256"
 
 @router.get("/", response_model=List[Dict[str, Any]])
 async def get_templates(
@@ -469,66 +473,76 @@ async def assemble_chunks(
     
     return {"message": "File assembled and uploaded", "blob_url": blob_url, "id": attachment.id}
 
+@router.post("/attachments/{attachment_id}/thumbnail-token", response_model=Dict[str, str])
+async def get_thumbnail_upload_token(
+    attachment_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Vérifie que l'attachement existe et appartient à l'utilisateur
+    attachment = db.query(Attachment).filter_by(id=attachment_id, user_id=current_user.id).first()
+    if not attachment:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    # Génère un token JWT valable 10 minutes
+    payload = {
+        "sub": current_user.id,
+        "attachment_id": attachment_id,
+        "exp": datetime.utcnow() + timedelta(minutes=10)
+    }
+    token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    return {"token": token}
+
 @router.post("/attachments/{attachment_id}/thumbnail", response_model=Dict[str, str])
 async def upload_custom_thumbnail(
     attachment_id: int,
     thumbnail: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
+    authorization: str = Header(None),
     db: Session = Depends(get_db)
 ):
-    """Upload a custom thumbnail for a video attachment"""
-    logger = logging.getLogger(__name__)
-    
-    logger.info(f"🎯 Starting custom thumbnail upload for attachment {attachment_id}")
-    logger.info(f"📁 Thumbnail file: {thumbnail.filename}")
-    logger.info(f"📊 Size: {thumbnail.size} bytes ({thumbnail.size / (1024*1024):.1f} MB)")
-    logger.info(f"🎬 Type: {thumbnail.content_type}")
-    
-    # Validate that the attachment exists and belongs to the user
-    attachment = db.query(Attachment).filter_by(id=attachment_id, user_id=current_user.id).first()
+    # Vérifie le token JWT spécifique thumbnail
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid token")
+    token = authorization.split(" ")[1]
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("attachment_id") != attachment_id:
+            raise HTTPException(status_code=403, detail="Token does not match attachment")
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    # ... suite de la logique d'upload existante ...
+    # Validate that the attachment exists
+    attachment = db.query(Attachment).filter_by(id=attachment_id).first()
     if not attachment:
         raise HTTPException(status_code=404, detail="Attachment not found")
-    
     # Only allow thumbnails for video attachments
     if not attachment.file_type.lower().startswith("video"):
         raise HTTPException(status_code=400, detail="Custom thumbnails can only be added to video attachments")
-    
     # Validate file type (must be an image)
     allowed_types = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]
     if thumbnail.content_type not in allowed_types:
-        logger.warning(f"❌ Invalid thumbnail file type: {thumbnail.content_type}")
         raise HTTPException(status_code=400, detail="Thumbnail must be an image (JPEG, PNG, GIF, WebP)")
-    
     # Validate file size (max 5MB for thumbnails)
     max_size = 5 * 1024 * 1024  # 5MB
     if thumbnail.size > max_size:
-        logger.warning(f"❌ Thumbnail too large: {thumbnail.size} bytes ({thumbnail.size / (1024*1024):.1f} MB) > {max_size / (1024*1024)} MB")
         raise HTTPException(status_code=400, detail="Thumbnail size must be < 5MB")
-    
     try:
         # Read thumbnail content
         content = await thumbnail.read()
         file_extension = os.path.splitext(thumbnail.filename)[1]
-        
         # Upload thumbnail to blob storage
-        thumbnail_url, _ = await blob_storage_service.upload_attachment(content, file_extension, current_user.email, is_video=False)
-        
+        thumbnail_url, _ = await blob_storage_service.upload_attachment(content, file_extension, "system", is_video=False)
         # Update attachment with custom thumbnail URL
         attachment.custom_thumbnail_url = thumbnail_url
         db.commit()
         db.refresh(attachment)
-        
-        logger.info(f"✅ Custom thumbnail uploaded successfully for attachment {attachment_id}")
-        logger.info(f"🔗 Thumbnail URL: {thumbnail_url}")
-        
         return {
             "message": "Custom thumbnail uploaded successfully",
             "thumbnail_url": thumbnail_url,
             "attachment_id": attachment_id
         }
-        
     except Exception as e:
-        logger.error(f"❌ Failed to upload custom thumbnail for attachment {attachment_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to upload thumbnail: {str(e)}")
 
 @router.delete("/attachments/{attachment_id}/thumbnail", response_model=Dict[str, str])
@@ -560,3 +574,4 @@ async def delete_custom_thumbnail(
         "message": "Custom thumbnail removed successfully",
         "attachment_id": attachment_id
     } 
+
