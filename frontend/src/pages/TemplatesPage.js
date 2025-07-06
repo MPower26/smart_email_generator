@@ -400,11 +400,24 @@ const TemplatesPage = () => {
               Authorization: `Bearer ${localStorage.getItem('userEmail')}` // Authentification classique (email)
             }
           });
-          if (!tokenRes.ok) {
+          console.log('thumbnail-token response status:', tokenRes.status);
+          let tokenJson = null;
+          try {
+            tokenJson = await tokenRes.json();
+            console.log('thumbnail-token JSON:', tokenJson);
+          } catch (e) {
+            console.error('Failed to parse thumbnail-token JSON:', e);
+          }
+          if (!tokenRes.ok || !tokenJson || !tokenJson.token) {
             setAttachmentError('Failed to get upload token.');
             return;
           }
-          const { token } = await tokenRes.json();
+          const token = tokenJson.token;
+          console.log('JWT token for thumbnail:', token);
+          if (!token || token === 'null') {
+            setAttachmentError('Upload token is null.');
+            return;
+          }
           // 2. Uploader le thumbnail avec ce token JWT
           const formData = new FormData();
           formData.append('thumbnail', attachmentThumbnail);
@@ -415,6 +428,14 @@ const TemplatesPage = () => {
               Authorization: `Bearer ${token}`
             }
           });
+          console.log('thumbnail upload response status:', uploadRes.status);
+          let uploadJson = null;
+          try {
+            uploadJson = await uploadRes.json();
+            console.log('thumbnail upload JSON:', uploadJson);
+          } catch (e) {
+            console.error('Failed to parse thumbnail upload JSON:', e);
+          }
           if (!uploadRes.ok) {
             setAttachmentError('Failed to upload thumbnail.');
             return;
