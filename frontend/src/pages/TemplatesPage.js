@@ -393,20 +393,32 @@ const TemplatesPage = () => {
       if (res && res.data && attachmentFile.type.startsWith('video') && attachmentThumbnail) {
         const attachmentId = res.data.id;
         if (attachmentId) {
-          const token = localStorage.getItem('token');
-          if (!token) {
-            setAttachmentError('You must be logged in to upload a thumbnail.');
+          // 1. Demander un token JWT temporaire pour l'upload du thumbnail
+          const tokenRes = await fetch(`${API_BASE_URL}/api/templates/attachments/${attachmentId}/thumbnail-token`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem('userEmail')}` // Authentification classique (email)
+            }
+          });
+          if (!tokenRes.ok) {
+            setAttachmentError('Failed to get upload token.');
             return;
           }
+          const { token } = await tokenRes.json();
+          // 2. Uploader le thumbnail avec ce token JWT
           const formData = new FormData();
           formData.append('thumbnail', attachmentThumbnail);
-          await fetch(`${API_BASE_URL}/api/templates/attachments/${attachmentId}/thumbnail`, {
+          const uploadRes = await fetch(`${API_BASE_URL}/api/templates/attachments/${attachmentId}/thumbnail`, {
             method: 'POST',
             body: formData,
             headers: {
               Authorization: `Bearer ${token}`
             }
           });
+          if (!uploadRes.ok) {
+            setAttachmentError('Failed to upload thumbnail.');
+            return;
+          }
         }
       }
       setAttachmentSuccess('Attachment uploaded successfully.');
