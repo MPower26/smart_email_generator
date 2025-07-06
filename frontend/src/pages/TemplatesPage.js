@@ -391,7 +391,8 @@ const TemplatesPage = () => {
       const res = await uploadAttachmentFile(attachmentFile, attachmentPlaceholder, attachmentCategory);
       // Si c'est une vidéo et qu'un thumbnail est sélectionné, upload du thumbnail
       if (res && res.data && attachmentFile.type.startsWith('video') && attachmentThumbnail) {
-        const attachmentId = res.data.id || (res.data.attachment_id || res.data.attachmentId);
+        // Use the new 'id' field from the backend response
+        const attachmentId = res.data.id;
         if (attachmentId) {
           const formData = new FormData();
           formData.append('thumbnail', attachmentThumbnail);
