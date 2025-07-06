@@ -376,7 +376,7 @@ async def upload_attachment(
     logger.info(f"👤 User: {current_user.email}")
     logger.info(f"🏷️  Placeholder: [{placeholder}]")
     
-    return {"message": "Attachment uploaded", "blob_url": blob_url}
+    return {"message": "Attachment uploaded", "blob_url": blob_url, "id": attachment.id}
 
 @router.get("/attachments", response_model=List[AttachmentOut])
 async def list_attachments(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -467,7 +467,7 @@ async def assemble_chunks(
     # Delete all chunk blobs
     await blob_storage_service.delete_chunks(upload_id, total_chunks, file_extension)
     
-    return {"message": "File assembled and uploaded", "blob_url": blob_url}
+    return {"message": "File assembled and uploaded", "blob_url": blob_url, "id": attachment.id}
 
 @router.post("/attachments/{attachment_id}/thumbnail", response_model=Dict[str, str])
 async def upload_custom_thumbnail(
@@ -560,4 +560,3 @@ async def delete_custom_thumbnail(
         "message": "Custom thumbnail removed successfully",
         "attachment_id": attachment_id
     } 
-
