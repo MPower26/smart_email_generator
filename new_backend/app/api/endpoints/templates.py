@@ -499,17 +499,24 @@ async def upload_custom_thumbnail(
     authorization: str = Header(None),
     db: Session = Depends(get_db)
 ):
+    print(f"[DEBUG] Authorization header received: {authorization}")
     # Vérifie le token JWT spécifique thumbnail
     if not authorization or not authorization.startswith("Bearer "):
+        print("[DEBUG] Missing or invalid Authorization header format.")
         raise HTTPException(status_code=401, detail="Missing or invalid token")
     token = authorization.split(" ")[1]
+    print(f"[DEBUG] JWT token extracted: {token}")
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        print(f"[DEBUG] JWT payload decoded: {payload}")
         if payload.get("attachment_id") != attachment_id:
+            print(f"[DEBUG] Token attachment_id {payload.get('attachment_id')} does not match URL attachment_id {attachment_id}")
             raise HTTPException(status_code=403, detail="Token does not match attachment")
     except jwt.ExpiredSignatureError:
+        print("[DEBUG] JWT token expired.")
         raise HTTPException(status_code=401, detail="Token expired")
-    except Exception:
+    except Exception as e:
+        print(f"[DEBUG] JWT decode error: {e}")
         raise HTTPException(status_code=401, detail="Invalid token")
     # ... suite de la logique d'upload existante ...
     # Validate that the attachment exists
@@ -574,4 +581,3 @@ async def delete_custom_thumbnail(
         "message": "Custom thumbnail removed successfully",
         "attachment_id": attachment_id
     } 
-
