@@ -10,6 +10,7 @@ import os
 import uuid
 from fastapi import status
 from sqlalchemy import or_, and_, text
+import time
 
 from app.db.database import get_db
 from app.models.models import GeneratedEmail, User, EmailTemplate, EmailGenerationProgress, SentHistory
@@ -1143,6 +1144,7 @@ async def send_all_by_group(
         progress_record.generated_emails = sent_count
         progress_record.updated_at = datetime.utcnow()
         db.commit()
+        time.sleep(1)  # Simulate delay for live progress
     # --- Mark progress as complete ---
     progress_record.status = "completed"
     progress_record.updated_at = datetime.utcnow()
