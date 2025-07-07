@@ -1102,27 +1102,30 @@ async def send_all_by_group(
     failed_count = 0
     errors = []
 
-    # Send start progress event
-    await manager.send_progress(str(current_user.id), {
-        "type": "group_sending_start",
-        "group_id": group_id,
-        "stage": stage,
-        "total": len(emails),
-        "current": 0,
-        "sent_count": 0,
-        "failed_count": 0
-    })
-    
+    # --- Create progress record ---
+    from app.models.models import EmailGenerationProgress
+    from datetime import datetime
+    progress_record = EmailGenerationProgress(
+        user_id=current_user.id,
+        total_contacts=len(emails),
+        processed_contacts=0,
+        generated_emails=0,
+        status="processing",
+        stage=stage,
+        group_id=group_id,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
+    )
+    db.add(progress_record)
+    db.commit()
+    db.refresh(progress_record)
+    progress_id = progress_record.id
+
     for idx, email in enumerate(emails):
         try:
-            # Actually send the email via Gmail (use the freshly fetched user)
             send_gmail_email(user, email.recipient_email, email.subject, email.content)
-            
-            # Mark email as sent
             email.status = f"{stage}_sent"
             email.sent_at = datetime.utcnow()
-            
-            # Generate next stage email if needed
             if stage == "followup":
                 try:
                     email_generator = EmailGenerator(db)
@@ -1130,50 +1133,20 @@ async def send_all_by_group(
                     logger.info(f"Generated last chance email for original email ID {email.id}")
                 except Exception as followup_error:
                     logger.error(f"Failed to generate last chance email: {str(followup_error)}")
-            
             sent_count += 1
-            
-            # Send progress event after each email
-            await manager.send_progress(str(current_user.id), {
-                "type": "group_sending_progress",
-                "group_id": group_id,
-                "stage": stage,
-                "total": len(emails),
-                "current": idx + 1,
-                "sent_count": sent_count,
-                "failed_count": failed_count
-            })
-            
         except Exception as e:
             logger.error(f"Failed to send email {email.id}: {e}")
             failed_count += 1
             errors.append(f"Email to {email.recipient_email}: {str(e)}")
-            # Send error progress event
-            await manager.send_progress(str(current_user.id), {
-                "type": "group_sending_error",
-                "group_id": group_id,
-                "stage": stage,
-                "total": len(emails),
-                "current": idx + 1,
-                "sent_count": sent_count,
-                "failed_count": failed_count,
-                "error": str(e),
-                "email_id": email.id,
-                "recipient": email.recipient_email
-            })
-    
-    # Commit all changes
+        # --- Update progress record ---
+        progress_record.processed_contacts = idx + 1
+        progress_record.generated_emails = sent_count
+        progress_record.updated_at = datetime.utcnow()
+        db.commit()
+    # --- Mark progress as complete ---
+    progress_record.status = "completed"
+    progress_record.updated_at = datetime.utcnow()
     db.commit()
-    
-    # Send complete progress event
-    await manager.send_progress(str(current_user.id), {
-        "type": "group_sending_complete",
-        "group_id": group_id,
-        "stage": stage,
-        "total": len(emails),
-        "sent_count": sent_count,
-        "failed_count": failed_count
-    })
     
     logger.info(f"[EMAILS] Sent {sent_count} emails in group '{group_id}' for user {current_user.email} in stage '{stage}'")
     
@@ -1183,7 +1156,8 @@ async def send_all_by_group(
         "sent_count": sent_count,
         "failed_count": failed_count,
         "total_count": len(emails),
-        "errors": errors if errors else None
+        "errors": errors if errors else None,
+        "progress_id": progress_id
     }
 
 @router.post("/regenerate_group/{group_id}", status_code=200)
