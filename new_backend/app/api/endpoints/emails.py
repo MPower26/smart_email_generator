@@ -1101,8 +1101,19 @@ async def send_all_by_group(
     sent_count = 0
     failed_count = 0
     errors = []
+
+    # Send start progress event
+    await manager.send_progress(str(current_user.id), {
+        "type": "group_sending_start",
+        "group_id": group_id,
+        "stage": stage,
+        "total": len(emails),
+        "current": 0,
+        "sent_count": 0,
+        "failed_count": 0
+    })
     
-    for email in emails:
+    for idx, email in enumerate(emails):
         try:
             # Actually send the email via Gmail (use the freshly fetched user)
             send_gmail_email(user, email.recipient_email, email.subject, email.content)
@@ -1122,14 +1133,48 @@ async def send_all_by_group(
             
             sent_count += 1
             
+            # Send progress event after each email
+            await manager.send_progress(str(current_user.id), {
+                "type": "group_sending_progress",
+                "group_id": group_id,
+                "stage": stage,
+                "total": len(emails),
+                "current": idx + 1,
+                "sent_count": sent_count,
+                "failed_count": failed_count
+            })
+            
         except Exception as e:
             logger.error(f"Failed to send email {email.id}: {e}")
             failed_count += 1
             errors.append(f"Email to {email.recipient_email}: {str(e)}")
+            # Send error progress event
+            await manager.send_progress(str(current_user.id), {
+                "type": "group_sending_error",
+                "group_id": group_id,
+                "stage": stage,
+                "total": len(emails),
+                "current": idx + 1,
+                "sent_count": sent_count,
+                "failed_count": failed_count,
+                "error": str(e),
+                "email_id": email.id,
+                "recipient": email.recipient_email
+            })
     
     # Commit all changes
     db.commit()
-            
+    
+    # Send complete progress event
+    await manager.send_progress(str(current_user.id), {
+        "type": "group_sending_complete",
+        "group_id": group_id,
+        "stage": stage,
+        "total": len(emails),
+        "sent_count": sent_count,
+        "failed_count": failed_count
+    })
+    
     logger.info(f"[EMAILS] Sent {sent_count} emails in group '{group_id}' for user {current_user.email} in stage '{stage}'")
     
     return {
