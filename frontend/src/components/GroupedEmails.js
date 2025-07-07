@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { emailService } from '../services/api.js';
 import { Card, Button, Badge, Collapse, Alert, Spinner, Form, Modal } from 'react-bootstrap';
 import websocketService from '../services/websocket';
@@ -161,6 +161,7 @@ const GroupedEmails = ({ stage }) => {
   const [searchQueries, setSearchQueries] = useState({}); // { [groupId]: searchString }
   const [groupProgress, setGroupProgress] = useState({}); // { [groupId]: {status, current, total, sent_count, failed_count} }
   const [pausedGroups, setPausedGroups] = useState(new Set());
+  const pollingIntervals = useRef({}); // { [groupId]: intervalId }
 
   useEffect(() => {
     loadGroupedEmails();
@@ -259,15 +260,46 @@ const GroupedEmails = ({ stage }) => {
     }
   };
 
-  const handleSendAllInGroup = async (groupId) => {
-    // Reset error before trying
-    setError(null);
-    // Add group to sending set to prevent duplicate clicks
-    setSendingGroups(prev => new Set(prev).add(groupId));
-    
+  // Poll progress for a group
+  const pollGroupProgress = async (groupId, progressId) => {
     try {
-      await emailService.sendAllByGroup(stage, groupId);
-      // Reload the groups to update the status and remove sent groups
+      const response = await emailService.getGenerationProgressById(progressId);
+      const progress = response.data;
+      setGroupProgress(prev => ({
+        ...prev,
+        [groupId]: {
+          status: progress.status,
+          current: progress.processed_contacts,
+          total: progress.total_contacts,
+          sent_count: progress.generated_emails,
+          failed_count: progress.total_contacts - progress.generated_emails,
+        }
+      }));
+      if (progress.status === 'completed' || progress.status === 'error') {
+        clearInterval(pollingIntervals.current[groupId]);
+        pollingIntervals.current[groupId] = null;
+      }
+    } catch (err) {
+      // Optionally handle polling error
+    }
+  };
+
+  const startPollingGroup = (groupId, progressId) => {
+    if (pollingIntervals.current[groupId]) {
+      clearInterval(pollingIntervals.current[groupId]);
+    }
+    pollGroupProgress(groupId, progressId); // Poll immediately
+    pollingIntervals.current[groupId] = setInterval(() => pollGroupProgress(groupId, progressId), 2000);
+  };
+
+  const handleSendAllInGroup = async (groupId) => {
+    setError(null);
+    setSendingGroups(prev => new Set(prev).add(groupId));
+    try {
+      const res = await emailService.sendAllByGroup(stage, groupId);
+      if (res.data && res.data.progress_id) {
+        startPollingGroup(groupId, res.data.progress_id);
+      }
       await loadGroupedEmails();
     } catch (err) {
       console.error('Error sending all emails in group:', err);
@@ -281,7 +313,6 @@ const GroupedEmails = ({ stage }) => {
         setError('Failed to send emails in group. Please try again.');
       }
     } finally {
-      // Remove group from sending set
       setSendingGroups(prev => {
         const newSet = new Set(prev);
         newSet.delete(groupId);
@@ -348,6 +379,15 @@ const GroupedEmails = ({ stage }) => {
     );
   };
 
+  // Cleanup polling intervals on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(pollingIntervals.current).forEach(intervalId => {
+        if (intervalId) clearInterval(intervalId);
+      });
+    };
+  }, []);
+
   if (loading) return <div>Loading grouped emails...</div>;
   if (error) return <div className="error">{error}</div>;
   if (groups.length === 0) return <div>No grouped emails found for {stage} stage.</div>;
@@ -403,12 +443,12 @@ const GroupedEmails = ({ stage }) => {
                 <ProgressBar
                   now={Math.round((progress.current / progress.total) * 100)}
                   label={`${progress.current}/${progress.total}`}
-                  variant={progress.status === 'group_sending_complete' ? 'success' : progress.status === 'group_sending_error' ? 'danger' : 'primary'}
-                  animated={progress.status === 'group_sending_progress'}
+                  variant={progress.status === 'completed' ? 'success' : progress.status === 'error' ? 'danger' : 'primary'}
+                  animated={progress.status === 'processing'}
                   striped
                 />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-                  <span>Status: {progress.status.replace('group_sending_', '').replace('_', ' ')}</span>
+                  <span>Status: {progress.status}</span>
                   <span>Sent: {progress.sent_count} | Failed: {progress.failed_count}</span>
                   <div>
                     <Button size="sm" variant="light" onClick={() => handlePauseGroup(group.group_id)} disabled={isPaused || progress.status === 'group_sending_complete'}>Pause</Button>
