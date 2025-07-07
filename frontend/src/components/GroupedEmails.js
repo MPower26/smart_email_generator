@@ -3,6 +3,7 @@ import { emailService } from '../services/api.js';
 import { Card, Button, Badge, Collapse, Alert, Spinner, Form, Modal } from 'react-bootstrap';
 import websocketService from '../services/websocket';
 import EnhancedTemplateEditor from './EnhancedTemplateEditor';
+import ProgressBar from 'react-bootstrap/ProgressBar';
 
 // This new component will handle the display and actions for a single email
 const EmailRow = ({ email, onUpdate }) => {
@@ -158,6 +159,8 @@ const GroupedEmails = ({ stage }) => {
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [sendingGroups, setSendingGroups] = useState(new Set());
   const [searchQueries, setSearchQueries] = useState({}); // { [groupId]: searchString }
+  const [groupProgress, setGroupProgress] = useState({}); // { [groupId]: {status, current, total, sent_count, failed_count} }
+  const [pausedGroups, setPausedGroups] = useState(new Set());
 
   useEffect(() => {
     loadGroupedEmails();
@@ -175,6 +178,19 @@ const GroupedEmails = ({ stage }) => {
             )
             : data.error
         );
+      }
+      if (data.type && data.group_id) {
+        setGroupProgress(prev => ({
+          ...prev,
+          [data.group_id]: {
+            status: data.type,
+            current: data.current ?? prev[data.group_id]?.current ?? 0,
+            total: data.total ?? prev[data.group_id]?.total ?? 0,
+            sent_count: data.sent_count ?? prev[data.group_id]?.sent_count ?? 0,
+            failed_count: data.failed_count ?? prev[data.group_id]?.failed_count ?? 0,
+            error: data.error || null
+          }
+        }));
       }
       // ... handle other types as needed ...
     });
@@ -274,6 +290,18 @@ const GroupedEmails = ({ stage }) => {
     }
   };
 
+  const handlePauseGroup = (groupId) => {
+    setPausedGroups(prev => new Set(prev).add(groupId));
+  };
+  const handleResumeGroup = async (groupId) => {
+    setPausedGroups(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(groupId);
+      return newSet;
+    });
+    await handleSendAllInGroup(groupId);
+  };
+
   const CountdownTimer = ({ dueDate }) => {
     const [timeLeft, setTimeLeft] = useState({});
 
@@ -343,6 +371,8 @@ const GroupedEmails = ({ stage }) => {
           );
         });
         const emailsToShow = filteredEmails.slice(0, visibleCounts[group.group_id] || 15);
+        const progress = groupProgress[group.group_id];
+        const isPaused = pausedGroups.has(group.group_id);
         return (
           <div key={group.group_id} className="email-group">
             <div className="group-header">
@@ -367,10 +397,31 @@ const GroupedEmails = ({ stage }) => {
                 onChange={handleSearchChange}
               />
             </div>
+            {/* Per-group progress bar */}
+            {progress && progress.total > 0 && (
+              <div className="group-progress-bar" style={{ margin: '10px 0' }}>
+                <ProgressBar
+                  now={Math.round((progress.current / progress.total) * 100)}
+                  label={`${progress.current}/${progress.total}`}
+                  variant={progress.status === 'group_sending_complete' ? 'success' : progress.status === 'group_sending_error' ? 'danger' : 'primary'}
+                  animated={progress.status === 'group_sending_progress'}
+                  striped
+                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                  <span>Status: {progress.status.replace('group_sending_', '').replace('_', ' ')}</span>
+                  <span>Sent: {progress.sent_count} | Failed: {progress.failed_count}</span>
+                  <div>
+                    <Button size="sm" variant="light" onClick={() => handlePauseGroup(group.group_id)} disabled={isPaused || progress.status === 'group_sending_complete'}>Pause</Button>
+                    <Button size="sm" variant="light" onClick={() => handleResumeGroup(group.group_id)} disabled={!isPaused}>Resume</Button>
+                  </div>
+                </div>
+                {progress.error && <Alert variant="danger">{progress.error}</Alert>}
+              </div>
+            )}
             <div className="group-actions">
               <button 
-                onClick={() => handleSendAllInGroup(group.group_id)}
-                disabled={!(group.status_counts?.followup_due || group.status_counts?.lastchance_due) || sendingGroups.has(group.group_id)}
+                onClick={() => !isPaused && handleSendAllInGroup(group.group_id)}
+                disabled={!(group.status_counts?.followup_due || group.status_counts?.lastchance_due) || sendingGroups.has(group.group_id) || isPaused}
                 className="send-all-btn"
               >
                 {sendingGroups.has(group.group_id) ? (
