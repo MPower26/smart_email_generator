@@ -265,9 +265,10 @@ const GroupedEmails = ({ stage }) => {
     try {
       const response = await emailService.getGenerationProgressById(progressId);
       const progress = response.data;
+      console.log('Polling progress for group:', groupId, 'progress:', progress);
       setGroupProgress(prev => ({
         ...prev,
-        [groupId]: {
+        [progress.group_id]: {
           status: progress.status,
           current: progress.processed_contacts,
           total: progress.total_contacts,
@@ -281,6 +282,7 @@ const GroupedEmails = ({ stage }) => {
       }
     } catch (err) {
       // Optionally handle polling error
+      console.error('Polling error for group', groupId, err);
     }
   };
 
@@ -411,7 +413,19 @@ const GroupedEmails = ({ stage }) => {
           );
         });
         const emailsToShow = filteredEmails.slice(0, visibleCounts[group.group_id] || 15);
-        const progress = groupProgress[group.group_id];
+        // --- DEBUG LOG ---
+        console.log('Rendering group:', group.group_id, 'progress:', groupProgress[group.group_id]);
+        // --- Always show progress bar, even if not started ---
+        let progress = groupProgress[group.group_id];
+        if (!progress) {
+          progress = {
+            status: 'idle',
+            current: 0,
+            total: group.email_count,
+            sent_count: 0,
+            failed_count: 0,
+          };
+        }
         const isPaused = pausedGroups.has(group.group_id);
         return (
           <div key={group.group_id} className="email-group">
@@ -437,27 +451,25 @@ const GroupedEmails = ({ stage }) => {
                 onChange={handleSearchChange}
               />
             </div>
-            {/* Per-group progress bar */}
-            {progress && progress.total > 0 && (
-              <div className="group-progress-bar" style={{ margin: '10px 0' }}>
-                <ProgressBar
-                  now={Math.round((progress.current / progress.total) * 100)}
-                  label={`${progress.current}/${progress.total}`}
-                  variant={progress.status === 'completed' ? 'success' : progress.status === 'error' ? 'danger' : 'primary'}
-                  animated={progress.status === 'processing'}
-                  striped
-                />
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-                  <span>Status: {progress.status}</span>
-                  <span>Sent: {progress.sent_count} | Failed: {progress.failed_count}</span>
-                  <div>
-                    <Button size="sm" variant="light" onClick={() => handlePauseGroup(group.group_id)} disabled={isPaused || progress.status === 'group_sending_complete'}>Pause</Button>
-                    <Button size="sm" variant="light" onClick={() => handleResumeGroup(group.group_id)} disabled={!isPaused}>Resume</Button>
-                  </div>
+            {/* Always show per-group progress bar */}
+            <div className="group-progress-bar" style={{ margin: '10px 0' }}>
+              <ProgressBar
+                now={progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0}
+                label={`${progress.current}/${progress.total}`}
+                variant={progress.status === 'completed' ? 'success' : progress.status === 'error' ? 'danger' : 'primary'}
+                animated={progress.status === 'processing'}
+                striped
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                <span>Status: {progress.status}</span>
+                <span>Sent: {progress.sent_count} | Failed: {progress.failed_count}</span>
+                <div>
+                  <Button size="sm" variant="light" onClick={() => handlePauseGroup(group.group_id)} disabled={isPaused || progress.status === 'group_sending_complete'}>Pause</Button>
+                  <Button size="sm" variant="light" onClick={() => handleResumeGroup(group.group_id)} disabled={!isPaused}>Resume</Button>
                 </div>
-                {progress.error && <Alert variant="danger">{progress.error}</Alert>}
               </div>
-            )}
+              {progress.error && <Alert variant="danger">{progress.error}</Alert>}
+            </div>
             <div className="group-actions">
               <button 
                 onClick={() => !isPaused && handleSendAllInGroup(group.group_id)}
