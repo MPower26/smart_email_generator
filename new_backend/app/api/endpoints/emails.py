@@ -12,6 +12,7 @@ from fastapi import status
 from sqlalchemy import or_, and_, text
 import time
 from fastapi import BackgroundTasks
+from sqlalchemy.exc import NoResultFound
 
 from app.db.database import get_db
 from app.models.models import GeneratedEmail, User, EmailTemplate, EmailGenerationProgress, SentHistory
@@ -1142,6 +1143,30 @@ async def send_all_by_group(
         "group_id": group_id
     }
 
+@router.post("/progress/{progress_id}/pause")
+async def pause_progress(progress_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    progress = db.query(EmailGenerationProgress).filter(
+        EmailGenerationProgress.id == progress_id,
+        EmailGenerationProgress.user_id == current_user.id
+    ).first()
+    if not progress:
+        raise HTTPException(status_code=404, detail="Progress record not found")
+    progress.paused = True
+    db.commit()
+    return {"message": "Progress paused", "progress_id": progress_id}
+
+@router.post("/progress/{progress_id}/resume")
+async def resume_progress(progress_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    progress = db.query(EmailGenerationProgress).filter(
+        EmailGenerationProgress.id == progress_id,
+        EmailGenerationProgress.user_id == current_user.id
+    ).first()
+    if not progress:
+        raise HTTPException(status_code=404, detail="Progress record not found")
+    progress.paused = False
+    db.commit()
+    return {"message": "Progress resumed", "progress_id": progress_id}
+
 # --- Background task for sending group emails ---
 def send_group_emails_background(email_ids, user_id, stage, group_id, progress_id):
     import time
@@ -1157,6 +1182,10 @@ def send_group_emails_background(email_ids, user_id, stage, group_id, progress_i
         failed_count = 0
         progress_record = db.query(EmailGenerationProgress).filter(EmailGenerationProgress.id == progress_id).first()
         for idx, email in enumerate(emails):
+            # --- Pause logic ---
+            while progress_record.paused:
+                time.sleep(1)
+                db.refresh(progress_record)
             try:
                 send_gmail_email(user, email.recipient_email, email.subject, email.content)
                 email.status = f"{stage}_sent"
