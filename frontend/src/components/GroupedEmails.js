@@ -274,6 +274,7 @@ const GroupedEmails = ({ stage }) => {
           total: progress.total_contacts,
           sent_count: progress.generated_emails,
           failed_count: progress.total_contacts - progress.generated_emails,
+          progress_id: progressId // <-- Store progress_id for pause/resume
         }
       }));
       if (progress.status === 'completed' || progress.status === 'error') {
@@ -323,16 +324,31 @@ const GroupedEmails = ({ stage }) => {
     }
   };
 
-  const handlePauseGroup = (groupId) => {
-    setPausedGroups(prev => new Set(prev).add(groupId));
+  const handlePauseGroup = async (groupId) => {
+    const progress = groupProgress[groupId];
+    if (progress && progress.progress_id) {
+      try {
+        await emailService.pauseGroupProgress(progress.progress_id);
+        setPausedGroups(prev => new Set(prev).add(groupId));
+      } catch (err) {
+        console.error('Failed to pause group:', err);
+      }
+    }
   };
   const handleResumeGroup = async (groupId) => {
-    setPausedGroups(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(groupId);
-      return newSet;
-    });
-    await handleSendAllInGroup(groupId);
+    const progress = groupProgress[groupId];
+    if (progress && progress.progress_id) {
+      try {
+        await emailService.resumeGroupProgress(progress.progress_id);
+        setPausedGroups(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(groupId);
+          return newSet;
+        });
+      } catch (err) {
+        console.error('Failed to resume group:', err);
+      }
+    }
   };
 
   const CountdownTimer = ({ dueDate }) => {
