@@ -159,6 +159,7 @@ class EmailGenerationProgress(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     group_id = Column(String(255), nullable=True, index=True)  # For grouping emails by campaign/batch
+    paused = Column(Boolean, default=False)  # <-- Added for pause/resume support
     
     # Relationship
     user = relationship("User", back_populates="generation_progress")
@@ -195,3 +196,4 @@ class SentHistory(Base):
     prospect_email = Column(String(255), nullable=False)
     prospect_name = Column(String(255), nullable=True)
     completed_at = Column(DateTime, default=datetime.utcnow)
+
