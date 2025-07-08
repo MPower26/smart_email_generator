@@ -1120,12 +1120,11 @@ async def send_all_by_group(
     db.refresh(progress_record)
     progress_id = progress_record.id
 
-    # Launch background task for sending emails
+    # Pass only IDs to the background task
     background_tasks.add_task(
         send_group_emails_background,
-        emails,
-        user,
-        current_user.id,
+        [email.id for email in emails],  # pass list of email IDs
+        user.id,                         # pass user ID
         stage,
         group_id,
         progress_id
@@ -1144,14 +1143,16 @@ async def send_all_by_group(
     }
 
 # --- Background task for sending group emails ---
-def send_group_emails_background(emails, user, user_id, stage, group_id, progress_id):
+def send_group_emails_background(email_ids, user_id, stage, group_id, progress_id):
     import time
-    from app.models.models import EmailGenerationProgress, GeneratedEmail
+    from app.models.models import EmailGenerationProgress, GeneratedEmail, User
     from app.services.email_generator import EmailGenerator
     from app.db.database import SessionLocal
     from datetime import datetime
     db = SessionLocal()
     try:
+        user = db.query(User).filter_by(id=user_id).first()
+        emails = db.query(GeneratedEmail).filter(GeneratedEmail.id.in_(email_ids)).all()
         sent_count = 0
         failed_count = 0
         progress_record = db.query(EmailGenerationProgress).filter(EmailGenerationProgress.id == progress_id).first()
@@ -1170,7 +1171,7 @@ def send_group_emails_background(emails, user, user_id, stage, group_id, progres
                         logger.error(f"Failed to generate last chance email: {str(followup_error)}")
                 sent_count += 1
             except Exception as e:
-                logger.error(f"Failed to send email {email.id}: {e}")
+                logger.error(f"Failed to send email {getattr(email, 'id', 'unknown')}: {e}")
                 failed_count += 1
             # --- Update progress record ---
             progress_record.processed_contacts = idx + 1
