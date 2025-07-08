@@ -159,6 +159,10 @@ export const emailService = {
       group_id: groupId
     });
   },
+
+  // Pause/resume group progress
+  pauseGroupProgress: (progressId) => api.post(`/api/emails/progress/${progressId}/pause`),
+  resumeGroupProgress: (progressId) => api.post(`/api/emails/progress/${progressId}/resume`),
 };
 
 // Template API - Fixed to match backend routes exactly
