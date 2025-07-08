@@ -11,6 +11,7 @@ import uuid
 from fastapi import status
 from sqlalchemy import or_, and_, text
 import time
+from fastapi import BackgroundTasks
 
 from app.db.database import get_db
 from app.models.models import GeneratedEmail, User, EmailTemplate, EmailGenerationProgress, SentHistory
@@ -1070,14 +1071,15 @@ async def get_emails_by_stage_grouped(
 async def send_all_by_group(
     stage: str,
     group_id: str,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Send all emails in a specific group for followup and lastchance stages"""
+    """Send all emails in a specific group for followup and lastchance stages (now as a background task)"""
     if stage not in ["followup", "lastchance"]:
         raise HTTPException(status_code=400, detail="Group sending is only available for followup and lastchance stages")
     
-    logger.info(f"[EMAILS] Sending all emails in group '{group_id}' for user {current_user.email} in stage '{stage}'")
+    logger.info(f"[EMAILS] Sending all emails in group '{group_id}' for user {current_user.email} in stage '{stage}' (background)")
     
     # Always re-fetch the user to get the latest signature_image_url
     user = db.query(User).filter_by(id=current_user.id).first()
@@ -1099,10 +1101,6 @@ async def send_all_by_group(
             "total_count": 0
         }
     
-    sent_count = 0
-    failed_count = 0
-    errors = []
-
     # --- Create progress record ---
     from app.models.models import EmailGenerationProgress
     from datetime import datetime
@@ -1122,45 +1120,71 @@ async def send_all_by_group(
     db.refresh(progress_record)
     progress_id = progress_record.id
 
-    for idx, email in enumerate(emails):
-        try:
-            send_gmail_email(user, email.recipient_email, email.subject, email.content)
-            email.status = f"{stage}_sent"
-            email.sent_at = datetime.utcnow()
-            if stage == "followup":
-                try:
-                    email_generator = EmailGenerator(db)
-                    email_generator.generate_lastchance_email(email, current_user)
-                    logger.info(f"Generated last chance email for original email ID {email.id}")
-                except Exception as followup_error:
-                    logger.error(f"Failed to generate last chance email: {str(followup_error)}")
-            sent_count += 1
-        except Exception as e:
-            logger.error(f"Failed to send email {email.id}: {e}")
-            failed_count += 1
-            errors.append(f"Email to {email.recipient_email}: {str(e)}")
-        # --- Update progress record ---
-        progress_record.processed_contacts = idx + 1
-        progress_record.generated_emails = sent_count
-        progress_record.updated_at = datetime.utcnow()
-        db.commit()
-        time.sleep(1)  # Simulate delay for live progress
-    # --- Mark progress as complete ---
-    progress_record.status = "completed"
-    progress_record.updated_at = datetime.utcnow()
-    db.commit()
-    
-    logger.info(f"[EMAILS] Sent {sent_count} emails in group '{group_id}' for user {current_user.email} in stage '{stage}'")
-    
+    # Launch background task for sending emails
+    background_tasks.add_task(
+        send_group_emails_background,
+        emails,
+        user,
+        current_user.id,
+        stage,
+        group_id,
+        progress_id
+    )
+
+    logger.info(f"[EMAILS] Background task started for group '{group_id}' (progress_id={progress_id})")
     return {
         "success": True,
-        "message": f"Sent {sent_count} emails in group '{group_id}'",
-        "sent_count": sent_count,
-        "failed_count": failed_count,
+        "message": f"Started sending {len(emails)} emails in group '{group_id}' in background",
+        "sent_count": 0,
+        "failed_count": 0,
         "total_count": len(emails),
-        "errors": errors if errors else None,
-        "progress_id": progress_id
+        "errors": None,
+        "progress_id": progress_id,
+        "group_id": group_id
     }
+
+# --- Background task for sending group emails ---
+def send_group_emails_background(emails, user, user_id, stage, group_id, progress_id):
+    import time
+    from app.models.models import EmailGenerationProgress, GeneratedEmail
+    from app.services.email_generator import EmailGenerator
+    from app.db.database import SessionLocal
+    from datetime import datetime
+    db = SessionLocal()
+    try:
+        sent_count = 0
+        failed_count = 0
+        progress_record = db.query(EmailGenerationProgress).filter(EmailGenerationProgress.id == progress_id).first()
+        for idx, email in enumerate(emails):
+            try:
+                send_gmail_email(user, email.recipient_email, email.subject, email.content)
+                email.status = f"{stage}_sent"
+                email.sent_at = datetime.utcnow()
+                db.commit()
+                if stage == "followup":
+                    try:
+                        email_generator = EmailGenerator(db)
+                        email_generator.generate_lastchance_email(email, user)
+                        logger.info(f"Generated last chance email for original email ID {email.id}")
+                    except Exception as followup_error:
+                        logger.error(f"Failed to generate last chance email: {str(followup_error)}")
+                sent_count += 1
+            except Exception as e:
+                logger.error(f"Failed to send email {email.id}: {e}")
+                failed_count += 1
+            # --- Update progress record ---
+            progress_record.processed_contacts = idx + 1
+            progress_record.generated_emails = sent_count
+            progress_record.updated_at = datetime.utcnow()
+            db.commit()
+            time.sleep(1)  # Simulate delay for live progress
+        # --- Mark progress as complete ---
+        progress_record.status = "completed"
+        progress_record.updated_at = datetime.utcnow()
+        db.commit()
+        logger.info(f"[EMAILS] Background: Sent {sent_count} emails in group '{group_id}' (progress_id={progress_id})")
+    finally:
+        db.close()
 
 @router.post("/regenerate_group/{group_id}", status_code=200)
 async def regenerate_group_emails(
