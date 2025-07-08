@@ -489,7 +489,12 @@ const GroupedEmails = ({ stage }) => {
             <div className="group-actions">
               <button 
                 onClick={() => !isPaused && handleSendAllInGroup(group.group_id)}
-                disabled={!(group.status_counts?.followup_due || group.status_counts?.lastchance_due) || sendingGroups.has(group.group_id) || isPaused}
+                disabled={
+                  !(group.status_counts?.followup_due || group.status_counts?.lastchance_due) ||
+                  sendingGroups.has(group.group_id) ||
+                  isPaused ||
+                  progress.status === 'processing' // <-- Disable if sending in progress
+                }
                 className="send-all-btn"
               >
                 {sendingGroups.has(group.group_id) ? (
