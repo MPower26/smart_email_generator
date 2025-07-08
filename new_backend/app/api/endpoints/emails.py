@@ -208,6 +208,10 @@ async def send_email(
     if not email:
         raise HTTPException(status_code=404, detail="Email not found")
 
+    # Vérification d'idempotence : déjà envoyé ?
+    if email.status and email.status.endswith('_sent'):
+        return {"message": "Cet email a déjà été envoyé.", "email_id": email_id, "status": email.status}
+
     original_stage = email.stage
     new_status = f"{original_stage}_sent"
     email.status = new_status
