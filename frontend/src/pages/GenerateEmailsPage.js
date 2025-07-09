@@ -853,7 +853,7 @@ const GenerateEmailsPage = () => {
                           }
                         }}
                       >
-                        Stop
+                        Stop / Reset
                       </button>
                     )}
                   </div>
