@@ -839,6 +839,23 @@ const GenerateEmailsPage = () => {
                       speed={generationProgress?.speed}
                       status={generationProgress?.status || 'processing'}
                     />
+                    {/* Stop button */}
+                    {generationProgress && generationProgress.status === 'processing' && generationProgress.progress_id && (
+                      <button
+                        className="btn btn-danger mt-3"
+                        onClick={async () => {
+                          try {
+                            await emailService.cancelGeneration(generationProgress.progress_id);
+                            setIsGenerating(false);
+                            setGenerationProgress(null);
+                          } catch (err) {
+                            alert('Erreur lors de l\'annulation : ' + (err?.response?.data?.detail || err.message));
+                          }
+                        }}
+                      >
+                        Stop
+                      </button>
+                    )}
                   </div>
                 )}
 
