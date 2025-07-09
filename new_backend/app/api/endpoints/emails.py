@@ -240,8 +240,8 @@ async def send_email(
     
     logger.info(f"Sent email {email_id} and updated status from '{original_stage}' to '{new_status}'")
     
-    # Après l'envoi effectif d'un lastchance, si tous les emails du prospect sont envoyés, archiver et supprimer
-    if original_stage == "lastchance":
+    # Après l'envoi effectif d'un lastchance_sent, si tous les emails du prospect sont envoyés, archiver et supprimer
+    if new_status == "lastchance_sent":
         # Vérifier si tous les emails pour ce prospect sont envoyés/completed
         all_emails = db.query(GeneratedEmail).filter(
             GeneratedEmail.user_id == current_user.id,
