@@ -240,6 +240,35 @@ async def send_email(
     
     logger.info(f"Sent email {email_id} and updated status from '{original_stage}' to '{new_status}'")
     
+    # Après l'envoi effectif d'un lastchance, si tous les emails du prospect sont envoyés, archiver et supprimer
+    if original_stage == "lastchance":
+        # Vérifier si tous les emails pour ce prospect sont envoyés/completed
+        all_emails = db.query(GeneratedEmail).filter(
+            GeneratedEmail.user_id == current_user.id,
+            GeneratedEmail.recipient_email == email.recipient_email
+        ).all()
+        if all(e.status.endswith('_sent') or e.status == 'completed' for e in all_emails):
+            # Ajouter à sent_history si non existant
+            from app.models.models import SentHistory
+            existing_sent = db.query(SentHistory).filter(
+                SentHistory.user_id == current_user.id,
+                SentHistory.prospect_email == email.recipient_email
+            ).first()
+            if not existing_sent:
+                sent_hist = SentHistory(
+                    user_id=current_user.id,
+                    prospect_email=email.recipient_email,
+                    prospect_name=email.recipient_name
+                )
+                db.add(sent_hist)
+                db.commit()
+            # Supprimer tous les emails du prospect
+            db.query(GeneratedEmail).filter(
+                GeneratedEmail.user_id == current_user.id,
+                GeneratedEmail.recipient_email == email.recipient_email
+            ).delete(synchronize_session=False)
+            db.commit()
+    
     return {"message": "Email sent successfully and next stage triggered", "email_id": email_id, "new_status": new_status}
 
 @router.put("/{email_id}/content", response_model=Dict[str, Any])
