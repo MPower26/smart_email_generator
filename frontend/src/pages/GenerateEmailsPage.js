@@ -826,31 +826,20 @@ const GenerateEmailsPage = () => {
                 {error && <Alert variant="danger">{error}</Alert>}
 
                 {/* Progress Trackers */}
-                {warmingUp ? (
-                  <div className="warming-up-container text-center my-4">
-                    <div className="warming-up-effect">
-                      <h3>🤖 AI is warming up, hang on a sec...</h3>
-                      <div className="warming-up-timer" style={{ fontSize: '2rem', margin: '1rem 0' }}>{warmingUpTimer}s</div>
-                      <div className="warming-up-bar" style={{ width: '100%', height: '8px', background: '#eee', borderRadius: '4px', overflow: 'hidden', margin: '0 auto', maxWidth: '400px' }}>
-                        <div style={{ width: `${(15-warmingUpTimer)/15*100}%`, height: '100%', background: 'linear-gradient(90deg, #D8400D, #ffb347)', transition: 'width 1s' }}></div>
-                      </div>
-                      <div style={{ marginTop: '1rem', color: '#888' }}>
-                        <em>Preparing your personalized emails...</em>
-                      </div>
-                    </div>
+                {(isGenerating || generationProgress) && (
+                  <div className="generation-progress-container text-center my-4">
+                    <h5 style={{marginBottom: '1rem'}}>
+                      {generationProgress ? `${generationProgress.current || 0}/${generationProgress.total || 0} emails générés` : 'Préparation de la génération...'}
+                    </h5>
+                    <ProgressTracker 
+                      type="generation"
+                      current={generationProgress?.current || 0}
+                      total={generationProgress?.total || 0}
+                      startTime={generationProgress?.startTime}
+                      speed={generationProgress?.speed}
+                      status={generationProgress?.status || 'processing'}
+                    />
                   </div>
-                ) : (
-                  <>
-                    {uploadProgress.status !== 'idle' && (
-                      <ProgressTracker {...uploadProgress} />
-                    )}
-                    {generationProgress && (
-                      <ProgressTracker {...generationProgress} />
-                    )}
-                    {sendingProgress.status !== 'idle' && (
-                      <ProgressTracker {...sendingProgress} />
-                    )}
-                  </>
                 )}
 
                 <div className="d-grid mt-4">
