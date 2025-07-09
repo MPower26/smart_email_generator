@@ -1045,7 +1045,6 @@ async def get_emails_by_stage_grouped(
         for email in emails_in_group:
             status = email["status"]
             status_counts[status] = status_counts.get(status, 0) + 1
-        
         # Get the earliest due date for the group
         due_dates = []
         for email in emails_in_group:
@@ -1053,15 +1052,28 @@ async def get_emails_by_stage_grouped(
                 due_dates.append(email["followup_due_at"])
             elif stage == "lastchance" and email["lastchance_due_at"]:
                 due_dates.append(email["lastchance_due_at"])
-        
         earliest_due = min(due_dates) if due_dates else None
-        
+        # Ajout de la progression par groupe
+        progress = db.query(EmailGenerationProgress).filter(
+            EmailGenerationProgress.user_id == current_user.id,
+            EmailGenerationProgress.group_id == group_id
+        ).order_by(EmailGenerationProgress.created_at.desc()).first()
+        progress_info = None
+        if progress:
+            progress_info = {
+                "progress_id": progress.id,
+                "processed_contacts": progress.processed_contacts,
+                "generated_emails": progress.generated_emails,
+                "total_contacts": progress.total_contacts,
+                "status": progress.status
+            }
         group_info = {
             "group_id": group_id,
             "email_count": len(emails_in_group),
             "status_counts": status_counts,
             "earliest_due_date": earliest_due,
-            "emails": emails_in_group
+            "emails": emails_in_group,
+            "progress": progress_info
         }
         result["groups"].append(group_info)
     
