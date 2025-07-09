@@ -355,6 +355,7 @@ async def get_generation_progress_generic(
         logger.info(f"Progress for user {current_user.id}: {progress.processed_contacts}/{progress.total_contacts} ({percentage:.1f}%)")
         
         return {
+            "progress_id": progress.id,
             "status": progress.status,
             "total_contacts": progress.total_contacts,
             "processed_contacts": progress.processed_contacts,
