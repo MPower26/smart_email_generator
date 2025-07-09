@@ -985,6 +985,26 @@ class EmailGenerator:
         self.db.add(lastchance_email)
         self.db.commit()
         self.db.refresh(lastchance_email)
+        # --- Après la génération du lastchance, ajouter à sent_history et supprimer les emails du prospect ---
+        # Vérifier si une entrée existe déjà dans sent_history
+        existing_sent = self.db.query(SentHistory).filter(
+            SentHistory.user_id == user.id,
+            SentHistory.prospect_email == recipient_email
+        ).first()
+        if not existing_sent:
+            sent_hist = SentHistory(
+                user_id=user.id,
+                prospect_email=recipient_email,
+                prospect_name=recipient_name
+            )
+            self.db.add(sent_hist)
+            self.db.commit()
+        # Supprimer tous les emails du prospect dans generated_emails
+        self.db.query(GeneratedEmail).filter(
+            GeneratedEmail.user_id == user.id,
+            GeneratedEmail.recipient_email == recipient_email
+        ).delete(synchronize_session=False)
+        self.db.commit()
         return lastchance_email
 
     def mark_generation_complete(self, progress_id: int):
