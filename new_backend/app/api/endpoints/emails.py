@@ -303,10 +303,8 @@ async def get_generation_progress_generic(
     """Get the current email generation progress for the user"""
     try:
         logger.info(f"Getting generation progress for user {current_user.id}")
-        
         # Check if the table exists first
         try:
-            # Try a simple query to check if table exists
             table_check = db.execute(text("SELECT COUNT(*) FROM email_generation_progress WHERE 1=0")).scalar()
             logger.info("Table email_generation_progress exists")
         except Exception as table_check_error:
@@ -319,18 +317,14 @@ async def get_generation_progress_generic(
                 "percentage": 0,
                 "error": "Database table not available - please run the SQL migration"
             }
-        
         try:
             progress = db.query(EmailGenerationProgress).filter(
                 EmailGenerationProgress.user_id == current_user.id,
                 EmailGenerationProgress.status == "processing"
             ).order_by(EmailGenerationProgress.created_at.desc()).first()
-            
             logger.info(f"Query executed successfully for user {current_user.id}")
-            
         except Exception as query_error:
             logger.error(f"Database error when querying progress: {str(query_error)}")
-            # Return idle status if table doesn't exist or other DB error
             return {
                 "status": "idle",
                 "total_contacts": 0,
@@ -339,7 +333,14 @@ async def get_generation_progress_generic(
                 "percentage": 0,
                 "error": f"Database query error: {str(query_error)}"
             }
-        
+        # --- Auto-cancel stale progress ---
+        if progress:
+            now = datetime.utcnow()
+            if (now - progress.updated_at).total_seconds() > 600:  # 10 minutes
+                logger.info(f"Auto-cancelling stale progress record {progress.id} for user {current_user.id}")
+                progress.status = "cancelled"
+                db.commit()
+                progress = None
         if not progress:
             logger.info(f"No active progress found for user {current_user.id}")
             return {
@@ -349,11 +350,8 @@ async def get_generation_progress_generic(
                 "generated_emails": 0,
                 "percentage": 0
             }
-        
         percentage = (progress.processed_contacts / progress.total_contacts * 100) if progress.total_contacts > 0 else 0
-        
         logger.info(f"Progress for user {current_user.id}: {progress.processed_contacts}/{progress.total_contacts} ({percentage:.1f}%)")
-        
         return {
             "progress_id": progress.id,
             "status": progress.status,
@@ -1172,6 +1170,18 @@ async def resume_progress(progress_id: int, current_user: User = Depends(get_cur
     db.commit()
     return {"message": "Progress resumed", "progress_id": progress_id}
 
+@router.post("/progress/{progress_id}/cancel")
+async def cancel_progress(progress_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    progress = db.query(EmailGenerationProgress).filter(
+        EmailGenerationProgress.id == progress_id,
+        EmailGenerationProgress.user_id == current_user.id
+    ).first()
+    if not progress:
+        raise HTTPException(status_code=404, detail="Progress record not found")
+    progress.status = "cancelled"
+    db.commit()
+    return {"message": "Progress cancelled", "progress_id": progress_id}
+
 # --- Background task for sending group emails ---
 def send_group_emails_background(email_ids, user_id, stage, group_id, progress_id):
     import time
@@ -1187,10 +1197,12 @@ def send_group_emails_background(email_ids, user_id, stage, group_id, progress_i
         failed_count = 0
         progress_record = db.query(EmailGenerationProgress).filter(EmailGenerationProgress.id == progress_id).first()
         for idx, email in enumerate(emails):
-            # --- Pause logic ---
+            # --- Pause/Cancel logic ---
             while progress_record.paused:
                 time.sleep(1)
                 db.refresh(progress_record)
+            if progress_record.status == "cancelled":
+                break
             try:
                 send_gmail_email(user, email.recipient_email, email.subject, email.content)
                 email.status = f"{stage}_sent"
@@ -1213,11 +1225,16 @@ def send_group_emails_background(email_ids, user_id, stage, group_id, progress_i
             progress_record.updated_at = datetime.utcnow()
             db.commit()
             time.sleep(1)  # Simulate delay for live progress
-        # --- Mark progress as complete ---
-        progress_record.status = "completed"
-        progress_record.updated_at = datetime.utcnow()
-        db.commit()
-        logger.info(f"[EMAILS] Background: Sent {sent_count} emails in group '{group_id}' (progress_id={progress_id})")
+        # --- Mark progress as complete or cancelled ---
+        if progress_record.status == "cancelled":
+            progress_record.updated_at = datetime.utcnow()
+            db.commit()
+            logger.info(f"[EMAILS] Background: Generation cancelled for group '{group_id}' (progress_id={progress_id})")
+        else:
+            progress_record.status = "completed"
+            progress_record.updated_at = datetime.utcnow()
+            db.commit()
+            logger.info(f"[EMAILS] Background: Sent {sent_count} emails in group '{group_id}' (progress_id={progress_id})")
     finally:
         db.close()
 
