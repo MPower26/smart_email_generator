@@ -580,7 +580,7 @@ async def generate_emails_background(
                     continue
 
                 email_obj = email_generator.generate_personalized_email(
-                    contact, user, template, stage, progress_id, group_id
+                    contact, user, template, stage, progress_id=progress_id, group_id=group_id
                 )
                 generated_emails.append(email_obj)
                 
