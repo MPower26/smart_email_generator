@@ -163,6 +163,7 @@ export const emailService = {
   // Pause/resume group progress
   pauseGroupProgress: (progressId) => api.post(`/api/emails/progress/${progressId}/pause`),
   resumeGroupProgress: (progressId) => api.post(`/api/emails/progress/${progressId}/resume`),
+  cancelGeneration: (progressId) => api.post(`/api/emails/progress/${progressId}/cancel`),
 };
 
 // Template API - Fixed to match backend routes exactly
