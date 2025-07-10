@@ -190,10 +190,10 @@ class Attachment(Base):
 
 class SentHistory(Base):
     __tablename__ = "sent_history"
+    __table_args__ = {'schema': 'dbo'}
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("dbo.users.id"), nullable=False)
     prospect_email = Column(String(255), nullable=False)
     prospect_name = Column(String(255), nullable=True)
     completed_at = Column(DateTime, default=datetime.utcnow)
-
