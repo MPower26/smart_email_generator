@@ -25,6 +25,7 @@ class FriendRequest(Base):
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = {'schema': 'dbo'}
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), unique=True, index=True)
@@ -83,6 +84,8 @@ class User(Base):
 
     # New relationship for attachments
     attachments = relationship("Attachment", back_populates="user", cascade="all, delete-orphan")
+
+    sent_histories = relationship("SentHistory", back_populates="user")
 
 class VerificationCode(Base):
     __tablename__ = "verification_codes"
@@ -197,3 +200,5 @@ class SentHistory(Base):
     prospect_email = Column(String(255), nullable=False)
     prospect_name = Column(String(255), nullable=True)
     completed_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="sent_histories")
