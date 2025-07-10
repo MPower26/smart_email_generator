@@ -472,14 +472,16 @@ class EmailGenerator:
         if avoid_duplicates:
             # Check GeneratedEmail table for all previous communications
             conditions = [GeneratedEmail.user_id == user.id]
+            sent_hist_user_ids = [user.id]
             if dedupe_with_friends and friends_ids:
                 conditions.append(GeneratedEmail.user_id.in_(friends_ids))
+                sent_hist_user_ids.extend(friends_ids)
             # Get emails from GeneratedEmail table
             query = self.db.query(GeneratedEmail.recipient_email).filter(or_(*conditions))
             emails = {r[0].lower() for r in query if r[0]}
             already_emailed.update(emails)
-            # Also check sent_history table
-            sent_hist_query = self.db.query(SentHistory.prospect_email).filter(SentHistory.user_id == user.id)
+            # Also check sent_history table for user and friends
+            sent_hist_query = self.db.query(SentHistory.prospect_email).filter(SentHistory.user_id.in_(sent_hist_user_ids))
             sent_hist_emails = {r[0].lower() for r in sent_hist_query if r[0]}
             already_emailed.update(sent_hist_emails)
 
