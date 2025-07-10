@@ -478,18 +478,20 @@ class EmailGenerator:
                 sent_hist_user_ids.extend(friends_ids)
             # Get emails from GeneratedEmail table
             query = self.db.query(GeneratedEmail.recipient_email).filter(or_(*conditions))
-            emails = {r[0].lower() for r in query if r[0]}
+            emails = {r[0].strip().lower() for r in query if r[0]}
             already_emailed.update(emails)
             # Also check sent_history table for user and friends
             sent_hist_query = self.db.query(SentHistory.prospect_email).filter(SentHistory.user_id.in_(sent_hist_user_ids))
-            sent_hist_emails = {r[0].lower() for r in sent_hist_query if r[0]}
+            sent_hist_emails = {r[0].strip().lower() for r in sent_hist_query if r[0]}
             already_emailed.update(sent_hist_emails)
+            logger.info(f"[DEDUPLICATION] Already emailed set: {already_emailed}")
 
         for i, contact in enumerate(csv_data):
-            email_addr = contact.get("Email", "").lower()
+            email_addr = contact.get("Email", "").strip().lower()
             if not email_addr:
                 continue
             if avoid_duplicates and email_addr in already_emailed:
+                logger.info(f"[DEDUPLICATION] Skipping {email_addr} as it is already in sent or generated emails.")
                 continue
             try:
                 email = self.generate_personalized_email(contact, user, template, stage, None, group_id)
