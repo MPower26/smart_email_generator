@@ -586,13 +586,20 @@ async def generate_emails_background(
             logger.info("Deduplication is enabled. Building set of already emailed addresses.")
             # Check GeneratedEmail table for all previous communications
             conditions = [GeneratedEmail.user_id == user.id]
+            sent_hist_user_ids = [user.id]
             if dedupe_with_friends and friends_with_sharing:
                 conditions.append(GeneratedEmail.user_id.in_(friends_with_sharing))
-            
+                sent_hist_user_ids.extend(friends_with_sharing)
             query = db.query(GeneratedEmail.recipient_email).filter(or_(*conditions))
-            emails = {r[0].lower() for r in query if r[0]}
+            emails = {r[0].strip().lower() for r in query if r[0]}
             already_emailed.update(emails)
-            logger.info(f"Found {len(already_emailed)} unique emails for deduplication from the generated_emails table.")
+            logger.info(f"[DEDUPLICATION] {len(emails)} emails from generated_emails table: {emails}")
+            # Also check sent_history table for user and friends
+            sent_hist_query = db.query(SentHistory.prospect_email).filter(SentHistory.user_id.in_(sent_hist_user_ids))
+            sent_hist_emails = {r[0].strip().lower() for r in sent_hist_query if r[0]}
+            already_emailed.update(sent_hist_emails)
+            logger.info(f"[DEDUPLICATION] {len(sent_hist_emails)} emails from sent_history table: {sent_hist_emails}")
+            logger.info(f"[DEDUPLICATION] Final deduplication set (total {len(already_emailed)}): {already_emailed}")
 
         total_contacts = len(contacts)
         processed_count = 0
@@ -604,8 +611,8 @@ async def generate_emails_background(
                     logger.warning(f"Skipping contact due to missing email or first name: {contact}")
                     continue
 
-                if avoid_duplicates and contact_email.lower() in already_emailed:
-                    logger.info(f"Skipping duplicate email: {contact_email}")
+                if avoid_duplicates and contact_email.strip().lower() in already_emailed:
+                    logger.info(f"[DEDUPLICATION] Skipping duplicate email: {contact_email.strip().lower()}")
                     continue
 
                 email_obj = email_generator.generate_personalized_email(
