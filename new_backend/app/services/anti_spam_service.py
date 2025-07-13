@@ -266,3 +266,44 @@ class AntiSpamService:
                 self.db.add(rule)
         
         self.db.commit()
+
+    def get_dashboard_for_user(self, user_id: int):
+        """Return a dashboard summary for the anti-spam page."""
+        # Get user limits
+        user_limits = self.get_user_email_limits(user_id)
+        # Get sender reputation
+        reputation = self.db.query(SenderReputation).filter(SenderReputation.user_id == user_id).first()
+        # Get recent logs (last 10)
+        recent_logs = self.db.query(EmailSendLog).filter(EmailSendLog.user_id == user_id).order_by(EmailSendLog.sent_at.desc()).limit(10).all()
+        # Get warnings
+        warnings = self.get_spam_warnings(user_id)
+
+        from app.schemas.anti_spam import (
+            AntiSpamDashboardResponse, EmailLimitsResponse, SenderReputationResponse, EmailSendLogResponse
+        )
+        # Compose response
+        return AntiSpamDashboardResponse(
+            user_limits=EmailLimitsResponse(**user_limits, warnings=warnings),
+            reputation=SenderReputationResponse(
+                reputation_score=float(reputation.reputation_score) if reputation else 5.0,
+                total_emails_sent=reputation.total_emails_sent if reputation else 0,
+                bounced_emails=reputation.bounced_emails if reputation else 0,
+                spam_reports=reputation.spam_reports if reputation else 0,
+                successful_deliveries=reputation.successful_deliveries if reputation else 0,
+                warmup_status=reputation.warmup_status if reputation else 'new',
+                last_calculated=reputation.last_calculated if reputation else None
+            ),
+            recent_logs=[
+                EmailSendLogResponse(
+                    id=log.id,
+                    recipient_email=log.recipient_email,
+                    subject=log.subject,
+                    sent_at=log.sent_at,
+                    status=log.status,
+                    message_id=log.message_id,
+                    bounce_reason=log.bounce_reason,
+                    spam_score=float(log.spam_score) if log.spam_score is not None else None
+                ) for log in recent_logs
+            ],
+            warnings=warnings
+        )
