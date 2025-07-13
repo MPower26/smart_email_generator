@@ -201,3 +201,92 @@ class SentHistory(Base):
     completed_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="sent_histories")
+
+class EmailSendingStats(Base):
+    __tablename__ = "email_sending_stats"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    date = Column(DateTime(timezone=True), nullable=False, index=True)
+    emails_sent = Column(Integer, default=0)
+    emails_bounced = Column(Integer, default=0)
+    emails_complained = Column(Integer, default=0)
+    reputation_score = Column(Integer, default=100)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User", backref="sending_stats")
+
+class EmailSendingLimits(Base):
+    __tablename__ = "email_sending_limits"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
+    daily_limit = Column(Integer, default=50)
+    hourly_limit = Column(Integer, default=10)
+    current_tier = Column(String(50), default='new')  # new, warming, established, premium
+    warm_up_started_at = Column(DateTime(timezone=True), server_default=func.now())
+    last_limit_increase = Column(DateTime(timezone=True), nullable=True)
+    is_suspended = Column(Boolean, default=False)
+    suspension_reason = Column(String(500), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User", backref="sending_limits", uselist=False)
+
+class HourlySendingStats(Base):
+    __tablename__ = "hourly_sending_stats"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    hour_timestamp = Column(DateTime(timezone=True), nullable=False)
+    emails_sent = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    user = relationship("User", backref="hourly_stats")
+
+class DomainReputation(Base):
+    __tablename__ = "domain_reputation"
+
+    id = Column(Integer, primary_key=True, index=True)
+    domain = Column(String(255), nullable=False, unique=True, index=True)
+    reputation_score = Column(Integer, default=50)
+    total_sent = Column(Integer, default=0)
+    total_bounced = Column(Integer, default=0)
+    total_complained = Column(Integer, default=0)
+    last_sent_at = Column(DateTime(timezone=True), nullable=True)
+    is_blocked = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+class SpamAlert(Base):
+    __tablename__ = "spam_alerts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    alert_type = Column(String(100), nullable=False)  # daily_limit_warning, hourly_limit_reached, etc.
+    alert_level = Column(String(50), nullable=False)  # info, warning, critical
+    message = Column(Text, nullable=False)
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    user = relationship("User", backref="spam_alerts")
+
+class SpamContentCheck(Base):
+    __tablename__ = "spam_content_checks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    generated_email_id = Column(Integer, ForeignKey("generated_emails.id"), nullable=False)
+    spam_score = Column(Integer, default=0)
+    spam_words_detected = Column(Text, nullable=True)  # JSON array
+    has_unsubscribe_link = Column(Boolean, default=False)
+    text_to_image_ratio = Column(Integer, nullable=True)
+    personalization_score = Column(Integer, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    generated_email = relationship("GeneratedEmail", backref="spam_checks")

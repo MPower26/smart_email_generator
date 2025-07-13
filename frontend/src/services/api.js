@@ -164,6 +164,27 @@ export const emailService = {
   pauseGroupProgress: (progressId) => api.post(`/api/emails/progress/${progressId}/pause`),
   resumeGroupProgress: (progressId) => api.post(`/api/emails/progress/${progressId}/resume`),
   cancelGeneration: (progressId) => api.post(`/api/emails/progress/${progressId}/cancel`),
+
+  checkGmailConnection: async () => {
+    const response = await api.get('/api/gmail/status');
+    return response;
+  },
+  
+  // Anti-spam methods
+  getAntiSpamSummary: async () => {
+    const response = await api.get('/api/antispam/summary');
+    return response;
+  },
+  
+  checkEmailBeforeSend: async (to_email, subject, content) => {
+    const params = new URLSearchParams({
+      to_email,
+      subject,
+      content
+    });
+    const response = await api.get(`/api/antispam/check-email?${params}`);
+    return response;
+  }
 };
 
 // Template API - Fixed to match backend routes exactly

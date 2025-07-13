@@ -4,6 +4,7 @@ import FileUpload from '../components/FileUpload';
 import EmailPreview from '../components/EmailPreview';
 import ProgressTracker from '../components/ProgressTracker';
 import GroupedEmails from '../components/GroupedEmails';
+import AntiSpamDashboard from '../components/AntiSpamDashboard';
 import { emailService, templateService } from '../services/api';
 import { UserContext } from '../contexts/UserContext';
 import '../styles/GroupedEmails.css';
@@ -48,6 +49,7 @@ const GenerateEmailsPage = () => {
   const [preRequisiteError, setPreRequisiteError] = useState('');
   const [activeTab, setActiveTab] = useState('generation');
   const [emailStage, setEmailStage] = useState('outreach');
+  const [showAntiSpamAlert, setShowAntiSpamAlert] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [paused, setPaused] = useState(false);
   
@@ -698,35 +700,45 @@ const GenerateEmailsPage = () => {
     <Container className="templates-page">
       <h1 className="mb-4">Email Campaign Manager</h1>
 
-      <Tabs
-        activeKey={activeTab}
-        onSelect={(k) => handleTabChange(k)}
-        className="mb-4"
+      <Tabs 
+        activeKey={activeTab} 
+        onSelect={handleTabChange}
+        className="mb-3"
       >
-        <Tab eventKey="generation" title="Generation">
+        <Tab eventKey="generation" title="Generate New Emails">
           <Card>
             <Card.Body>
-              <h5 className="mb-4">Import Contacts</h5>
-              <FileUpload onFileSelect={handleFileChange} acceptedTypes=".csv" />
-
-              <h5 className="mt-4 mb-3">Generation Options</h5>
-              
-              {/* Template Reminder */}
-              <Alert variant="info" className="mb-3">
-                <i className="bi bi-info-circle me-2"></i>
-                <strong>Pro Tip:</strong> Before generating emails, make sure you have created templates for Initial Outreach, Follow-Up, and Last Chance stages. 
-                This will ensure your emails are personalized and consistent. 
-                <Button 
-                  variant="link" 
-                  className="p-0 ms-2" 
-                  onClick={handleAddTemplate}
-                  style={{ textDecoration: 'none' }}
-                >
-                  Create templates now →
-                </Button>
-              </Alert>
-              
+              {showAntiSpamAlert && (
+                <Alert variant="info" dismissible onClose={() => setShowAntiSpamAlert(false)}>
+                  <Alert.Heading>📧 Email Sending Limits Active</Alert.Heading>
+                  <p>
+                    To protect your sender reputation and avoid spam filters, we've implemented 
+                    sending limits. Check the <strong>Anti-Spam Status</strong> tab to view your 
+                    current limits and usage.
+                  </p>
+                </Alert>
+              )}
               <Form>
+                <h5 className="mb-4">Import Contacts</h5>
+                <FileUpload onFileSelect={handleFileChange} acceptedTypes=".csv" />
+
+                <h5 className="mt-4 mb-3">Generation Options</h5>
+                
+                {/* Template Reminder */}
+                <Alert variant="info" className="mb-3">
+                  <i className="bi bi-info-circle me-2"></i>
+                  <strong>Pro Tip:</strong> Before generating emails, make sure you have created templates for Initial Outreach, Follow-Up, and Last Chance stages. 
+                  This will ensure your emails are personalized and consistent. 
+                  <Button 
+                    variant="link" 
+                    className="p-0 ms-2" 
+                    onClick={handleAddTemplate}
+                    style={{ textDecoration: 'none' }}
+                  >
+                    Create templates now →
+                  </Button>
+                </Alert>
+                
                 <Form.Group className="mb-3">
                   <Form.Label>Email Stage</Form.Label>
                   <div>
@@ -885,6 +897,18 @@ const GenerateEmailsPage = () => {
               </Form>
             </Card.Body>
           </Card>
+        </Tab>
+
+        <Tab 
+          eventKey="anti-spam" 
+          title={
+            <span>
+              Anti-Spam Status
+              <Badge bg="info" className="ms-2">New</Badge>
+            </span>
+          }
+        >
+          <AntiSpamDashboard />
         </Tab>
 
         <Tab eventKey="outreach" title={<span>Outreach {outreachEmails.length > 0 && <Badge bg="primary">{outreachEmails.length}</Badge>}</span>}>

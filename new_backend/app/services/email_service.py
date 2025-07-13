@@ -3,6 +3,7 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email, To, Content
 from ..config.settings import EMAIL_CONFIG
 from app.services.gmail_service import send_gmail_email, GmailTokenError
+from app.services.antispam_service import AntiSpamService
 from fastapi import HTTPException
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -65,9 +66,41 @@ async def send_verification_email(recipient_email: str, code: str):
         logger.error(error_msg)
         raise EmailServiceError(error_msg) from e 
 
-def send_email_via_gmail(db: Session, user: User, email: GeneratedEmail):
+async def send_email_via_gmail(db: Session, user: User, email: GeneratedEmail):
     """Sends a single generated email using the user's Gmail account."""
     try:
+        # Initialize anti-spam service
+        antispam = AntiSpamService(db)
+        
+        # Check if user can send email (rate limits)
+        can_send, reason = await antispam.check_can_send_email(user.id)
+        if not can_send:
+            raise HTTPException(
+                status_code=429,  # Too Many Requests
+                detail=f"Cannot send email: {reason}"
+            )
+        
+        # Check domain reputation
+        recipient_domain = email.recipient_email.split('@')[1] if '@' in email.recipient_email else 'unknown'
+        domain_ok = await antispam.check_domain_reputation(recipient_domain)
+        if not domain_ok:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot send to domain {recipient_domain}: Poor reputation or blocked"
+            )
+        
+        # Check email content for spam
+        spam_check = await antispam.check_email_content(email)
+        if spam_check['risk_level'] == 'high':
+            raise HTTPException(
+                status_code=400,
+                detail=f"Email blocked due to high spam risk (score: {spam_check['spam_score']}). Please review your content."
+            )
+        
+        # Add warning header if medium risk
+        if spam_check['risk_level'] == 'medium':
+            logger.warning(f"Email {email.id} has medium spam risk: {spam_check['spam_score']}")
+        
         # The actual sending logic using the Gmail service
         gmail_response = send_gmail_email(
             user=user,
@@ -81,6 +114,12 @@ def send_email_via_gmail(db: Session, user: User, email: GeneratedEmail):
         email.sent_at = datetime.utcnow()
         db.commit()
         
+        # Record the email as sent for statistics
+        await antispam.record_email_sent(user.id, email.recipient_email)
+        
+        # Update warm-up limits if needed
+        await antispam.update_warm_up_limits(user.id)
+        
         return {"message": "Email sent successfully via Gmail", "gmail_response": gmail_response}
         
     except GmailTokenError as e:
@@ -90,6 +129,9 @@ def send_email_via_gmail(db: Session, user: User, email: GeneratedEmail):
             status_code=401, 
             detail="Gmail token is invalid or expired. Please reconnect your account in settings."
         )
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
         # Catch any other sending errors
         logger.error(f"Failed to send email {email.id} for user {user.email} via Gmail: {e}")
