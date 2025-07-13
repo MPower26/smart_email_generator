@@ -12,7 +12,6 @@ import time
 import httpx
 import urllib.parse
 
-from app.api.endpoints import emails, friends, auth_gmail, user_settings, templates, anti_spam
 from app.api import auth
 from app.db.database import engine, get_db
 from app.models.models import Base
@@ -133,13 +132,11 @@ async def https_redirect(request: Request, call_next):
 
 # Include API routers
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
-app.include_router(emails.router, prefix="/api/emails", tags=["Emails"])
-app.include_router(friends.router, prefix="/api/friends", tags=["Friends"])
 app.include_router(users.router, prefix="/api/users", tags=["Users"])
-app.include_router(auth_gmail.router, prefix="/api", tags=["Gmail Auth"])
-app.include_router(user_settings.router, prefix="/api", tags=["User Settings"])
-app.include_router(templates.router, prefix="/api/templates", tags=["Templates"])
-app.include_router(anti_spam.router, prefix="/api/anti-spam", tags=["Anti-Spam"])
+app.include_router(auth.router, prefix="/api", tags=["Gmail Auth"])
+app.include_router(users.router, prefix="/api", tags=["User Settings"])
+app.include_router(users.router, prefix="/api/templates", tags=["Templates"])
+app.include_router(users.router, prefix="/api/anti-spam", tags=["Anti-Spam"])
 
 @app.get("/")
 async def root():
@@ -296,4 +293,3 @@ async def video_proxy(video_path: str, request: Request):
     except Exception as e:
         logger.error(f"Error serving video {video_path}: {str(e)}")
         raise HTTPException(status_code=500, detail="Error serving video") 
-
