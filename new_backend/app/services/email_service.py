@@ -3,10 +3,12 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email, To, Content
 from ..config.settings import EMAIL_CONFIG
 from app.services.gmail_service import send_gmail_email, GmailTokenError
+from app.services.anti_spam_service import AntiSpamService
 from fastapi import HTTPException
 from datetime import datetime
 from sqlalchemy.orm import Session
 from ..models.models import User, GeneratedEmail
+from typing import List
 
 logger = logging.getLogger(__name__)
 
@@ -68,12 +70,34 @@ async def send_verification_email(recipient_email: str, code: str):
 def send_email_via_gmail(db: Session, user: User, email: GeneratedEmail):
     """Sends a single generated email using the user's Gmail account."""
     try:
+        # Vérifier les limites anti-spam avant l'envoi
+        anti_spam_service = AntiSpamService(db)
+        can_send, message = anti_spam_service.check_email_limits(user.id, 1)
+        
+        if not can_send:
+            raise HTTPException(status_code=429, detail=message)
+        
         # The actual sending logic using the Gmail service
         gmail_response = send_gmail_email(
             user=user,
             to_email=email.recipient_email,
             subject=email.subject,
             body=email.content
+        )
+        
+        # Si l'envoi est réussi, mettre à jour les logs anti-spam
+        anti_spam_service.update_email_send_log(
+            user_id=user.id,
+            recipient_email=email.recipient_email,
+            subject=email.subject,
+            message_id=gmail_response.get('message_id') if isinstance(gmail_response, dict) else None
+        )
+        
+        # Mettre à jour les limites quotidiennes
+        anti_spam_service.update_daily_limits(
+            user_id=user.id,
+            recipient_count=1,
+            unique_recipients=[email.recipient_email]
         )
         
         # If sending is successful, update the email's status in our DB
@@ -90,7 +114,86 @@ def send_email_via_gmail(db: Session, user: User, email: GeneratedEmail):
             status_code=401, 
             detail="Gmail token is invalid or expired. Please reconnect your account in settings."
         )
+    except HTTPException:
+        # Re-raise HTTP exceptions (like anti-spam limits)
+        raise
     except Exception as e:
         # Catch any other sending errors
         logger.error(f"Failed to send email {email.id} for user {user.email} via Gmail: {e}")
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
+
+def send_bulk_emails_via_gmail(db: Session, user: User, emails: List[GeneratedEmail]):
+    """Sends multiple generated emails using the user's Gmail account with anti-spam checks."""
+    try:
+        # Vérifier les limites anti-spam avant l'envoi en lot
+        anti_spam_service = AntiSpamService(db)
+        can_send, message = anti_spam_service.check_email_limits(user.id, len(emails))
+        
+        if not can_send:
+            raise HTTPException(status_code=429, detail=message)
+        
+        # Extraire les destinataires uniques
+        unique_recipients = list(set([email.recipient_email for email in emails]))
+        
+        results = []
+        for email in emails:
+            try:
+                # Envoyer l'email individuel
+                gmail_response = send_gmail_email(
+                    user=user,
+                    to_email=email.recipient_email,
+                    subject=email.subject,
+                    body=email.content
+                )
+                
+                # Mettre à jour les logs anti-spam
+                anti_spam_service.update_email_send_log(
+                    user_id=user.id,
+                    recipient_email=email.recipient_email,
+                    subject=email.subject,
+                    message_id=gmail_response.get('message_id') if isinstance(gmail_response, dict) else None
+                )
+                
+                # Mettre à jour le statut de l'email
+                email.status = f"{email.stage}_sent"
+                email.sent_at = datetime.utcnow()
+                
+                results.append({
+                    "email_id": email.id,
+                    "recipient": email.recipient_email,
+                    "status": "sent",
+                    "gmail_response": gmail_response
+                })
+                
+            except Exception as e:
+                logger.error(f"Failed to send email {email.id} to {email.recipient_email}: {e}")
+                results.append({
+                    "email_id": email.id,
+                    "recipient": email.recipient_email,
+                    "status": "failed",
+                    "error": str(e)
+                })
+        
+        # Mettre à jour les limites quotidiennes après l'envoi en lot
+        anti_spam_service.update_daily_limits(
+            user_id=user.id,
+            recipient_count=len(emails),
+            unique_recipients=unique_recipients
+        )
+        
+        # Mettre à jour la réputation de l'expéditeur
+        anti_spam_service.update_sender_reputation(user.id)
+        
+        db.commit()
+        
+        return {
+            "message": f"Bulk email sending completed. {len([r for r in results if r['status'] == 'sent'])} sent, {len([r for r in results if r['status'] == 'failed'])} failed",
+            "results": results
+        }
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions (like anti-spam limits)
+        raise
+    except Exception as e:
+        logger.error(f"Failed to send bulk emails for user {user.email}: {e}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}") 
