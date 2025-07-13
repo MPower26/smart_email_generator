@@ -17,16 +17,16 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
     const fetchAntiSpamData = async () => {
         try {
             setLoading(true);
-            const response = await apiCall('/api/anti-spam/dashboard', 'GET');
+            const response = await api.get('/api/anti-spam/dashboard');
             
-            if (response.success) {
-                setWarnings(response.data.warnings || []);
-                setLimits(response.data.user_limits);
-                setReputation(response.data.reputation);
+            if (response.data.success) {
+                setWarnings(response.data.data.warnings || []);
+                setLimits(response.data.data.user_limits);
+                setReputation(response.data.data.reputation);
                 
                 // Notifier le composant parent s'il y a des avertissements
                 if (onWarningChange) {
-                    onWarningChange(response.data.warnings || []);
+                    onWarningChange(response.data.data.warnings || []);
                 }
             }
         } catch (err) {
