@@ -291,7 +291,7 @@ class AntiSpamService:
                 spam_reports=reputation.spam_reports if reputation else 0,
                 successful_deliveries=reputation.successful_deliveries if reputation else 0,
                 warmup_status=reputation.warmup_status if reputation else 'new',
-                last_calculated=reputation.last_calculated if reputation else None
+                last_calculated=reputation.last_calculated if (reputation and reputation.last_calculated) else datetime.utcnow()
             ),
             recent_logs=[
                 EmailSendLogResponse(
