@@ -21,6 +21,7 @@ from app.services.email_generator import EmailGenerator
 from app.services.email_service import send_verification_email, EMAIL_CONFIG, send_email_via_gmail
 from app.services.gmail_service import send_gmail_email
 from app.websocket_manager import manager
+from app.services.email_limits_service import EmailLimitsService
 from pydantic import BaseModel, EmailStr
 
 router = APIRouter()
@@ -54,6 +55,42 @@ class GroupedEmailResponse(BaseModel):
 
 class RegeneratePrompt(BaseModel):
     prompt: str
+
+@router.get("/limits")
+async def get_email_limits(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Récupère les informations sur les limites d'envoi de l'utilisateur"""
+    try:
+        limits_info = await EmailLimitsService.get_user_limits_info(db, current_user.id)
+        return {
+            "status": "success",
+            "data": limits_info
+        }
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des limites: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/validate-content")
+async def validate_email_content(
+    data: Dict[str, str] = Body(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Valide le contenu d'un email pour éviter les marqueurs de spam"""
+    try:
+        subject = data.get("subject", "")
+        body = data.get("body", "")
+        
+        validation_result = EmailLimitsService.validate_email_content(subject, body)
+        return {
+            "status": "success",
+            "data": validation_result
+        }
+    except Exception as e:
+        logger.error(f"Erreur lors de la validation du contenu: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/cache")
 async def get_cache_info(
@@ -825,10 +862,31 @@ async def test_email_service(
         }
 
 @router.post("/send_via_gmail")
-def send_via_gmail(email_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+async def send_via_gmail(email_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     generated_email = db.query(GeneratedEmail).filter_by(id=email_id, user_id=user.id).first()
     if not generated_email:
         raise HTTPException(status_code=404, detail="Email not found")
+    
+    # Vérifier les limites d'envoi avant d'envoyer
+    can_send, limit_message = await EmailLimitsService.check_sending_limits(db, user.id, 1)
+    if not can_send:
+        raise HTTPException(status_code=429, detail=limit_message)
+    
+    # Valider le contenu de l'email
+    validation_result = EmailLimitsService.validate_email_content(
+        generated_email.subject,
+        generated_email.content
+    )
+    if not validation_result['is_valid']:
+        logger.warning(f"Email avec un score de spam élevé: {validation_result['spam_score']}")
+        # Optionnel: vous pouvez décider de bloquer ou juste avertir
+        if validation_result['spam_score'] >= 5:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Email susceptible d'être marqué comme spam. Score: {validation_result['spam_score']}/10. "
+                       f"Problèmes: {', '.join(validation_result['issues'])}"
+            )
+    
     try:
         send_gmail_email(user, generated_email.recipient_email, generated_email.subject, generated_email.content)
         
@@ -855,6 +913,10 @@ def send_via_gmail(email_id: int, db: Session = Depends(get_db), user: User = De
             # Don't fail the main operation if follow-up generation fails
         
         db.commit()
+        
+        # Mettre à jour les compteurs d'envoi
+        await EmailLimitsService.update_send_count(db, user.id, [generated_email.recipient_email])
+        
         return {"success": True, "message": "Email sent and moved to follow-up queue"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -898,6 +960,19 @@ async def send_all_via_gmail(
     
     if not current_user.gmail_access_token:
         raise HTTPException(status_code=400, detail="Gmail not connected. Please connect your Gmail account first.")
+    
+    # Vérifier les limites d'envoi pour le nombre total d'emails
+    can_send, limit_message = await EmailLimitsService.check_sending_limits(db, current_user.id, len(emails))
+    if not can_send:
+        # Récupérer les informations sur les limites pour un message plus détaillé
+        limits_info = await EmailLimitsService.get_user_limits_info(db, current_user.id)
+        return {
+            "success": False,
+            "message": limit_message,
+            "sent_count": 0,
+            "total_count": len(emails),
+            "limits": limits_info
+        }
     
     sent_count = 0
     failed_count = 0
@@ -1017,6 +1092,11 @@ async def send_all_via_gmail(
     
     # Commit status changes for sent emails
     db.commit()
+    
+    # Mettre à jour les compteurs d'envoi
+    if sent_count > 0:
+        sent_recipients = [email.recipient_email for email in emails if email.status in ["followup_due", "lastchance_due", "sent"]]
+        await EmailLimitsService.update_send_count(db, current_user.id, sent_recipients)
     
     # Update email statuses to indicate they've been sent
     # We no longer delete emails or create SentEmailRecord entries

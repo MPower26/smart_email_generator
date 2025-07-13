@@ -7,6 +7,7 @@ from ..db.database import get_db
 from ..models.models import User, VerificationCode
 from ..services.email_service import send_verification_email
 from ..schemas.auth import VerificationRequest, VerificationResponse
+from ..services.email_limits_service import EmailLimitsService
 from typing import Optional
 from sqlalchemy import text
 
@@ -113,6 +114,13 @@ async def request_verification_code(request: VerificationRequest, db: Session = 
                 db.commit()
                 db.refresh(user)
                 logger.info(f"Created new user with email: {request.email}")
+                
+                # Initialiser la réputation de l'utilisateur
+                try:
+                    await EmailLimitsService.initialize_user_reputation(db, user.id)
+                    logger.info(f"Initialized reputation for user: {request.email}")
+                except Exception as rep_error:
+                    logger.warning(f"Failed to initialize reputation: {str(rep_error)}")
             except Exception as create_error:
                 logger.error(f"User creation error: {str(create_error)}")
                 raise HTTPException(
