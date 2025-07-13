@@ -302,7 +302,7 @@ const SettingsPage = () => {
               <h4 className="mb-0">Gestion du cache</h4>
             </Card.Header>
             <Card.Body>
-              <p className="text-white">
+              <p>
                 L'application stocke en cache les résultats de génération d'emails pour améliorer les performances. 
                 Vous pouvez vider le cache si nécessaire.
               </p>
@@ -347,12 +347,12 @@ const SettingsPage = () => {
               <h4 className="mb-0">À propos</h4>
             </Card.Header>
             <Card.Body>
-              <p className="text-white"><strong>Version de l'application:</strong> 1.0.0</p>
-              <p className="text-white">
+              <p><strong>Version de l'application:</strong> 1.0.0</p>
+              <p>
                 Cette application permet de générer des emails personnalisés à partir de listes de contacts,
                 en utilisant l'IA ou des templates prédéfinis.
               </p>
-              <p className="text-white">
+              <p>
                 Pour toute question ou assistance, veuillez contacter l'administrateur système.
               </p>
             </Card.Body>
@@ -360,14 +360,16 @@ const SettingsPage = () => {
         </Col>
       </Row>
 
-      <Card className="mb-4">
-        <Card.Header>Compte</Card.Header>
-        <Card.Body>
-          <Button variant="danger" onClick={logout}>
-            Se déconnecter
-          </Button>
-        </Card.Body>
-      </Card>
+      <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+        <Card className="mb-4 compte-card">
+          <Card.Header>Compte</Card.Header>
+          <Card.Body>
+            <Button variant="danger" onClick={logout}>
+              Se déconnecter
+            </Button>
+          </Card.Body>
+        </Card>
+      </div>
     </Container>
   );
 };

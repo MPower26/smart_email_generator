@@ -12,6 +12,7 @@ const AuthScreen = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [codeInputs, setCodeInputs] = useState(['', '', '', '', '', '']);
+  const [showContent, setShowContent] = useState(false);
   
   // Initialize refs for code inputs
   const codeRef1 = useRef(null);
@@ -28,6 +29,11 @@ const AuthScreen = () => {
       setEmail(userProfile.email);
     }
   }, [authStep, userProfile]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowContent(true), 700);
+    return () => clearTimeout(timer);
+  }, []);
   
   // Handle code input with auto-focus
   const handleCodeInput = (index, value) => {
@@ -149,100 +155,116 @@ const AuthScreen = () => {
   };
   
   return (
-    <Container className="d-flex justify-content-center align-items-center" style={{ minHeight: '80vh' }}>
-      <Card className="shadow" style={{ width: '400px' }}>
-        <Card.Body className="p-4">
-          <h2 className="text-center mb-4">Email Generator</h2>
-          
-          {error && <Alert variant="danger">{error}</Alert>}
-          
-          {authStep === 'email' && (
-            <Form onSubmit={handleEmailSubmit}>
-              <Form.Group className="mb-3">
-                <Form.Label>Email Address</Form.Label>
-                <Form.Control
-                  type="email"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-                <Form.Text className="text-muted">
-                  You will receive a verification code at this address.
-                </Form.Text>
-              </Form.Group>
-              
-              <Button 
-                variant="primary" 
-                type="submit" 
-                className="w-100 mt-3" 
-                disabled={loading}
-              >
-                {loading ? 'Sending...' : 'Get Verification Code'}
-              </Button>
-            </Form>
-          )}
-          
-          {authStep === 'code' && (
-            <Form onSubmit={handleCodeSubmit}>
-              <Form.Group className="mb-3">
-                <Form.Label>Verification Code</Form.Label>
-                <p className="text-muted small mb-3">
-                  A 6-digit code has been sent to {email}
-                </p>
-                
-                <Row className="g-2 mb-3">
-                  {codeInputs.map((digit, index) => (
-                    <Col key={index} xs={2}>
+    <>
+      {showContent && (
+        <Container className="d-flex justify-content-center align-items-center" style={{ minHeight: '70vh' }}>
+          <img src="/logo01.png" alt="Background Logo" className="background-logo" />
+          <Card className="shadow fade-in-down" style={{ width: '900px', minHeight: '480px', transform: 'translateY(30px)' }}>
+            <Card.Body className="p-4" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', height: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem', alignSelf: 'flex-start' }}>
+                <img src="/logo00.png" alt="Logo" style={{ height: '56px', width: '56px', marginRight: '12px' }} />
+              </div>
+              <h2 className="text-center mb-4" style={{ color: '#D8400D', fontFamily: 'Poppins, sans-serif', fontSize: '3.2rem', textAlign: 'center', width: '100%' }}>Automated Email Generator</h2>
+              <div className="text-center mb-4 fade-in-opacity" style={{ color: '#555', fontSize: '0.97rem', fontFamily: 'Poppins, sans-serif', maxWidth: '90%', margin: '0 auto', lineHeight: 1.5, width: '100%' }}>
+                Harness AI to generate personalized, impactful emails tailored to each recipient. Effortlessly manage your contact lists, schedule and track follow-ups, and receive timely reminders for every stage of your outreach.
+              </div>
+              {error && <Alert variant="danger">{error}</Alert>}
+              {authStep === 'email' && (
+                <div className="fade-in-opacity-delayed" style={{ maxWidth: '420px', margin: '0 auto' }}>
+                  <Form onSubmit={handleEmailSubmit}>
+                    <Form.Group className="mb-3">
+                      <Form.Label className="email-label">Email Address</Form.Label>
                       <Form.Control
-                        type="text"
-                        maxLength="1"
-                        className="text-center"
-                        value={digit}
-                        onChange={(e) => handleCodeInput(index, e.target.value)}
-                        onKeyDown={(e) => handleKeyDown(index, e)}
-                        onPaste={handlePaste}
-                        ref={codeRefs[index]}
+                        type="email"
+                        placeholder="Enter your email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
                         required
                       />
-                    </Col>
-                  ))}
-                </Row>
-                
-                <div className="text-center">
-                  <Button
-                    variant="link"
-                    onClick={handleResendCode}
-                    disabled={loading}
-                    className="p-0 text-decoration-none"
-                  >
-                    Resend Code
-                  </Button>
+                      <Form.Text className="text-muted">
+                        You will receive a verification code at this address.
+                      </Form.Text>
+                    </Form.Group>
+                    <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-end' }}>
+                      <Button 
+                        variant="primary" 
+                        type="submit" 
+                        className="mt-3" 
+                        disabled={loading}
+                      >
+                        {loading ? 'Sending...' : 'Get Verification Code'}
+                      </Button>
+                    </div>
+                  </Form>
                 </div>
-              </Form.Group>
-              
-              <Button 
-                variant="primary" 
-                type="submit" 
-                className="w-100 mt-3" 
-                disabled={loading || code.length !== 6}
-              >
-                {loading ? 'Verifying...' : 'Verify Code'}
-              </Button>
-              
-              <Button 
-                variant="outline-secondary" 
-                className="w-100 mt-2" 
-                onClick={() => setAuthStep('email')}
-                disabled={loading}
-              >
-                Change Email
-              </Button>
-            </Form>
-          )}
-        </Card.Body>
-      </Card>
-    </Container>
+              )}
+              {authStep === 'code' && (
+                <div className="fade-in-opacity-delayed" style={{ position: 'absolute', bottom: '36px', right: '36px', maxWidth: '420px', width: '100%' }}>
+                  <Form onSubmit={handleCodeSubmit} style={{ width: '100%', padding: '12px 16px 12px 16px', background: 'rgba(245, 250, 255, 0.98)', borderRadius: '18px 0 18px 0', boxShadow: '0 2px 12px rgba(0,0,0,0.07)' }}>
+                    <Form.Group className="mb-3">
+                      <Form.Label style={{ display: 'block', textAlign: 'right' }}>Verification Code</Form.Label>
+                      <p className="text-muted small mb-3">
+                        A 6-digit code has been sent to {email}
+                      </p>
+                      <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-end' }}>
+                        <Row className="g-2 mb-3" style={{ width: 'auto', minWidth: '180px' }}>
+                          {codeInputs.map((digit, index) => (
+                            <Col key={index} xs={2}>
+                              <Form.Control
+                                type="text"
+                                maxLength="1"
+                                className="text-center"
+                                value={digit}
+                                onChange={(e) => handleCodeInput(index, e.target.value)}
+                                onKeyDown={(e) => handleKeyDown(index, e)}
+                                onPaste={handlePaste}
+                                ref={codeRefs[index]}
+                                required
+                              />
+                            </Col>
+                          ))}
+                        </Row>
+                      </div>
+                      <div className="text-center">
+                        <Button
+                          variant="link"
+                          onClick={handleResendCode}
+                          disabled={loading}
+                          className="p-0 text-decoration-none"
+                        >
+                          Resend Code
+                        </Button>
+                      </div>
+                    </Form.Group>
+                    <Button 
+                      variant="primary" 
+                      type="submit" 
+                      className="w-100 mt-3" 
+                      disabled={loading || code.length !== 6}
+                    >
+                      {loading ? 'Verifying...' : 'Verify Code'}
+                    </Button>
+                    <Button 
+                      variant="outline-secondary" 
+                      className="w-100 mt-2" 
+                      onClick={() => setAuthStep('email')}
+                      disabled={loading}
+                    >
+                      Change Email
+                    </Button>
+                  </Form>
+                </div>
+              )}
+            </Card.Body>
+          </Card>
+        </Container>
+      )}
+      <div style={{ display: 'flex', justifyContent: 'center', width: '700px', margin: '0 auto', marginTop: '8px' }}>
+        <span style={{ color: '#888', fontSize: '0.9rem', fontFamily: 'Poppins, sans-serif', letterSpacing: '0.5px', opacity: 0.72 }}>
+          Powered by WesI Ltd.
+        </span>
+      </div>
+    </>
   );
 };
 

@@ -11,6 +11,7 @@ import FriendsButton from './components/FriendsButton';
 import AuthScreen from './components/AuthScreen';
 import { UserProvider, useUser } from './contexts/UserContext';
 import GmailSuccess from './pages/GmailSuccess';
+import DevPreviewPage from './pages/DevPreviewPage';
 import './App.css';
 
 // Composant de routes protégées
@@ -50,7 +51,10 @@ function App() {
     <UserProvider>
       <Router>
         <div className="App d-flex flex-column min-vh-100">
+          {/* Background logo for all pages */}
+          <img src="/logo01.png" alt="Background Logo" className="background-logo" />
           <Routes>
+            <Route path="/dev-preview" element={<DevPreviewPage />} />
             <Route path="/gmail/success" element={<GmailSuccess />} />
             <Route path="/watch" element={<WatchPage />} />
             <Route path="/*" element={<ProtectedRoutes />} />

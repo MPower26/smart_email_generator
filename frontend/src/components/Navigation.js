@@ -8,8 +8,11 @@ const Navigation = () => {
   return (
     <Navbar expand="lg" className="mb-4">
       <Container>
-        <Navbar.Brand as={Link} to="/">
-          Email Generator
+        <Navbar.Brand>
+          <a href="https://wesi.ltd/" target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', color: 'inherit' }}>
+            <img src="/logo02.png" alt="Logo" style={{ height: '40px', width: '40px', marginRight: '10px', verticalAlign: 'middle' }} />
+            Automated Email Generator
+          </a>
         </Navbar.Brand>
         <Navbar.Toggle aria-controls="basic-navbar-nav" />
         <Navbar.Collapse id="basic-navbar-nav">

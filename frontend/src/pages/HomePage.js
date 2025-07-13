@@ -10,16 +10,16 @@ const HomePage = () => {
   return (
     <Container>
       {/* Hero Section */}
-      <Row className="mb-5 text-center">
+      <Row className="mb-5 text-center section-bg fade-in-up">
         <Col>
-          <h1 className="display-4 mb-4">Personalized Email Generator</h1>
-          <p className="lead mb-4">
+          <h1 className="display-4 mb-4 section-title fade-in-up">Personalized Email Generator</h1>
+          <p className="lead mb-4 fade-in-scale">
             Generate targeted, personalized emails for your prospects using AI and customizable templates.
             Save time and increase engagement with professionally crafted messages.
           </p>
           
           {/* Video Section - Small Format */}
-          <div className="video-container mb-4" style={{ maxWidth: '500px', margin: '0 auto' }}>
+          <div className="video-container mb-4 fade-in-scale" style={{ maxWidth: '500px', margin: '0 auto' }}>
             <iframe
               width="100%"
               height="315"
@@ -37,6 +37,7 @@ const HomePage = () => {
             size="lg" 
             variant="primary"
             onClick={scrollToTop}
+            className="fade-in-scale"
           >
             Get Started
           </Button>
@@ -44,10 +45,10 @@ const HomePage = () => {
       </Row>
 
       {/* Features Section */}
-      <Row className="mb-5">
+      <Row className="mb-5 section-bg fade-in-up">
         <Col md={4} className="mb-4">
           <Link to="/generate-emails" style={{ textDecoration: 'none' }} onClick={scrollToTop}>
-            <Card className="h-100 feature-card">
+            <Card className="h-100 feature-card fade-in-scale">
               <Card.Body className="text-center">
                 <div className="feature-icon">
                   <i className="bi bi-envelope-paper"></i>
@@ -63,7 +64,7 @@ const HomePage = () => {
         </Col>
         <Col md={4} className="mb-4">
           <Link to="/templates" style={{ textDecoration: 'none' }} onClick={scrollToTop}>
-            <Card className="h-100 feature-card">
+            <Card className="h-100 feature-card fade-in-scale">
               <Card.Body className="text-center">
                 <div className="feature-icon">
                   <i className="bi bi-file-earmark-text"></i>
@@ -79,7 +80,7 @@ const HomePage = () => {
         </Col>
         <Col md={4} className="mb-4">
           <Link to="/settings" style={{ textDecoration: 'none' }} onClick={scrollToTop}>
-            <Card className="h-100 feature-card">
+            <Card className="h-100 feature-card fade-in-scale">
               <Card.Body className="text-center">
                 <div className="feature-icon">
                   <i className="bi bi-gear"></i>
