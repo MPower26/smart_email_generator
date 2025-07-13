@@ -67,3 +67,21 @@ class User(UserBase):
 
     class Config:
         from_attributes = True 
+
+class EmailLimitsResponse(BaseModel):
+    user_id: int
+    email: str
+    emails_sent_today: int
+    unique_recipients_today: int
+    reputation_score: float
+    warmup_status: str
+    daily_limit: int
+    recipient_limit: int
+    warning_message: str | None = None
+
+class CheckEmailSendRequest(BaseModel):
+    recipient_count: int
+
+class CheckEmailSendResponse(BaseModel):
+    can_send: bool
+    message: str 
