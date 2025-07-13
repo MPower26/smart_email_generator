@@ -19,6 +19,7 @@ from app.models.models import Base
 from app.routers import users
 from app.services.followup_tasks import check_and_notify_followups
 from app.websocket_manager import manager
+from app.routers import email_limits
 
 # Configure logging
 logging.basicConfig(
@@ -139,6 +140,7 @@ app.include_router(users.router, prefix="/api/users", tags=["Users"])
 app.include_router(auth_gmail.router, prefix="/api", tags=["Gmail Auth"])
 app.include_router(user_settings.router, prefix="/api", tags=["User Settings"])
 app.include_router(templates.router, prefix="/api/templates", tags=["Templates"])
+app.include_router(email_limits.router, prefix="/api", tags=["Email Limits"])
 
 @app.get("/")
 async def root():
