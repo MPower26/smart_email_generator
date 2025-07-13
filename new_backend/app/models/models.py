@@ -86,6 +86,11 @@ class User(Base):
 
     sent_histories = relationship("SentHistory", back_populates="user")
 
+    # Anti-spam relationships
+    email_daily_limits = relationship("EmailDailyLimit", back_populates="user")
+    sender_reputation = relationship("SenderReputation", back_populates="user", uselist=False)
+    email_send_logs = relationship("EmailSendLog", back_populates="user")
+
 class VerificationCode(Base):
     __tablename__ = "verification_codes"
 
