@@ -4,6 +4,7 @@ import FileUpload from '../components/FileUpload';
 import EmailPreview from '../components/EmailPreview';
 import ProgressTracker from '../components/ProgressTracker';
 import GroupedEmails from '../components/GroupedEmails';
+import AntiSpamWarnings from '../components/AntiSpamWarnings';
 import { emailService, templateService } from '../services/api';
 import { UserContext } from '../contexts/UserContext';
 import '../styles/GroupedEmails.css';
@@ -97,6 +98,9 @@ const GenerateEmailsPage = () => {
   const progressSectionRef = useRef(null);
 
   const pausedRef = useRef(false);
+
+  // Anti-spam warnings state
+  const [antiSpamWarnings, setAntiSpamWarnings] = useState([]);
 
   // Load emails by stage - moved before functions that reference it
   const loadEmailsByStage = async () => {
@@ -726,6 +730,11 @@ const GenerateEmailsPage = () => {
                 </Button>
               </Alert>
               
+              {/* Anti-Spam Warnings */}
+              <div className="mb-4">
+                <AntiSpamWarnings onWarningChange={setAntiSpamWarnings} />
+              </div>
+
               <Form>
                 <Form.Group className="mb-3">
                   <Form.Label>Email Stage</Form.Label>
@@ -857,6 +866,19 @@ const GenerateEmailsPage = () => {
                       </button>
                     )}
                   </div>
+                )}
+
+                {/* Anti-spam warning before generation */}
+                {antiSpamWarnings.length > 0 && (
+                  <Alert variant="warning" className="mt-3">
+                    <Alert.Heading>⚠️ Attention Anti-Spam</Alert.Heading>
+                    <p>Avant de générer des emails, veuillez noter les avertissements suivants :</p>
+                    <ul>
+                      {antiSpamWarnings.map((warning, index) => (
+                        <li key={index}>{warning}</li>
+                      ))}
+                    </ul>
+                  </Alert>
                 )}
 
                 <div className="d-grid mt-4">
