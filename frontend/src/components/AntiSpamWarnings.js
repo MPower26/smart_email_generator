@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { apiCall } from '../services/api';
+import api from '../services/api';
 import './AntiSpamWarnings.css';
 
 const AntiSpamWarnings = ({ onWarningChange }) => {
@@ -8,6 +8,7 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
     const [reputation, setReputation] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    
 
     useEffect(() => {
         fetchAntiSpamData();
