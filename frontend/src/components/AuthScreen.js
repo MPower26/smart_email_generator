@@ -199,15 +199,15 @@ const AuthScreen = () => {
                 </div>
               )}
               {authStep === 'code' && (
-                <div className="fade-in-opacity-delayed" style={{ position: 'absolute', bottom: '36px', right: '36px', maxWidth: '420px', width: '100%' }}>
-                  <Form onSubmit={handleCodeSubmit} style={{ width: '100%', padding: '12px 16px 12px 16px', background: 'rgba(245, 250, 255, 0.98)', borderRadius: '18px 0 18px 0', boxShadow: '0 2px 12px rgba(0,0,0,0.07)' }}>
+                <div className="fade-in-opacity-delayed" style={{ maxWidth: '420px', margin: '0 auto', width: '100%' }}>
+                  <Form onSubmit={handleCodeSubmit} style={{ width: '100%', padding: '20px', background: 'rgba(245, 250, 255, 0.98)', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.07)', border: '1px solid rgba(0,0,0,0.1)' }}>
                     <Form.Group className="mb-3">
-                      <Form.Label style={{ display: 'block', textAlign: 'right' }}>Verification Code</Form.Label>
-                      <p className="text-muted small mb-3">
+                      <Form.Label style={{ display: 'block', textAlign: 'center', fontWeight: '600', marginBottom: '8px' }}>Verification Code</Form.Label>
+                      <p className="text-muted small mb-3 text-center">
                         A 6-digit code has been sent to {email}
                       </p>
-                      <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-end' }}>
-                        <Row className="g-2 mb-3" style={{ width: 'auto', minWidth: '180px' }}>
+                      <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+                        <Row className="g-2 mb-3" style={{ width: 'auto', minWidth: '240px' }}>
                           {codeInputs.map((digit, index) => (
                             <Col key={index} xs={2}>
                               <Form.Control
@@ -220,6 +220,7 @@ const AuthScreen = () => {
                                 onPaste={handlePaste}
                                 ref={codeRefs[index]}
                                 required
+                                style={{ fontSize: '1.2rem', fontWeight: '600' }}
                               />
                             </Col>
                           ))}
