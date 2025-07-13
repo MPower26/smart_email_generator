@@ -199,11 +199,11 @@ const AuthScreen = () => {
                 </div>
               )}
               {authStep === 'code' && (
-                <div className="fade-in-opacity-delayed" style={{ maxWidth: '420px', margin: '0 auto', width: '100%' }}>
-                  <Form onSubmit={handleCodeSubmit} style={{ width: '100%', padding: '20px', background: 'rgba(245, 250, 255, 0.98)', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.07)', border: '1px solid rgba(0,0,0,0.1)' }}>
+                <div className="fade-in-opacity-delayed" style={{ maxWidth: '420px', margin: '0 auto' }}>
+                  <Form onSubmit={handleCodeSubmit}>
                     <Form.Group className="mb-3">
-                      <Form.Label style={{ display: 'block', textAlign: 'center', fontWeight: '600', marginBottom: '8px' }}>Verification Code</Form.Label>
-                      <p className="text-muted small mb-3 text-center">
+                      <Form.Label className="email-label">Verification Code</Form.Label>
+                      <p className="text-muted small mb-3">
                         A 6-digit code has been sent to {email}
                       </p>
                       <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
@@ -237,22 +237,16 @@ const AuthScreen = () => {
                         </Button>
                       </div>
                     </Form.Group>
-                    <Button 
-                      variant="primary" 
-                      type="submit" 
-                      className="w-100 mt-3" 
-                      disabled={loading || code.length !== 6}
-                    >
-                      {loading ? 'Verifying...' : 'Verify Code'}
-                    </Button>
-                    <Button 
-                      variant="outline-secondary" 
-                      className="w-100 mt-2" 
-                      onClick={() => setAuthStep('email')}
-                      disabled={loading}
-                    >
-                      Change Email
-                    </Button>
+                    <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-end' }}>
+                      <Button 
+                        variant="primary" 
+                        type="submit" 
+                        className="mt-3" 
+                        disabled={loading || code.length !== 6}
+                      >
+                        {loading ? 'Verifying...' : 'Verify Code'}
+                      </Button>
+                    </div>
                   </Form>
                 </div>
               )}
