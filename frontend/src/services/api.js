@@ -164,10 +164,6 @@ export const emailService = {
   pauseGroupProgress: (progressId) => api.post(`/api/emails/progress/${progressId}/pause`),
   resumeGroupProgress: (progressId) => api.post(`/api/emails/progress/${progressId}/resume`),
   cancelGeneration: (progressId) => api.post(`/api/emails/progress/${progressId}/cancel`),
-
-  // --- ANTI-SPAM LIMITS ---
-  getEmailLimits: () => api.get('/api/email-limits'),
-  checkEmailSend: (recipientCount) => api.post('/api/check-email-send', { recipient_count: recipientCount }),
 };
 
 // Template API - Fixed to match backend routes exactly
