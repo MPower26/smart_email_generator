@@ -4,7 +4,7 @@ from sqlalchemy import text
 from app.db.database import get_db
 from app.middleware.auth import get_current_user
 from app.models.models import User
-from app.schemas.user import EmailLimitsResponse, CheckEmailSendRequest, CheckEmailSendResponse
+from app.schemas.anti_spam import EmailLimitsResponse, EmailLimitCheckRequest as CheckEmailSendRequest, EmailLimitCheckResponse as CheckEmailSendResponse
 
 router = APIRouter()
 
