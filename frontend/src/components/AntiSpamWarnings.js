@@ -381,6 +381,15 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
                             {dnsResult.dkim_found && <div style={{fontSize:'12px',wordBreak:'break-all'}}><b>Enregistrement :</b> {dnsResult.dkim_record}</div>}
                             <b>DMARC :</b> {dnsResult.dmarc_found ? '✅' : '❌'}<br/>
                             {dnsResult.dmarc_found && <div style={{fontSize:'12px',wordBreak:'break-all'}}><b>Enregistrement :</b> {dnsResult.dmarc_record}</div>}
+                            <b>Blacklists :</b> {dnsResult.blacklist_hits && dnsResult.blacklist_hits.length === 0 ? (
+                                <span style={{color: 'green'}}>✅ Aucune blacklist majeure détectée</span>
+                            ) : (
+                                <span style={{color: 'red'}}>❌ Listé sur&nbsp;
+                                    {dnsResult.blacklist_hits && dnsResult.blacklist_hits.map((rbl, idx) => (
+                                        <span key={rbl}>{rbl}{idx < dnsResult.blacklist_hits.length - 1 ? ', ' : ''}</span>
+                                    ))}
+                                </span>
+                            )}
                         </Alert>
                     )}
                     {dnsError && <Alert variant="danger" className="mt-3">{dnsError}</Alert>}
