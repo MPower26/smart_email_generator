@@ -15,6 +15,10 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
     const [checking, setChecking] = useState(false);
     const [checkResult, setCheckResult] = useState(null);
     const [checkError, setCheckError] = useState(null);
+    const [showReputationModal, setShowReputationModal] = useState(false);
+
+    const handleOpenReputationModal = () => setShowReputationModal(true);
+    const handleCloseReputationModal = () => setShowReputationModal(false);
     
 
     useEffect(() => {
@@ -232,7 +236,10 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
                         Respectez les limites d'envoi quotidiennes
                         <Button variant="link" size="sm" style={{padding:0, marginLeft:8}} onClick={handleOpenModal}>Vérifier</Button>
                     </li>
-                    <li>Surveillez votre score de réputation régulièrement</li>
+                    <li>
+                        Surveillez votre score de réputation régulièrement
+                        <Button variant="link" size="sm" style={{padding:0, marginLeft:8}} onClick={handleOpenReputationModal}>Vérifier</Button>
+                    </li>
                     <li>Configurez correctement SPF, DKIM et DMARC pour votre domaine</li>
                 </ul>
             </div>
@@ -282,9 +289,33 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
                     <Button variant="secondary" onClick={handleCloseModal}>Fermer</Button>
                 </Modal.Footer>
             </Modal>
+
+            {/* Reputation Check Modal */}
+            <Modal show={showReputationModal} onHide={handleCloseReputationModal}>
+                <Modal.Header closeButton>
+                    <Modal.Title>Vérifier votre réputation d'expéditeur</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    {reputation ? (
+                        <div>
+                            <p><b>Score de réputation :</b> {reputation.reputation_score.toFixed(1)} / 10</p>
+                            <p><b>Statut :</b> {reputation.warmup_status}</p>
+                            <p><b>Emails envoyés (total) :</b> {reputation.total_emails_sent}</p>
+                            <p><b>Livraisons réussies :</b> {reputation.successful_deliveries}</p>
+                            <p><b>Emails rejetés (bounces) :</b> {reputation.bounced_emails}</p>
+                            <p><b>Signalements spam :</b> {reputation.spam_reports}</p>
+                            <p><b>Dernier calcul :</b> {new Date(reputation.last_calculated).toLocaleString()}</p>
+                        </div>
+                    ) : (
+                        <Alert variant="warning">Impossible de charger votre réputation. Veuillez réessayer plus tard.</Alert>
+                    )}
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={handleCloseReputationModal}>Fermer</Button>
+                </Modal.Footer>
+            </Modal>
         </div>
     );
 };
 
 export default AntiSpamWarnings;
-
