@@ -140,6 +140,7 @@ app.include_router(auth_gmail.router, prefix="/api", tags=["Gmail Auth"])
 app.include_router(user_settings.router, prefix="/api", tags=["User Settings"])
 app.include_router(templates.router, prefix="/api/templates", tags=["Templates"])
 app.include_router(anti_spam.router, prefix="/api/anti-spam", tags=["Anti-Spam"])
+app.include_router(anti_spam.router, prefix="/api", tags=["Anti-Spam Validation"])
 
 @app.get("/")
 async def root():
