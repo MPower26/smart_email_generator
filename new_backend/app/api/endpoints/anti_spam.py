@@ -73,19 +73,19 @@ class DomainDNSValidationRequest(BaseModel):
 
 class DomainDNSValidationResponse(BaseModel):
     domain: str
-    spf_found: bool
+    spf_found: Optional[bool] = None
     spf_record: Optional[str] = None
-    dkim_found: bool
+    dkim_found: Optional[bool] = None
     dkim_record: Optional[str] = None
-    dmarc_found: bool
+    dmarc_found: Optional[bool] = None
     dmarc_record: Optional[str] = None
+    blacklist_hits: Optional[list[str]] = None
 
 @router.post("/validate-domain-dns", response_model=DomainDNSValidationResponse)
 async def validate_domain_dns(request: DomainDNSValidationRequest = Body(...)):
-    """Check SPF, DKIM, DMARC DNS records for a domain or email."""
     import re
+    import ipaddress
     value = request.value.strip()
-    # Extract domain from email if needed
     if '@' in value:
         domain = value.split('@')[-1].lower()
     else:
@@ -96,8 +96,9 @@ async def validate_domain_dns(request: DomainDNSValidationRequest = Body(...)):
     dkim_record = None
     dmarc_found = False
     dmarc_record = None
+    blacklist_hits = []
+    # DNS checks (SPF, DKIM, DMARC)
     try:
-        # SPF: TXT record with v=spf1
         answers = dns.resolver.resolve(domain, 'TXT')
         for rdata in answers:
             txt = ''.join(rdata.strings if hasattr(rdata, 'strings') else rdata)
@@ -110,7 +111,6 @@ async def validate_domain_dns(request: DomainDNSValidationRequest = Body(...)):
     except Exception:
         pass
     try:
-        # DKIM: TXT record at default._domainkey.domain
         dkim_domain = f'default._domainkey.{domain}'
         answers = dns.resolver.resolve(dkim_domain, 'TXT')
         for rdata in answers:
@@ -124,7 +124,6 @@ async def validate_domain_dns(request: DomainDNSValidationRequest = Body(...)):
     except Exception:
         pass
     try:
-        # DMARC: TXT record at _dmarc.domain
         dmarc_domain = f'_dmarc.{domain}'
         answers = dns.resolver.resolve(dmarc_domain, 'TXT')
         for rdata in answers:
@@ -137,6 +136,37 @@ async def validate_domain_dns(request: DomainDNSValidationRequest = Body(...)):
                 break
     except Exception:
         pass
+    # Blacklist (RBL) check
+    try:
+        ip = None
+        answers = dns.resolver.resolve(domain, 'A')
+        for rdata in answers:
+            ip = rdata.to_text()
+            break
+        if ip:
+            # List of major RBLs
+            rbls = [
+                'zen.spamhaus.org',
+                'bl.spamcop.net',
+                'b.barracudacentral.org',
+                'dnsbl.sorbs.net',
+                'psbl.surriel.com',
+                'spam.abuse.ch',
+                'cbl.abuseat.org',
+                'dnsbl-1.uceprotect.net',
+                'dnsbl-2.uceprotect.net',
+                'dnsbl-3.uceprotect.net',
+            ]
+            reversed_ip = '.'.join(reversed(ip.split('.')))
+            for rbl in rbls:
+                query = f"{reversed_ip}.{rbl}"
+                try:
+                    dns.resolver.resolve(query, 'A')
+                    blacklist_hits.append(rbl)
+                except Exception:
+                    pass
+    except Exception:
+        pass
     return DomainDNSValidationResponse(
         domain=domain,
         spf_found=spf_found,
@@ -144,5 +174,6 @@ async def validate_domain_dns(request: DomainDNSValidationRequest = Body(...)):
         dkim_found=dkim_found,
         dkim_record=dkim_record,
         dmarc_found=dmarc_found,
-        dmarc_record=dmarc_record
+        dmarc_record=dmarc_record,
+        blacklist_hits=blacklist_hits
     ) 
