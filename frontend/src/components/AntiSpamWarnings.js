@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import './AntiSpamWarnings.css';
+import { validateEmail } from '../services/api';
+import { Modal, Button, Form, Spinner, Alert } from 'react-bootstrap';
+import { validateDomainDNS } from '../services/api';
 
 const AntiSpamWarnings = ({ onWarningChange }) => {
     const [warnings, setWarnings] = useState([]);
@@ -8,6 +11,20 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
     const [reputation, setReputation] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [showEmailModal, setShowEmailModal] = useState(false);
+    const [emailToCheck, setEmailToCheck] = useState('');
+    const [checking, setChecking] = useState(false);
+    const [checkResult, setCheckResult] = useState(null);
+    const [checkError, setCheckError] = useState(null);
+    const [showReputationModal, setShowReputationModal] = useState(false);
+    const [showDNSModal, setShowDNSModal] = useState(false);
+    const [dnsInput, setDnsInput] = useState('');
+    const [dnsChecking, setDnsChecking] = useState(false);
+    const [dnsResult, setDnsResult] = useState(null);
+    const [dnsError, setDnsError] = useState(null);
+
+    const handleOpenReputationModal = () => setShowReputationModal(true);
+    const handleCloseReputationModal = () => setShowReputationModal(false);
     
 
     useEffect(() => {
@@ -61,6 +78,60 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
             case 'active': return '#28a745';
             case 'restricted': return '#dc3545';
             default: return '#6c757d';
+        }
+    };
+
+    const handleOpenModal = () => {
+        setShowEmailModal(true);
+        setEmailToCheck('');
+        setCheckResult(null);
+        setCheckError(null);
+    };
+    const handleCloseModal = () => {
+        setShowEmailModal(false);
+        setEmailToCheck('');
+        setCheckResult(null);
+        setCheckError(null);
+    };
+    const handleCheckEmail = async (e) => {
+        e.preventDefault();
+        setChecking(true);
+        setCheckResult(null);
+        setCheckError(null);
+        try {
+            const response = await validateEmail(emailToCheck);
+            setCheckResult(response.data);
+        } catch (err) {
+            setCheckError('Erreur lors de la vérification.');
+        } finally {
+            setChecking(false);
+        }
+    };
+
+    const handleOpenDNSModal = () => {
+        setShowDNSModal(true);
+        setDnsInput('');
+        setDnsResult(null);
+        setDnsError(null);
+    };
+    const handleCloseDNSModal = () => {
+        setShowDNSModal(false);
+        setDnsInput('');
+        setDnsResult(null);
+        setDnsError(null);
+    };
+    const handleCheckDNS = async (e) => {
+        e.preventDefault();
+        setDnsChecking(true);
+        setDnsResult(null);
+        setDnsError(null);
+        try {
+            const response = await validateDomainDNS(dnsInput);
+            setDnsResult(response.data);
+        } catch (err) {
+            setDnsError('Erreur lors de la vérification DNS.');
+        } finally {
+            setDnsChecking(false);
         }
     };
 
@@ -189,13 +260,144 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
                 <h4>💡 Conseils pour éviter le spam</h4>
                 <ul className="tips-list">
                     <li>Commencez par de petits volumes (50 emails/jour) pour établir votre réputation</li>
-                    <li>Utilisez des adresses email valides et vérifiées</li>
+                    <li>
+                        Utilisez des adresses email valides et vérifiées
+                        <Button variant="link" size="sm" style={{padding:0, marginLeft:8}} onClick={handleOpenModal}>Vérifier</Button>
+                    </li>
                     <li>Évitez les mots-clés spam dans vos sujets et contenus</li>
-                    <li>Respectez les limites d'envoi quotidiennes</li>
-                    <li>Surveillez votre score de réputation régulièrement</li>
-                    <li>Configurez correctement SPF, DKIM et DMARC pour votre domaine</li>
+                    <li>
+                        Respectez les limites d'envoi quotidiennes
+                        <Button variant="link" size="sm" style={{padding:0, marginLeft:8}} onClick={handleOpenModal}>Vérifier</Button>
+                    </li>
+                    <li>
+                        Surveillez votre score de réputation régulièrement
+                        <Button variant="link" size="sm" style={{padding:0, marginLeft:8}} onClick={handleOpenReputationModal}>Vérifier</Button>
+                    </li>
+                    <li>
+                        Configurez correctement SPF, DKIM et DMARC pour votre domaine
+                        <Button variant="link" size="sm" style={{padding:0, marginLeft:8}} onClick={handleOpenDNSModal}>Vérifier</Button>
+                    </li>
                 </ul>
             </div>
+
+            {/* Email Check Modal */}
+            <Modal show={showEmailModal} onHide={handleCloseModal}>
+                <Modal.Header closeButton>
+                    <Modal.Title>Vérifier une adresse email</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <Form onSubmit={handleCheckEmail}>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Adresse email à vérifier</Form.Label>
+                            <Form.Control
+                                type="email"
+                                value={emailToCheck}
+                                onChange={e => setEmailToCheck(e.target.value)}
+                                placeholder="exemple@domaine.com"
+                                required
+                            />
+                        </Form.Group>
+                        <Button type="submit" variant="primary" disabled={checking || !emailToCheck} className="w-100">
+                            {checking ? <Spinner as="span" animation="border" size="sm" /> : 'Vérifier'}
+                        </Button>
+                    </Form>
+                    {checkResult && (
+                        <Alert variant={checkResult.valid ? 'success' : 'danger'} className="mt-3">
+                            {checkResult.valid ? (
+                                <>
+                                    ✅ Adresse valide<br/>
+                                    <b>Adresse normalisée:</b> {checkResult.normalized}<br/>
+                                    <b>MX trouvé:</b> {checkResult.mx_found ? 'Oui' : 'Non'}<br/>
+                                    <b>Type de compte:</b> {checkResult.account_type === 'gmail' ? 'Gmail gratuit' : checkResult.account_type === 'workspace' ? 'Google Workspace' : 'Autre'}<br/>
+                                    <b>Limite quotidienne:</b> {checkResult.daily_limit ? checkResult.daily_limit + ' emails/jour' : 'Inconnue'}
+                                </>
+                            ) : (
+                                <>
+                                    ❌ Adresse invalide<br/>
+                                    <b>Raison:</b> {checkResult.reason}
+                                </>
+                            )}
+                        </Alert>
+                    )}
+                    {checkError && <Alert variant="danger" className="mt-3">{checkError}</Alert>}
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={handleCloseModal}>Fermer</Button>
+                </Modal.Footer>
+            </Modal>
+
+            {/* Reputation Check Modal */}
+            <Modal show={showReputationModal} onHide={handleCloseReputationModal}>
+                <Modal.Header closeButton>
+                    <Modal.Title>Vérifier votre réputation d'expéditeur</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    {reputation ? (
+                        <div>
+                            <p><b>Score de réputation :</b> {reputation.reputation_score.toFixed(1)} / 10</p>
+                            <p><b>Statut :</b> {reputation.warmup_status}</p>
+                            <p><b>Emails envoyés (total) :</b> {reputation.total_emails_sent}</p>
+                            <p><b>Livraisons réussies :</b> {reputation.successful_deliveries}</p>
+                            <p><b>Emails rejetés (bounces) :</b> {reputation.bounced_emails}</p>
+                            <p><b>Signalements spam :</b> {reputation.spam_reports}</p>
+                            <p><b>Dernier calcul :</b> {new Date(reputation.last_calculated).toLocaleString()}</p>
+                        </div>
+                    ) : (
+                        <Alert variant="warning">Impossible de charger votre réputation. Veuillez réessayer plus tard.</Alert>
+                    )}
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={handleCloseReputationModal}>Fermer</Button>
+                </Modal.Footer>
+            </Modal>
+
+            {/* DNS Check Modal */}
+            <Modal show={showDNSModal} onHide={handleCloseDNSModal}>
+                <Modal.Header closeButton>
+                    <Modal.Title>Vérifier SPF, DKIM, DMARC</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <Form onSubmit={handleCheckDNS}>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Entrez un email ou un domaine</Form.Label>
+                            <Form.Control
+                                type="text"
+                                value={dnsInput}
+                                onChange={e => setDnsInput(e.target.value)}
+                                placeholder="exemple@domaine.com ou domaine.com"
+                                required
+                            />
+                        </Form.Group>
+                        <Button type="submit" variant="primary" disabled={dnsChecking || !dnsInput} className="w-100">
+                            {dnsChecking ? <Spinner as="span" animation="border" size="sm" /> : 'Vérifier'}
+                        </Button>
+                    </Form>
+                    {dnsResult && (
+                        <Alert variant="info" className="mt-3">
+                            <b>Domaine vérifié :</b> {dnsResult.domain}<br/>
+                            <b>SPF :</b> {dnsResult.spf_found ? '✅' : '❌'}<br/>
+                            {dnsResult.spf_found && <div style={{fontSize:'12px',wordBreak:'break-all'}}><b>Enregistrement :</b> {dnsResult.spf_record}</div>}
+                            <b>DKIM :</b> {dnsResult.dkim_found ? '✅' : '❌'}<br/>
+                            {dnsResult.dkim_found && <div style={{fontSize:'12px',wordBreak:'break-all'}}><b>Enregistrement :</b> {dnsResult.dkim_record}</div>}
+                            <b>DMARC :</b> {dnsResult.dmarc_found ? '✅' : '❌'}<br/>
+                            {dnsResult.dmarc_found && <div style={{fontSize:'12px',wordBreak:'break-all'}}><b>Enregistrement :</b> {dnsResult.dmarc_record}</div>}
+                            <b>Blacklists :</b> {dnsResult.blacklist_hits && dnsResult.blacklist_hits.length === 0 ? (
+                                <span style={{color: 'green'}}>✅ Aucune blacklist majeure détectée</span>
+                            ) : (
+                                <span style={{color: 'red'}}>❌ Listé sur&nbsp;
+                                    {dnsResult.blacklist_hits && dnsResult.blacklist_hits.map((rbl, idx) => (
+                                        <span key={rbl}>{rbl}{idx < dnsResult.blacklist_hits.length - 1 ? ', ' : ''}</span>
+                                    ))}
+                                </span>
+                            )}
+                        </Alert>
+                    )}
+                    {dnsError && <Alert variant="danger" className="mt-3">{dnsError}</Alert>}
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={handleCloseDNSModal}>Fermer</Button>
+                </Modal.Footer>
+            </Modal>
         </div>
     );
 };
