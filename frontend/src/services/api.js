@@ -308,5 +308,9 @@ export const attachmentService = {
   resolvePlaceholder: (placeholder) => api.get(`/api/templates/attachments/resolve/${placeholder}`),
 };
 
+export const validateEmail = (email) => {
+  return api.post('/api/validate-email', { email });
+};
+
 export default api;
 export { API_BASE_URL };
