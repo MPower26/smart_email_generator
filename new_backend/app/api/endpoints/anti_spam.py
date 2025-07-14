@@ -8,6 +8,7 @@ from app.schemas.anti_spam import AntiSpamDashboardResponse
 from pydantic import BaseModel, EmailStr
 from email_validator import validate_email, EmailNotValidError
 import dns.resolver
+from typing import Optional
 
 router = APIRouter()
 
@@ -73,11 +74,11 @@ class DomainDNSValidationRequest(BaseModel):
 class DomainDNSValidationResponse(BaseModel):
     domain: str
     spf_found: bool
-    spf_record: str = None
+    spf_record: Optional[str] = None
     dkim_found: bool
-    dkim_record: str = None
+    dkim_record: Optional[str] = None
     dmarc_found: bool
-    dmarc_record: str = None
+    dmarc_record: Optional[str] = None
 
 @router.post("/validate-domain-dns", response_model=DomainDNSValidationResponse)
 async def validate_domain_dns(request: DomainDNSValidationRequest = Body(...)):
