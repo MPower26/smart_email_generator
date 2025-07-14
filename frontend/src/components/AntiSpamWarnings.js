@@ -3,6 +3,7 @@ import api from '../services/api';
 import './AntiSpamWarnings.css';
 import { validateEmail } from '../services/api';
 import { Modal, Button, Form, Spinner, Alert } from 'react-bootstrap';
+import { validateDomainDNS } from '../services/api';
 
 const AntiSpamWarnings = ({ onWarningChange }) => {
     const [warnings, setWarnings] = useState([]);
@@ -16,6 +17,11 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
     const [checkResult, setCheckResult] = useState(null);
     const [checkError, setCheckError] = useState(null);
     const [showReputationModal, setShowReputationModal] = useState(false);
+    const [showDNSModal, setShowDNSModal] = useState(false);
+    const [dnsInput, setDnsInput] = useState('');
+    const [dnsChecking, setDnsChecking] = useState(false);
+    const [dnsResult, setDnsResult] = useState(null);
+    const [dnsError, setDnsError] = useState(null);
 
     const handleOpenReputationModal = () => setShowReputationModal(true);
     const handleCloseReputationModal = () => setShowReputationModal(false);
@@ -99,6 +105,33 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
             setCheckError('Erreur lors de la vérification.');
         } finally {
             setChecking(false);
+        }
+    };
+
+    const handleOpenDNSModal = () => {
+        setShowDNSModal(true);
+        setDnsInput('');
+        setDnsResult(null);
+        setDnsError(null);
+    };
+    const handleCloseDNSModal = () => {
+        setShowDNSModal(false);
+        setDnsInput('');
+        setDnsResult(null);
+        setDnsError(null);
+    };
+    const handleCheckDNS = async (e) => {
+        e.preventDefault();
+        setDnsChecking(true);
+        setDnsResult(null);
+        setDnsError(null);
+        try {
+            const response = await validateDomainDNS(dnsInput);
+            setDnsResult(response.data);
+        } catch (err) {
+            setDnsError('Erreur lors de la vérification DNS.');
+        } finally {
+            setDnsChecking(false);
         }
     };
 
@@ -240,7 +273,10 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
                         Surveillez votre score de réputation régulièrement
                         <Button variant="link" size="sm" style={{padding:0, marginLeft:8}} onClick={handleOpenReputationModal}>Vérifier</Button>
                     </li>
-                    <li>Configurez correctement SPF, DKIM et DMARC pour votre domaine</li>
+                    <li>
+                        Configurez correctement SPF, DKIM et DMARC pour votre domaine
+                        <Button variant="link" size="sm" style={{padding:0, marginLeft:8}} onClick={handleOpenDNSModal}>Vérifier</Button>
+                    </li>
                 </ul>
             </div>
 
@@ -312,6 +348,45 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
                 </Modal.Body>
                 <Modal.Footer>
                     <Button variant="secondary" onClick={handleCloseReputationModal}>Fermer</Button>
+                </Modal.Footer>
+            </Modal>
+
+            {/* DNS Check Modal */}
+            <Modal show={showDNSModal} onHide={handleCloseDNSModal}>
+                <Modal.Header closeButton>
+                    <Modal.Title>Vérifier SPF, DKIM, DMARC</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <Form onSubmit={handleCheckDNS}>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Entrez un email ou un domaine</Form.Label>
+                            <Form.Control
+                                type="text"
+                                value={dnsInput}
+                                onChange={e => setDnsInput(e.target.value)}
+                                placeholder="exemple@domaine.com ou domaine.com"
+                                required
+                            />
+                        </Form.Group>
+                        <Button type="submit" variant="primary" disabled={dnsChecking || !dnsInput} className="w-100">
+                            {dnsChecking ? <Spinner as="span" animation="border" size="sm" /> : 'Vérifier'}
+                        </Button>
+                    </Form>
+                    {dnsResult && (
+                        <Alert variant="info" className="mt-3">
+                            <b>Domaine vérifié :</b> {dnsResult.domain}<br/>
+                            <b>SPF :</b> {dnsResult.spf_found ? '✅' : '❌'}<br/>
+                            {dnsResult.spf_found && <div style={{fontSize:'12px',wordBreak:'break-all'}}><b>Enregistrement :</b> {dnsResult.spf_record}</div>}
+                            <b>DKIM :</b> {dnsResult.dkim_found ? '✅' : '❌'}<br/>
+                            {dnsResult.dkim_found && <div style={{fontSize:'12px',wordBreak:'break-all'}}><b>Enregistrement :</b> {dnsResult.dkim_record}</div>}
+                            <b>DMARC :</b> {dnsResult.dmarc_found ? '✅' : '❌'}<br/>
+                            {dnsResult.dmarc_found && <div style={{fontSize:'12px',wordBreak:'break-all'}}><b>Enregistrement :</b> {dnsResult.dmarc_record}</div>}
+                        </Alert>
+                    )}
+                    {dnsError && <Alert variant="danger" className="mt-3">{dnsError}</Alert>}
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={handleCloseDNSModal}>Fermer</Button>
                 </Modal.Footer>
             </Modal>
         </div>
