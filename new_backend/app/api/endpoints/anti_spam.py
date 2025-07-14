@@ -7,6 +7,7 @@ from app.services.anti_spam_service import AntiSpamService
 from app.schemas.anti_spam import AntiSpamDashboardResponse
 from pydantic import BaseModel, EmailStr
 from email_validator import validate_email, EmailNotValidError
+import dns.resolver
 
 router = APIRouter()
 
@@ -64,4 +65,83 @@ async def validate_email_endpoint(request: EmailValidationRequest = Body(...)):
             mx_found=False,
             account_type=None,
             daily_limit=None
-        ) 
+        )
+
+class DomainDNSValidationRequest(BaseModel):
+    value: str  # email or domain
+
+class DomainDNSValidationResponse(BaseModel):
+    domain: str
+    spf_found: bool
+    spf_record: str = None
+    dkim_found: bool
+    dkim_record: str = None
+    dmarc_found: bool
+    dmarc_record: str = None
+
+@router.post("/validate-domain-dns", response_model=DomainDNSValidationResponse)
+async def validate_domain_dns(request: DomainDNSValidationRequest = Body(...)):
+    """Check SPF, DKIM, DMARC DNS records for a domain or email."""
+    import re
+    value = request.value.strip()
+    # Extract domain from email if needed
+    if '@' in value:
+        domain = value.split('@')[-1].lower()
+    else:
+        domain = value.lower()
+    spf_found = False
+    spf_record = None
+    dkim_found = False
+    dkim_record = None
+    dmarc_found = False
+    dmarc_record = None
+    try:
+        # SPF: TXT record with v=spf1
+        answers = dns.resolver.resolve(domain, 'TXT')
+        for rdata in answers:
+            txt = ''.join(rdata.strings if hasattr(rdata, 'strings') else rdata)
+            if isinstance(txt, bytes):
+                txt = txt.decode('utf-8')
+            if 'v=spf1' in txt:
+                spf_found = True
+                spf_record = txt
+                break
+    except Exception:
+        pass
+    try:
+        # DKIM: TXT record at default._domainkey.domain
+        dkim_domain = f'default._domainkey.{domain}'
+        answers = dns.resolver.resolve(dkim_domain, 'TXT')
+        for rdata in answers:
+            txt = ''.join(rdata.strings if hasattr(rdata, 'strings') else rdata)
+            if isinstance(txt, bytes):
+                txt = txt.decode('utf-8')
+            if 'v=DKIM1' in txt:
+                dkim_found = True
+                dkim_record = txt
+                break
+    except Exception:
+        pass
+    try:
+        # DMARC: TXT record at _dmarc.domain
+        dmarc_domain = f'_dmarc.{domain}'
+        answers = dns.resolver.resolve(dmarc_domain, 'TXT')
+        for rdata in answers:
+            txt = ''.join(rdata.strings if hasattr(rdata, 'strings') else rdata)
+            if isinstance(txt, bytes):
+                txt = txt.decode('utf-8')
+            if 'v=DMARC1' in txt:
+                dmarc_found = True
+                dmarc_record = txt
+                break
+    except Exception:
+        pass
+    return DomainDNSValidationResponse(
+        domain=domain,
+        spf_found=spf_found,
+        spf_record=spf_record,
+        dkim_found=dkim_found,
+        dkim_record=dkim_record,
+        dmarc_found=dmarc_found,
+        dmarc_record=dmarc_record
+    ) 
