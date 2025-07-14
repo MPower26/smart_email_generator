@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import './AntiSpamWarnings.css';
+import { validateEmail } from '../services/api';
+import { Modal, Button, Form, Spinner, Alert } from 'react-bootstrap';
 
 const AntiSpamWarnings = ({ onWarningChange }) => {
     const [warnings, setWarnings] = useState([]);
@@ -8,6 +10,11 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
     const [reputation, setReputation] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [showEmailModal, setShowEmailModal] = useState(false);
+    const [emailToCheck, setEmailToCheck] = useState('');
+    const [checking, setChecking] = useState(false);
+    const [checkResult, setCheckResult] = useState(null);
+    const [checkError, setCheckError] = useState(null);
     
 
     useEffect(() => {
@@ -61,6 +68,33 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
             case 'active': return '#28a745';
             case 'restricted': return '#dc3545';
             default: return '#6c757d';
+        }
+    };
+
+    const handleOpenModal = () => {
+        setShowEmailModal(true);
+        setEmailToCheck('');
+        setCheckResult(null);
+        setCheckError(null);
+    };
+    const handleCloseModal = () => {
+        setShowEmailModal(false);
+        setEmailToCheck('');
+        setCheckResult(null);
+        setCheckError(null);
+    };
+    const handleCheckEmail = async (e) => {
+        e.preventDefault();
+        setChecking(true);
+        setCheckResult(null);
+        setCheckError(null);
+        try {
+            const response = await validateEmail(emailToCheck);
+            setCheckResult(response.data);
+        } catch (err) {
+            setCheckError('Erreur lors de la vérification.');
+        } finally {
+            setChecking(false);
         }
     };
 
@@ -189,15 +223,63 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
                 <h4>💡 Conseils pour éviter le spam</h4>
                 <ul className="tips-list">
                     <li>Commencez par de petits volumes (50 emails/jour) pour établir votre réputation</li>
-                    <li>Utilisez des adresses email valides et vérifiées</li>
+                    <li>
+                        Utilisez des adresses email valides et vérifiées
+                        <Button variant="link" size="sm" style={{padding:0, marginLeft:8}} onClick={handleOpenModal}>Vérifier</Button>
+                    </li>
                     <li>Évitez les mots-clés spam dans vos sujets et contenus</li>
                     <li>Respectez les limites d'envoi quotidiennes</li>
                     <li>Surveillez votre score de réputation régulièrement</li>
                     <li>Configurez correctement SPF, DKIM et DMARC pour votre domaine</li>
                 </ul>
             </div>
+
+            {/* Email Check Modal */}
+            <Modal show={showEmailModal} onHide={handleCloseModal}>
+                <Modal.Header closeButton>
+                    <Modal.Title>Vérifier une adresse email</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <Form onSubmit={handleCheckEmail}>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Adresse email à vérifier</Form.Label>
+                            <Form.Control
+                                type="email"
+                                value={emailToCheck}
+                                onChange={e => setEmailToCheck(e.target.value)}
+                                placeholder="exemple@domaine.com"
+                                required
+                            />
+                        </Form.Group>
+                        <Button type="submit" variant="primary" disabled={checking || !emailToCheck} className="w-100">
+                            {checking ? <Spinner as="span" animation="border" size="sm" /> : 'Vérifier'}
+                        </Button>
+                    </Form>
+                    {checkResult && (
+                        <Alert variant={checkResult.valid ? 'success' : 'danger'} className="mt-3">
+                            {checkResult.valid ? (
+                                <>
+                                    ✅ Adresse valide<br/>
+                                    <b>Adresse normalisée:</b> {checkResult.normalized}<br/>
+                                    <b>MX trouvé:</b> {checkResult.mx_found ? 'Oui' : 'Non'}
+                                </>
+                            ) : (
+                                <>
+                                    ❌ Adresse invalide<br/>
+                                    <b>Raison:</b> {checkResult.reason}
+                                </>
+                            )}
+                        </Alert>
+                    )}
+                    {checkError && <Alert variant="danger" className="mt-3">{checkError}</Alert>}
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={handleCloseModal}>Fermer</Button>
+                </Modal.Footer>
+            </Modal>
         </div>
     );
 };
 
 export default AntiSpamWarnings;
+
