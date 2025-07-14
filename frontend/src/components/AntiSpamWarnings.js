@@ -228,7 +228,10 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
                         <Button variant="link" size="sm" style={{padding:0, marginLeft:8}} onClick={handleOpenModal}>Vérifier</Button>
                     </li>
                     <li>Évitez les mots-clés spam dans vos sujets et contenus</li>
-                    <li>Respectez les limites d'envoi quotidiennes</li>
+                    <li>
+                        Respectez les limites d'envoi quotidiennes
+                        <Button variant="link" size="sm" style={{padding:0, marginLeft:8}} onClick={handleOpenModal}>Vérifier</Button>
+                    </li>
                     <li>Surveillez votre score de réputation régulièrement</li>
                     <li>Configurez correctement SPF, DKIM et DMARC pour votre domaine</li>
                 </ul>
@@ -261,7 +264,9 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
                                 <>
                                     ✅ Adresse valide<br/>
                                     <b>Adresse normalisée:</b> {checkResult.normalized}<br/>
-                                    <b>MX trouvé:</b> {checkResult.mx_found ? 'Oui' : 'Non'}
+                                    <b>MX trouvé:</b> {checkResult.mx_found ? 'Oui' : 'Non'}<br/>
+                                    <b>Type de compte:</b> {checkResult.account_type === 'gmail' ? 'Gmail gratuit' : checkResult.account_type === 'workspace' ? 'Google Workspace' : 'Autre'}<br/>
+                                    <b>Limite quotidienne:</b> {checkResult.daily_limit ? checkResult.daily_limit + ' emails/jour' : 'Inconnue'}
                                 </>
                             ) : (
                                 <>
