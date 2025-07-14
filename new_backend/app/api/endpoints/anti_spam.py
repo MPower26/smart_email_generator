@@ -32,22 +32,36 @@ class EmailValidationResponse(BaseModel):
     reason: str = None
     normalized: str = None
     mx_found: bool = None
+    account_type: str = None  # 'gmail', 'workspace', 'other'
+    daily_limit: int = None
 
 @router.post("/validate-email", response_model=EmailValidationResponse)
 async def validate_email_endpoint(request: EmailValidationRequest = Body(...)):
-    """Validate email syntax and MX records."""
+    """Validate email syntax and MX records, and return account type and daily limit."""
     try:
         result = validate_email(request.email, check_deliverability=True)
+        normalized = result.email
+        domain = normalized.split('@')[-1].lower()
+        if domain in ["gmail.com", "googlemail.com"]:
+            account_type = "gmail"
+            daily_limit = 500
+        else:
+            account_type = "workspace"
+            daily_limit = 2000
         return EmailValidationResponse(
             valid=True,
             reason="Valid email address.",
-            normalized=result.email,
-            mx_found=bool(result.mx)
+            normalized=normalized,
+            mx_found=bool(result.mx),
+            account_type=account_type,
+            daily_limit=daily_limit
         )
     except EmailNotValidError as e:
         return EmailValidationResponse(
             valid=False,
             reason=str(e),
             normalized=None,
-            mx_found=False
+            mx_found=False,
+            account_type=None,
+            daily_limit=None
         ) 
