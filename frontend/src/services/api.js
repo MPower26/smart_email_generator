@@ -312,5 +312,9 @@ export const validateEmail = (email) => {
   return api.post('/api/validate-email', { email });
 };
 
+export const validateDomainDNS = (value) => {
+  return api.post('/api/validate-domain-dns', { value });
+};
+
 export default api;
 export { API_BASE_URL };
