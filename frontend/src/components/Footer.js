@@ -6,7 +6,7 @@ const Footer = () => {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', maxWidth: 1200, margin: '0 auto', flexWrap: 'wrap', gap: 24 }}>
         {/* Left: Logo */}
         <div style={{ flex: '1 1 180px', display: 'flex', alignItems: 'center' }}>
-          <img src="/logo02.png" alt="Wesi Logo" style={{ height: 56, width: 56, marginRight: 12 }} />
+          <img src="/hermesslogo.svg" alt="Hermes Logo" className="hermes-logo-animated" style={{ height: 56, width: 56, marginRight: 12 }} />
         </div>
         {/* Center: Text */}
         <div style={{ flex: '2 1 300px', textAlign: 'center', fontWeight: 600, fontSize: '1.3rem', color: '#D8400D', letterSpacing: '0.04em' }}>
