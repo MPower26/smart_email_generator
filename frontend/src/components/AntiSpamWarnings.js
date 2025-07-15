@@ -41,14 +41,14 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
                 setLimits(response.data.data.user_limits);
                 setReputation(response.data.data.reputation);
                 
-                // Notifier le composant parent s'il y a des avertissements
+                // Notify parent component if there are warnings
                 if (onWarningChange) {
                     onWarningChange(response.data.data.warnings || []);
                 }
             }
         } catch (err) {
-            console.error('Erreur lors du chargement des données anti-spam:', err);
-            setError('Impossible de charger les données anti-spam');
+            console.error('Error loading anti-spam data:', err);
+            setError('Unable to load anti-spam data');
         } finally {
             setLoading(false);
         }
@@ -63,10 +63,10 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
 
     const getWarmupStatusText = (status) => {
         switch (status) {
-            case 'new': return 'Nouveau compte';
-            case 'warming': return 'En montée en charge';
-            case 'active': return 'Actif';
-            case 'restricted': return 'Restreint';
+            case 'new': return 'New account';
+            case 'warming': return 'Warming up';
+            case 'active': return 'Active';
+            case 'restricted': return 'Restricted';
             default: return status;
         }
     };
@@ -102,7 +102,7 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
             const response = await validateEmail(emailToCheck);
             setCheckResult(response.data);
         } catch (err) {
-            setCheckError('Erreur lors de la vérification.');
+            setCheckError('Error during verification.');
         } finally {
             setChecking(false);
         }
@@ -129,7 +129,7 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
             const response = await validateDomainDNS(dnsInput);
             setDnsResult(response.data);
         } catch (err) {
-            setDnsError('Erreur lors de la vérification DNS.');
+            setDnsError('Error during DNS verification.');
         } finally {
             setDnsChecking(false);
         }
@@ -138,7 +138,7 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
     if (loading) {
         return (
             <div className="anti-spam-warnings">
-                <div className="loading">Chargement des données anti-spam...</div>
+                <div className="loading">Loading anti-spam data...</div>
             </div>
         );
     }
@@ -153,10 +153,10 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
 
     return (
         <div className="anti-spam-warnings">
-            {/* Avertissements */}
+            {/* Warnings */}
             {warnings.length > 0 && (
                 <div className="warnings-section">
-                    <h4>⚠️ Avertissements Anti-Spam</h4>
+                    <h4>⚠️ Anti-Spam Warnings</h4>
                     <div className="warnings-list">
                         {warnings.map((warning, index) => (
                             <div key={index} className="warning-item">
@@ -167,13 +167,13 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
                 </div>
             )}
 
-            {/* Limites d'envoi */}
+            {/* Sending Limits */}
             {limits && (
                 <div className="limits-section">
-                    <h4>📊 Limites d'envoi</h4>
+                    <h4>📊 Sending Limits</h4>
                     <div className="limits-grid">
                         <div className="limit-item">
-                            <span className="limit-label">Emails envoyés aujourd'hui:</span>
+                            <span className="limit-label">Emails sent today:</span>
                             <span className="limit-value">
                                 {limits.emails_sent_today} / {limits.daily_limit}
                             </span>
@@ -189,7 +189,7 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
                         </div>
                         
                         <div className="limit-item">
-                            <span className="limit-label">Destinataires uniques:</span>
+                            <span className="limit-label">Unique recipients:</span>
                             <span className="limit-value">
                                 {limits.unique_recipients_today} / {limits.recipient_limit}
                             </span>
@@ -207,13 +207,13 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
                 </div>
             )}
 
-            {/* Réputation */}
+            {/* Reputation */}
             {reputation && (
                 <div className="reputation-section">
-                    <h4>🏆 Réputation d'expéditeur</h4>
+                    <h4>🏆 Sender Reputation</h4>
                     <div className="reputation-grid">
                         <div className="reputation-item">
-                            <span className="reputation-label">Score de réputation:</span>
+                            <span className="reputation-label">Reputation score:</span>
                             <span 
                                 className="reputation-score"
                                 style={{ color: getReputationColor(reputation.reputation_score) }}
@@ -223,7 +223,7 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
                         </div>
                         
                         <div className="reputation-item">
-                            <span className="reputation-label">Statut:</span>
+                            <span className="reputation-label">Status:</span>
                             <span 
                                 className="reputation-status"
                                 style={{ color: getWarmupStatusColor(reputation.warmup_status) }}
@@ -233,49 +233,49 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
                         </div>
                         
                         <div className="reputation-item">
-                            <span className="reputation-label">Emails envoyés (total):</span>
+                            <span className="reputation-label">Emails sent (total):</span>
                             <span className="reputation-value">{reputation.total_emails_sent}</span>
                         </div>
                         
                         <div className="reputation-item">
-                            <span className="reputation-label">Livraisons réussies:</span>
+                            <span className="reputation-label">Successful deliveries:</span>
                             <span className="reputation-value">{reputation.successful_deliveries}</span>
                         </div>
                         
                         <div className="reputation-item">
-                            <span className="reputation-label">Emails rejetés:</span>
+                            <span className="reputation-label">Bounced emails:</span>
                             <span className="reputation-value">{reputation.bounced_emails}</span>
                         </div>
                         
                         <div className="reputation-item">
-                            <span className="reputation-label">Signalements spam:</span>
+                            <span className="reputation-label">Spam reports:</span>
                             <span className="reputation-value">{reputation.spam_reports}</span>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Conseils */}
+            {/* Tips */}
             <div className="tips-section">
-                <h4>💡 Conseils pour éviter le spam</h4>
+                <h4>💡 Tips to avoid spam</h4>
                 <ul className="tips-list">
-                    <li>Commencez par de petits volumes (50 emails/jour) pour établir votre réputation</li>
+                    <li>Start with small volumes (50 emails/day) to establish your reputation</li>
                     <li>
-                        Utilisez des adresses email valides et vérifiées
-                        <Button variant="link" size="sm" style={{padding:0, marginLeft:8}} onClick={handleOpenModal}>Vérifier</Button>
+                        Use valid and verified email addresses
+                        <Button variant="link" size="sm" style={{padding:0, marginLeft:8}} onClick={handleOpenModal}>Verify</Button>
                     </li>
-                    <li>Évitez les mots-clés spam dans vos sujets et contenus</li>
+                    <li>Avoid spam keywords in your subjects and content</li>
                     <li>
-                        Respectez les limites d'envoi quotidiennes
-                        <Button variant="link" size="sm" style={{padding:0, marginLeft:8}} onClick={handleOpenModal}>Vérifier</Button>
-                    </li>
-                    <li>
-                        Surveillez votre score de réputation régulièrement
-                        <Button variant="link" size="sm" style={{padding:0, marginLeft:8}} onClick={handleOpenReputationModal}>Vérifier</Button>
+                        Respect daily sending limits
+                        <Button variant="link" size="sm" style={{padding:0, marginLeft:8}} onClick={handleOpenModal}>Verify</Button>
                     </li>
                     <li>
-                        Configurez correctement SPF, DKIM et DMARC pour votre domaine
-                        <Button variant="link" size="sm" style={{padding:0, marginLeft:8}} onClick={handleOpenDNSModal}>Vérifier</Button>
+                        Monitor your reputation score regularly
+                        <Button variant="link" size="sm" style={{padding:0, marginLeft:8}} onClick={handleOpenReputationModal}>Verify</Button>
+                    </li>
+                    <li>
+                        Configure SPF, DKIM and DMARC correctly for your domain
+                        <Button variant="link" size="sm" style={{padding:0, marginLeft:8}} onClick={handleOpenDNSModal}>Verify</Button>
                     </li>
                 </ul>
             </div>
@@ -283,38 +283,38 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
             {/* Email Check Modal */}
             <Modal show={showEmailModal} onHide={handleCloseModal}>
                 <Modal.Header closeButton>
-                    <Modal.Title>Vérifier une adresse email</Modal.Title>
+                    <Modal.Title>Verify an email address</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
                     <Form onSubmit={handleCheckEmail}>
                         <Form.Group className="mb-3">
-                            <Form.Label>Adresse email à vérifier</Form.Label>
+                            <Form.Label>Email address to verify</Form.Label>
                             <Form.Control
                                 type="email"
                                 value={emailToCheck}
                                 onChange={e => setEmailToCheck(e.target.value)}
-                                placeholder="exemple@domaine.com"
+                                placeholder="example@domain.com"
                                 required
                             />
                         </Form.Group>
                         <Button type="submit" variant="primary" disabled={checking || !emailToCheck} className="w-100">
-                            {checking ? <Spinner as="span" animation="border" size="sm" /> : 'Vérifier'}
+                            {checking ? <Spinner as="span" animation="border" size="sm" /> : 'Verify'}
                         </Button>
                     </Form>
                     {checkResult && (
                         <Alert variant={checkResult.valid ? 'success' : 'danger'} className="mt-3">
                             {checkResult.valid ? (
                                 <>
-                                    ✅ Adresse valide<br/>
-                                    <b>Adresse normalisée:</b> {checkResult.normalized}<br/>
-                                    <b>MX trouvé:</b> {checkResult.mx_found ? 'Oui' : 'Non'}<br/>
-                                    <b>Type de compte:</b> {checkResult.account_type === 'gmail' ? 'Gmail gratuit' : checkResult.account_type === 'workspace' ? 'Google Workspace' : 'Autre'}<br/>
-                                    <b>Limite quotidienne:</b> {checkResult.daily_limit ? checkResult.daily_limit + ' emails/jour' : 'Inconnue'}
+                                    ✅ Valid address<br/>
+                                    <b>Normalized address:</b> {checkResult.normalized}<br/>
+                                    <b>MX found:</b> {checkResult.mx_found ? 'Yes' : 'No'}<br/>
+                                    <b>Account type:</b> {checkResult.account_type === 'gmail' ? 'Free Gmail' : checkResult.account_type === 'workspace' ? 'Google Workspace' : 'Other'}<br/>
+                                    <b>Daily limit:</b> {checkResult.daily_limit ? checkResult.daily_limit + ' emails/day' : 'Unknown'}
                                 </>
                             ) : (
                                 <>
-                                    ❌ Adresse invalide<br/>
-                                    <b>Raison:</b> {checkResult.reason}
+                                    ❌ Invalid address<br/>
+                                    <b>Reason:</b> {checkResult.reason}
                                 </>
                             )}
                         </Alert>
@@ -322,80 +322,79 @@ const AntiSpamWarnings = ({ onWarningChange }) => {
                     {checkError && <Alert variant="danger" className="mt-3">{checkError}</Alert>}
                 </Modal.Body>
                 <Modal.Footer>
-                    <Button variant="secondary" onClick={handleCloseModal}>Fermer</Button>
+                    <Button variant="secondary" onClick={handleCloseModal}>Close</Button>
                 </Modal.Footer>
             </Modal>
 
             {/* Reputation Check Modal */}
             <Modal show={showReputationModal} onHide={handleCloseReputationModal}>
                 <Modal.Header closeButton>
-                    <Modal.Title>Vérifier votre réputation d'expéditeur</Modal.Title>
+                    <Modal.Title>Check your sender reputation</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
                     {reputation ? (
                         <div>
-                            <p><b>Score de réputation :</b> {reputation.reputation_score.toFixed(1)} / 10</p>
-                            <p><b>Statut :</b> {reputation.warmup_status}</p>
-                            <p><b>Emails envoyés (total) :</b> {reputation.total_emails_sent}</p>
-                            <p><b>Livraisons réussies :</b> {reputation.successful_deliveries}</p>
-                            <p><b>Emails rejetés (bounces) :</b> {reputation.bounced_emails}</p>
-                            <p><b>Signalements spam :</b> {reputation.spam_reports}</p>
-                            <p><b>Dernier calcul :</b> {new Date(reputation.last_calculated).toLocaleString()}</p>
+                            <p><b>Reputation score:</b> {reputation.reputation_score.toFixed(1)} / 10</p>
+                            <p><b>Status:</b> {reputation.warmup_status}</p>
+                            <p><b>Emails sent (total):</b> {reputation.total_emails_sent}</p>
+                            <p><b>Successful deliveries:</b> {reputation.successful_deliveries}</p>
+                            <p><b>Bounced emails:</b> {reputation.bounced_emails}</p>
+                            <p><b>Spam reports:</b> {reputation.spam_reports}</p>
+                            <p><b>Last calculated:</b> {new Date(reputation.last_calculated).toLocaleString()}</p>
                         </div>
                     ) : (
-                        <Alert variant="warning">Impossible de charger votre réputation. Veuillez réessayer plus tard.</Alert>
+                        <Alert variant="warning">Unable to load your reputation. Please try again later.</Alert>
                     )}
                 </Modal.Body>
                 <Modal.Footer>
-                    <Button variant="secondary" onClick={handleCloseReputationModal}>Fermer</Button>
+                    <Button variant="secondary" onClick={handleCloseReputationModal}>Close</Button>
                 </Modal.Footer>
             </Modal>
 
             {/* DNS Check Modal */}
             <Modal show={showDNSModal} onHide={handleCloseDNSModal}>
                 <Modal.Header closeButton>
-                    <Modal.Title>Vérifier SPF, DKIM, DMARC</Modal.Title>
+                    <Modal.Title>Check DNS configuration</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
                     <Form onSubmit={handleCheckDNS}>
                         <Form.Group className="mb-3">
-                            <Form.Label>Entrez un email ou un domaine</Form.Label>
+                            <Form.Label>Domain to check</Form.Label>
                             <Form.Control
                                 type="text"
                                 value={dnsInput}
                                 onChange={e => setDnsInput(e.target.value)}
-                                placeholder="exemple@domaine.com ou domaine.com"
+                                placeholder="example.com"
                                 required
                             />
                         </Form.Group>
                         <Button type="submit" variant="primary" disabled={dnsChecking || !dnsInput} className="w-100">
-                            {dnsChecking ? <Spinner as="span" animation="border" size="sm" /> : 'Vérifier'}
+                            {dnsChecking ? <Spinner as="span" animation="border" size="sm" /> : 'Check DNS'}
                         </Button>
                     </Form>
                     {dnsResult && (
                         <Alert variant="info" className="mt-3">
-                            <b>Domaine vérifié :</b> {dnsResult.domain}<br/>
-                            <b>SPF :</b> {dnsResult.spf_found ? '✅' : '❌'}<br/>
-                            {dnsResult.spf_found && <div style={{fontSize:'12px',wordBreak:'break-all'}}><b>Enregistrement :</b> {dnsResult.spf_record}</div>}
-                            <b>DKIM :</b> {dnsResult.dkim_found ? '✅' : '❌'}<br/>
-                            {dnsResult.dkim_found && <div style={{fontSize:'12px',wordBreak:'break-all'}}><b>Enregistrement :</b> {dnsResult.dkim_record}</div>}
-                            <b>DMARC :</b> {dnsResult.dmarc_found ? '✅' : '❌'}<br/>
-                            {dnsResult.dmarc_found && <div style={{fontSize:'12px',wordBreak:'break-all'}}><b>Enregistrement :</b> {dnsResult.dmarc_record}</div>}
-                            <b>Blacklists :</b> {dnsResult.blacklist_hits && dnsResult.blacklist_hits.length === 0 ? (
-                                <span style={{color: 'green'}}>✅ Aucune blacklist majeure détectée</span>
-                            ) : (
-                                <span style={{color: 'red'}}>❌ Listé sur&nbsp;
-                                    {dnsResult.blacklist_hits && dnsResult.blacklist_hits.map((rbl, idx) => (
-                                        <span key={rbl}>{rbl}{idx < dnsResult.blacklist_hits.length - 1 ? ', ' : ''}</span>
-                                    ))}
-                                </span>
+                            <h6>DNS Configuration Results:</h6>
+                            <p><b>Domain:</b> {dnsResult.domain}</p>
+                            <p><b>SPF:</b> {dnsResult.spf ? '✅ Configured' : '❌ Not configured'}</p>
+                            <p><b>DKIM:</b> {dnsResult.dkim ? '✅ Configured' : '❌ Not configured'}</p>
+                            <p><b>DMARC:</b> {dnsResult.dmarc ? '✅ Configured' : '❌ Not configured'}</p>
+                            {dnsResult.recommendations && (
+                                <div className="mt-2">
+                                    <b>Recommendations:</b>
+                                    <ul className="mb-0">
+                                        {dnsResult.recommendations.map((rec, index) => (
+                                            <li key={index}>{rec}</li>
+                                        ))}
+                                    </ul>
+                                </div>
                             )}
                         </Alert>
                     )}
                     {dnsError && <Alert variant="danger" className="mt-3">{dnsError}</Alert>}
                 </Modal.Body>
                 <Modal.Footer>
-                    <Button variant="secondary" onClick={handleCloseDNSModal}>Fermer</Button>
+                    <Button variant="secondary" onClick={handleCloseDNSModal}>Close</Button>
                 </Modal.Footer>
             </Modal>
         </div>
