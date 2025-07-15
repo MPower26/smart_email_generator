@@ -46,8 +46,8 @@ const SettingsPage = () => {
       const result = await emailService.getCacheInfo();
       setCacheInfo(result);
     } catch (err) {
-      console.error('Erreur lors du chargement des informations du cache:', err);
-      setCacheError('Impossible de charger les informations du cache. Veuillez réessayer.');
+      console.error('Error loading cache information:', err);
+      setCacheError('Unable to load cache information. Please try again.');
     } finally {
       setLoadingCache(false);
     }
@@ -61,8 +61,8 @@ const SettingsPage = () => {
       await emailService.clearCache();
       fetchCacheInfo();
     } catch (err) {
-      console.error('Erreur lors du vidage du cache:', err);
-      setCacheError('Impossible de vider le cache. Veuillez réessayer.');
+      console.error('Error clearing cache:', err);
+      setCacheError('Unable to clear cache. Please try again.');
     } finally {
       setClearingCache(false);
     }
@@ -146,21 +146,21 @@ const SettingsPage = () => {
 
   return (
     <Container>
-      <h1 className="page-title">Paramètres</h1>
+      <h1 className="page-title">Settings</h1>
 
       <Row className="mb-5">
         <Col md={8}>
           <div className="form-section">
-            <h3 className="section-title">Informations personnelles</h3>
+            <h3 className="section-title">Personal Information</h3>
             <p className="text-muted mb-4">
-              Ces informations seront utilisées pour personnaliser les emails générés.
+              This information will be used to personalize the generated emails.
             </p>
             
             <Form>
               <Row className="mb-3">
                 <Col md={6}>
                   <Form.Group controlId="formName">
-                    <Form.Label>Votre nom</Form.Label>
+                    <Form.Label>Your Name</Form.Label>
                     <Form.Control
                       type="text"
                       placeholder="John Doe"
@@ -172,7 +172,7 @@ const SettingsPage = () => {
                 </Col>
                 <Col md={6}>
                   <Form.Group controlId="formEmail">
-                    <Form.Label>Votre email</Form.Label>
+                    <Form.Label>Your Email</Form.Label>
                     <Form.Control
                       type="email"
                       placeholder="john.doe@example.com"
@@ -182,7 +182,7 @@ const SettingsPage = () => {
                       disabled
                     />
                     <Form.Text className="text-muted">
-                      L'email ne peut pas être modifié
+                      Email cannot be modified
                     </Form.Text>
                   </Form.Group>
                 </Col>
@@ -191,10 +191,10 @@ const SettingsPage = () => {
               <Row className="mb-3">
                 <Col md={6}>
                   <Form.Group controlId="formPosition">
-                    <Form.Label>Votre poste/fonction</Form.Label>
+                    <Form.Label>Your Position/Title</Form.Label>
                     <Form.Control
                       type="text"
-                      placeholder="Directeur Commercial"
+                      placeholder="Sales Director"
                       name="position"
                       value={profile.position}
                       onChange={handleInputChange}
@@ -203,7 +203,7 @@ const SettingsPage = () => {
                 </Col>
                 <Col md={6}>
                   <Form.Group controlId="formCompanyName">
-                    <Form.Label>Nom de votre entreprise</Form.Label>
+                    <Form.Label>Company Name</Form.Label>
                     <Form.Control
                       type="text"
                       placeholder="Acme Inc."
@@ -216,11 +216,11 @@ const SettingsPage = () => {
               </Row>
 
               <Form.Group className="mb-4" controlId="formCompanyDescription">
-                <Form.Label>Description de votre entreprise</Form.Label>
+                <Form.Label>Company Description</Form.Label>
                 <Form.Control
                   as="textarea"
                   rows={3}
-                  placeholder="Une brève description de votre entreprise, ses activités et sa proposition de valeur..."
+                  placeholder="A brief description of your company, its activities and value proposition..."
                   name="company_description"
                   value={profile.company_description}
                   onChange={handleInputChange}
@@ -229,13 +229,13 @@ const SettingsPage = () => {
 
               {saveSuccess && (
                 <Alert variant="success" className="mb-3">
-                  Vos informations ont été sauvegardées avec succès!
+                  Your information has been saved successfully!
                 </Alert>
               )}
 
               <div className="d-flex justify-content-end">
                 <Button variant="primary" onClick={handleSaveProfile}>
-                  Sauvegarder
+                  Save
                 </Button>
               </div>
             </Form>
@@ -248,11 +248,11 @@ const SettingsPage = () => {
         <Col md={8}>
           <Card>
             <Card.Header>
-              <h4 className="mb-0">Intégration Gmail</h4>
+              <h4 className="mb-0">Gmail Integration</h4>
             </Card.Header>
             <Card.Body>
               <p className="text-muted mb-4">
-                Connectez votre compte Gmail pour envoyer des emails directement depuis l'application.
+                Connect your Gmail account to send emails directly from the application.
               </p>
               
               <div className="d-flex align-items-center mb-3">
@@ -260,12 +260,12 @@ const SettingsPage = () => {
                   {gmailConnected ? (
                     <Alert variant="success" className="mb-0 py-2">
                       <i className="bi bi-check-circle-fill me-2"></i>
-                      Gmail connecté
+                      Gmail Connected
                     </Alert>
                   ) : (
                     <Alert variant="warning" className="mb-0 py-2">
                       <i className="bi bi-exclamation-triangle-fill me-2"></i>
-                      Gmail non connecté
+                      Gmail Not Connected
                     </Alert>
                   )}
                 </div>
@@ -278,12 +278,12 @@ const SettingsPage = () => {
                   {gmailLoading ? (
                     <>
                       <Spinner animation="border" size="sm" className="me-2" />
-                      Connexion...
+                      Connecting...
                     </>
                   ) : gmailConnected ? (
-                    "Reconnecter Gmail"
+                    "Reconnect Gmail"
                   ) : (
-                    "Connecter Gmail"
+                    "Connect Gmail"
                   )}
                 </Button>
               </div>
@@ -299,12 +299,12 @@ const SettingsPage = () => {
         <Col md={6}>
           <Card className="mb-4">
             <Card.Header>
-              <h4 className="mb-0">Gestion du cache</h4>
+              <h4 className="mb-0">Cache Management</h4>
             </Card.Header>
             <Card.Body>
               <p>
-                L'application stocke en cache les résultats de génération d'emails pour améliorer les performances. 
-                Vous pouvez vider le cache si nécessaire.
+                The application caches email generation results to improve performance. 
+                You can clear the cache if needed.
               </p>
 
               {cacheError && (
@@ -316,12 +316,12 @@ const SettingsPage = () => {
               {loadingCache ? (
                 <div className="text-center my-3">
                   <Spinner animation="border" size="sm" />
-                  <span className="ms-2">Chargement...</span>
+                  <span className="ms-2">Loading...</span>
                 </div>
               ) : cacheInfo ? (
                 <div className="mb-3">
-                  <p><strong>Taille du cache:</strong> {cacheInfo.size || '0'} entrées</p>
-                  <p><strong>Dernière mise à jour:</strong> {cacheInfo.lastUpdated || 'Jamais'}</p>
+                  <p><strong>Cache Size:</strong> {cacheInfo.size || '0'} entries</p>
+                  <p><strong>Last Updated:</strong> {cacheInfo.lastUpdated || 'Never'}</p>
                 </div>
               ) : null}
 
@@ -333,9 +333,9 @@ const SettingsPage = () => {
                 {clearingCache ? (
                   <>
                     <Spinner animation="border" size="sm" className="me-2" />
-                    Nettoyage...
+                    Clearing...
                   </>
-                ) : 'Vider le cache'}
+                ) : 'Clear Cache'}
               </Button>
             </Card.Body>
           </Card>
@@ -344,16 +344,16 @@ const SettingsPage = () => {
         <Col md={6}>
           <Card>
             <Card.Header>
-              <h4 className="mb-0">À propos</h4>
+              <h4 className="mb-0">About</h4>
             </Card.Header>
             <Card.Body>
-              <p><strong>Version de l'application:</strong> 1.0.0</p>
+              <p><strong>Application Version:</strong> 1.0.0</p>
               <p>
-                Cette application permet de générer des emails personnalisés à partir de listes de contacts,
-                en utilisant l'IA ou des templates prédéfinis.
+                This application allows you to generate personalized emails from contact lists,
+                using AI or predefined templates.
               </p>
               <p>
-                Pour toute question ou assistance, veuillez contacter l'administrateur système.
+                For any questions or assistance, please contact the system administrator.
               </p>
             </Card.Body>
           </Card>
@@ -362,10 +362,10 @@ const SettingsPage = () => {
 
       <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
         <Card className="mb-4 compte-card">
-          <Card.Header>Compte</Card.Header>
+          <Card.Header>Account</Card.Header>
           <Card.Body>
             <Button variant="danger" onClick={logout}>
-              Se déconnecter
+              Sign Out
             </Button>
           </Card.Body>
         </Card>
@@ -390,12 +390,12 @@ function FollowupIntervals({ user }) {
   return (
     <Card className="mb-4">
       <Card.Header>
-        <h4 className="mb-0">Délais de relance</h4>
+        <h4 className="mb-0">Followup Intervals</h4>
       </Card.Header>
       <Card.Body>
         <Form>
           <Form.Group controlId="followupInterval">
-            <Form.Label>Délai avant relance (jours)</Form.Label>
+            <Form.Label>Days before followup</Form.Label>
             <Form.Control
               type="number"
               value={followup}
@@ -405,7 +405,7 @@ function FollowupIntervals({ user }) {
             />
           </Form.Group>
           <Form.Group controlId="lastchanceInterval" className="mt-3">
-            <Form.Label>Délai avant dernier rappel (jours)</Form.Label>
+            <Form.Label>Days before last chance</Form.Label>
             <Form.Control
               type="number"
               value={lastchance}
@@ -414,11 +414,12 @@ function FollowupIntervals({ user }) {
               onChange={e => setLastchance(Number(e.target.value))}
             />
           </Form.Group>
-          <Button className="mt-3" onClick={update}>Mettre à jour</Button>
+          <Button className="mt-3" onClick={update}>Update</Button>
         </Form>
       </Card.Body>
     </Card>
   );
 }
 export default SettingsPage; 
+
 
