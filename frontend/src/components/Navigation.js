@@ -6,14 +6,14 @@ const Navigation = () => {
   const location = useLocation();
   
   return (
-    <Navbar expand="lg" className="mb-4">
+    <Navbar expand="lg" className="mb-4" style={{ padding: '0.5rem 0' }}>
       <Container>
         <Navbar.Brand>
           <a href="https://wesi.ltd/" target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', color: 'inherit' }}>
-            <img src="/logo02.png" alt="Logo" style={{ height: '40px', width: '40px', marginRight: '10px', verticalAlign: 'middle' }} />
+            <img src="/logo02.png" alt="Logo" style={{ height: '50px', width: '50px', marginRight: '10px', verticalAlign: 'middle' }} />
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-              <span className="hermes-title">HERMES</span>
-              <span className="hermes-subtitle">By Wesi.ltd</span>
+              <span className="hermes-title-compact">HERMES</span>
+              <span className="hermes-subtitle-compact">By Wesi.ltd</span>
             </div>
           </a>
         </Navbar.Brand>
