@@ -1,504 +1,424 @@
-              import dns.resolver
-import dns.exception
-import re
-import json
-import logging
-from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional, Tuple
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.backends import default_backend
-import base64
+from typing import List, Optional
+from datetime import datetime
 
-from ..models.domain_auth_models import Domain, DomainAuthCheck, DomainAlert
-from ..schemas.domain_auth import CheckType, AlertType, AlertLevel, DKIMKeyPair
+from ...db.database import get_db
+from ...middleware.auth import get_current_user
+from ...models.models import User
+from ...models.domain_auth_models import Domain, DomainAuthCheck, DomainAlert
+from ...schemas.domain_auth import (
+    DomainCreate, DomainUpdate, DomainResponse, DomainAuthCheckRequest,
+    DomainAuthCheckResponse, DKIMKeyPair, DomainConfiguration, CheckType
+)
+from ...services.domain_auth_service import DomainAuthService
 
-logger = logging.getLogger(__name__)
+router = APIRouter()
 
-class DomainAuthService:
-    def __init__(self, db: Session):
-        self.db = db
-
-    def check_spf(self, domain: str) -> Dict[str, Any]:
-        """
-        Check SPF record for a domain
-        """
-        try:
-            # Look for TXT records
-            txt_records = dns.resolver.resolve(domain, 'TXT')
-            
-            spf_record = None
-            for record in txt_records:
-                record_str = str(record).strip('"')
-                if record_str.startswith('v=spf1'):
-                    spf_record = record_str
-                    break
-            
-            if not spf_record:
-                return {
-                    'record_found': False,
-                    'is_valid': False,
-                    'check_data': {
-                        'error': 'No SPF record found',
-                        'recommendation': f'Add SPF record: v=spf1 include:_spf.yourdomain.com ~all'
-                    }
-                }
-            
-            # Basic SPF validation
-            is_valid = self._validate_spf_record(spf_record)
-            
-            return {
-                'record_found': True,
-                'is_valid': is_valid,
-                'check_data': {
-                    'spf_record': spf_record,
-                    'validation_details': self._analyze_spf_record(spf_record)
-                }
-            }
-            
-        except dns.exception.DNSException as e:
-            logger.error(f"DNS error checking SPF for {domain}: {e}")
-            return {
-                'record_found': False,
-                'is_valid': False,
-                'check_data': {
-                    'error': f'DNS resolution failed: {str(e)}'
-                }
-            }
-        except Exception as e:
-            logger.error(f"Error checking SPF for {domain}: {e}")
-            return {
-                'record_found': False,
-                'is_valid': False,
-                'check_data': {
-                    'error': f'Unexpected error: {str(e)}'
-                }
-            }
-
-    def check_dkim(self, domain: str, selector: str = "default") -> Dict[str, Any]:
-        """
-        Check DKIM record for a domain
-        """
-        try:
-            dkim_domain = f"{selector}._domainkey.{domain}"
-            txt_records = dns.resolver.resolve(dkim_domain, 'TXT')
-            
-            dkim_record = None
-            for record in txt_records:
-                record_str = str(record).strip('"')
-                if 'v=DKIM1' in record_str and 'p=' in record_str:
-                    dkim_record = record_str
-                    break
-            
-            if not dkim_record:
-                return {
-                    'record_found': False,
-                    'is_valid': False,
-                    'check_data': {
-                        'error': f'No DKIM record found for selector {selector}',
-                        'recommendation': f'Add DKIM record for {dkim_domain}'
-                    }
-                }
-            
-            # Validate DKIM record format
-            is_valid = self._validate_dkim_record(dkim_record)
-            
-            return {
-                'record_found': True,
-                'is_valid': is_valid,
-                'check_data': {
-                    'dkim_record': dkim_record,
-                    'selector': selector,
-                    'dkim_domain': dkim_domain,
-                    'validation_details': self._analyze_dkim_record(dkim_record)
-                }
-            }
-            
-        except dns.resolver.NXDOMAIN:
-            # Domain doesn't exist - this is expected for many DKIM selectors
-            return {
-                'record_found': False,
-                'is_valid': False,
-                'check_data': {
-                    'error': f'No DKIM record found for selector {selector}',
-                    'recommendation': f'Add DKIM record for {dkim_domain}'
-                }
-            }
-        except dns.exception.DNSException as e:
-            # Only log as error if it's not a "domain not found" type error
-            if "does not exist" not in str(e) and "NXDOMAIN" not in str(e):
-                logger.error(f"DNS error checking DKIM for {domain}: {e}")
-            return {
-                'record_found': False,
-                'is_valid': False,
-                'check_data': {
-                    'error': f'DNS resolution failed: {str(e)}'
-                }
-            }
-        except Exception as e:
-            logger.error(f"Error checking DKIM for {domain}: {e}")
-            return {
-                'record_found': False,
-                'is_valid': False,
-                'check_data': {
-                    'error': f'Unexpected error: {str(e)}'
-                }
-            }
-
-    def check_dmarc(self, domain: str) -> Dict[str, Any]:
-        """
-        Check DMARC record for a domain
-        """
-        try:
-            dmarc_domain = f"_dmarc.{domain}"
-            txt_records = dns.resolver.resolve(dmarc_domain, 'TXT')
-            
-            dmarc_record = None
-            for record in txt_records:
-                record_str = str(record).strip('"')
-                if record_str.startswith('v=DMARC1'):
-                    dmarc_record = record_str
-                    break
-            
-            if not dmarc_record:
-                return {
-                    'record_found': False,
-                    'is_valid': False,
-                    'check_data': {
-                        'error': 'No DMARC record found',
-                        'recommendation': f'Add DMARC record: v=DMARC1; p=quarantine; rua=mailto:dmarc@{domain}'
-                    }
-                }
-            
-            # Validate DMARC record
-            is_valid, policy = self._validate_dmarc_record(dmarc_record)
-            
-            return {
-                'record_found': True,
-                'is_valid': is_valid,
-                'check_data': {
-                    'dmarc_record': dmarc_record,
-                    'policy': policy,
-                    'validation_details': self._analyze_dmarc_record(dmarc_record)
-                }
-            }
-            
-        except dns.exception.DNSException as e:
-            logger.error(f"DNS error checking DMARC for {domain}: {e}")
-            return {
-                'record_found': False,
-                'is_valid': False,
-                'check_data': {
-                    'error': f'DNS resolution failed: {str(e)}'
-                }
-            }
-        except Exception as e:
-            logger.error(f"Error checking DMARC for {domain}: {e}")
-            return {
-                'record_found': False,
-                'is_valid': False,
-                'check_data': {
-                    'error': f'Unexpected error: {str(e)}'
-                }
-            }
-
-    def _validate_spf_record(self, spf_record: str) -> bool:
-        """
-        Basic SPF record validation
-        """
-        if not spf_record.startswith('v=spf1'):
-            return False
-        
-        # Check for basic SPF mechanisms
-        mechanisms = spf_record.split()
-        if len(mechanisms) < 2:  # Must have at least v=spf1 and one mechanism
-            return False
-        
-        return True
-
-    def _analyze_spf_record(self, spf_record: str) -> Dict[str, Any]:
-        """
-        Analyze SPF record and provide recommendations
-        """
-        mechanisms = spf_record.split()
-        analysis = {
-            'mechanisms': [],
-            'recommendations': []
-        }
-        
-        for mechanism in mechanisms[1:]:  # Skip v=spf1
-            if mechanism.startswith('include:'):
-                analysis['mechanisms'].append(f"Include: {mechanism.split(':')[1]}")
-            elif mechanism.startswith('ip4:'):
-                analysis['mechanisms'].append(f"IP4: {mechanism.split(':')[1]}")
-            elif mechanism.startswith('ip6:'):
-                analysis['mechanisms'].append(f"IP6: {mechanism.split(':')[1]}")
-            elif mechanism in ['a', 'mx', 'exists']:
-                analysis['mechanisms'].append(f"Mechanism: {mechanism}")
-            elif mechanism in ['~all', '-all', '+all']:
-                analysis['mechanisms'].append(f"Default: {mechanism}")
-        
-        # Check for common issues
-        if '~all' in spf_record:
-            analysis['recommendations'].append("Consider using '-all' instead of '~all' for stricter policy")
-        
-        if not any(mech in spf_record for mech in ['~all', '-all', '+all']):
-            analysis['recommendations'].append("Add default mechanism (e.g., ~all)")
-        
-        return analysis
-
-    def _validate_dkim_record(self, dkim_record: str) -> bool:
-        """
-        Basic DKIM record validation
-        """
-        required_fields = ['v=DKIM1', 'p=']
-        return all(field in dkim_record for field in required_fields)
-
-    def _analyze_dkim_record(self, dkim_record: str) -> Dict[str, Any]:
-        """
-        Analyze DKIM record and provide recommendations
-        """
-        analysis = {
-            'fields': {},
-            'recommendations': []
-        }
-        
-        # Parse DKIM fields
-        fields = dkim_record.split(';')
-        for field in fields:
-            field = field.strip()
-            if '=' in field:
-                key, value = field.split('=', 1)
-                analysis['fields'][key.strip()] = value.strip()
-        
-        # Check for common issues
-        if 'k=rsa' not in dkim_record:
-            analysis['recommendations'].append("Consider specifying key type: k=rsa")
-        
-        if 's=email' not in dkim_record:
-            analysis['recommendations'].append("Consider specifying service type: s=email")
-        
-        return analysis
-
-    def _validate_dmarc_record(self, dmarc_record: str) -> Tuple[bool, str]:
-        """
-        Validate DMARC record and extract policy
-        """
-        if not dmarc_record.startswith('v=DMARC1'):
-            return False, "none"
-        
-        # Extract policy
-        policy_match = re.search(r'p=(\w+)', dmarc_record)
-        if not policy_match:
-            return False, "none"
-        
-        policy = policy_match.group(1)
-        return True, policy
-
-    def _analyze_dmarc_record(self, dmarc_record: str) -> Dict[str, Any]:
-        """
-        Analyze DMARC record and provide recommendations
-        """
-        analysis = {
-            'fields': {},
-            'recommendations': []
-        }
-        
-        # Parse DMARC fields
-        fields = dmarc_record.split(';')
-        for field in fields:
-            field = field.strip()
-            if '=' in field:
-                key, value = field.split('=', 1)
-                analysis['fields'][key.strip()] = value.strip()
-        
-        # Check policy
-        policy = analysis['fields'].get('p', 'none')
-        if policy == 'none':
-            analysis['recommendations'].append("Consider upgrading policy to 'quarantine' or 'reject'")
-        elif policy == 'quarantine':
-            analysis['recommendations'].append("Consider upgrading policy to 'reject' for maximum security")
-        
-        # Check for reporting
-        if 'rua=' not in dmarc_record:
-            analysis['recommendations'].append("Add reporting address: rua=mailto:dmarc@yourdomain.com")
-        
-        return analysis
-
-    def generate_dkim_keys(self, domain: str, selector: str = "default") -> DKIMKeyPair:
-        """
-        Generate DKIM key pair for a domain
-        """
-        # Generate RSA key pair
-        private_key = rsa.generate_private_key(
-            public_exponent=65537,
-            key_size=2048,
-            backend=default_backend()
+@router.post("/domains", response_model=DomainResponse)
+async def create_domain(
+    domain_data: DomainCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Create a new domain for the current user
+    """
+    # Check if domain already exists for this user
+    existing_domain = db.query(Domain).filter(
+        Domain.user_id == current_user.id,
+        Domain.domain_name == domain_data.domain_name
+    ).first()
+    
+    if existing_domain:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Domain already exists for this user"
         )
-        
-        public_key = private_key.public_key()
-        
-        # Serialize keys
-        private_pem = private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption()
-        ).decode('utf-8')
-        
-        public_pem = public_key.public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo
-        ).decode('utf-8')
-        
-        # Extract public key for DNS record (remove headers and newlines)
-        public_key_clean = ''.join(public_pem.split('\n')[1:-2])
-        
-        # Create DNS record
-        dns_record = f'v=DKIM1; k=rsa; p={public_key_clean}'
-        
-        return DKIMKeyPair(
-            selector=selector,
-            private_key=private_pem,
-            public_key=public_pem,
-            dns_record=dns_record
+    
+    # If this is the first domain or marked as primary, set it as primary
+    if domain_data.is_primary or not db.query(Domain).filter(Domain.user_id == current_user.id).first():
+        domain_data.is_primary = True
+        # Unset other primary domains
+        db.query(Domain).filter(Domain.user_id == current_user.id).update({"is_primary": False})
+    
+    # Create domain
+    domain = Domain(
+        user_id=current_user.id,
+        domain_name=domain_data.domain_name,
+        is_primary=domain_data.is_primary,
+        is_active=domain_data.is_active
+    )
+    
+    db.add(domain)
+    db.commit()
+    db.refresh(domain)
+    
+    # Perform initial authentication check
+    auth_service = DomainAuthService(db)
+    auth_result = auth_service.check_domain_auth(domain.domain_name)
+    
+    # Save check results
+    for check_type, result in auth_result['checks'].items():
+        auth_service.save_domain_auth_check(domain.id, CheckType(check_type), result)
+    
+    # Create alerts if any
+    for alert in auth_result['alerts']:
+        auth_service.create_domain_alert(
+            domain.id,
+            alert['type'],
+            alert['level'],
+            alert['message']
         )
+    
+    return domain
 
-    def check_domain_auth(self, domain: str, check_types: Optional[List[CheckType]] = None) -> Dict[str, Any]:
-        """
-        Perform comprehensive domain authentication check
-        """
-        if check_types is None:
-            check_types = [CheckType.SPF, CheckType.DKIM, CheckType.DMARC]
-        
-        results = {
-            'domain': domain,
-            'checks': {},
-            'alerts': [],
-            'overall_status': 'valid'
+@router.get("/domains", response_model=List[DomainResponse])
+async def get_user_domains(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all domains for the current user
+    """
+    domains = db.query(Domain).filter(Domain.user_id == current_user.id).all()
+    return domains
+
+@router.get("/domains/{domain_id}", response_model=DomainResponse)
+async def get_domain(
+    domain_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get a specific domain by ID
+    """
+    domain = db.query(Domain).filter(
+        Domain.id == domain_id,
+        Domain.user_id == current_user.id
+    ).first()
+    
+    if not domain:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Domain not found"
+        )
+    
+    return domain
+
+@router.put("/domains/{domain_id}", response_model=DomainResponse)
+async def update_domain(
+    domain_id: int,
+    domain_data: DomainUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update a domain
+    """
+    domain = db.query(Domain).filter(
+        Domain.id == domain_id,
+        Domain.user_id == current_user.id
+    ).first()
+    
+    if not domain:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Domain not found"
+        )
+    
+    # Update fields
+    update_data = domain_data.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(domain, field, value)
+    
+    # Handle primary domain logic
+    if domain_data.is_primary:
+        # Unset other primary domains
+        db.query(Domain).filter(
+            Domain.user_id == current_user.id,
+            Domain.id != domain_id
+        ).update({"is_primary": False})
+    
+    domain.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(domain)
+    
+    return domain
+
+@router.delete("/domains/{domain_id}")
+async def delete_domain(
+    domain_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete a domain
+    """
+    domain = db.query(Domain).filter(
+        Domain.id == domain_id,
+        Domain.user_id == current_user.id
+    ).first()
+    
+    if not domain:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Domain not found"
+        )
+    
+    db.delete(domain)
+    db.commit()
+    
+    return {"message": "Domain deleted successfully"}
+
+@router.post("/domains/{domain_id}/check-auth", response_model=DomainAuthCheckResponse)
+async def check_domain_auth(
+    domain_id: int,
+    check_request: DomainAuthCheckRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Check domain authentication (SPF, DKIM, DMARC)
+    """
+    domain = db.query(Domain).filter(
+        Domain.id == domain_id,
+        Domain.user_id == current_user.id
+    ).first()
+    
+    if not domain:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Domain not found"
+        )
+    
+    auth_service = DomainAuthService(db)
+    auth_result = auth_service.check_domain_auth(
+        domain.domain_name,
+        check_request.check_types
+    )
+    
+    # Save check results
+    for check_type, result in auth_result['checks'].items():
+        auth_service.save_domain_auth_check(domain.id, CheckType(check_type), result)
+    
+    # Create or update alerts
+    for alert in auth_result['alerts']:
+        auth_service.create_domain_alert(
+            domain.id,
+            alert['type'],
+            alert['level'],
+            alert['message']
+        )
+    
+    return {
+        "domain": domain.domain_name,
+        "checks": [
+            {
+                "check_type": CheckType(check_type),
+                "record_found": result['record_found'],
+                "is_valid": result['is_valid'],
+                "last_checked": datetime.utcnow(),
+                "check_data": result.get('check_data', {})
+            }
+            for check_type, result in auth_result['checks'].items()
+        ],
+        "alerts": auth_result['alerts'],
+        "summary": {
+            "overall_status": auth_result['overall_status'],
+            "total_checks": len(auth_result['checks']),
+            "valid_checks": sum(1 for result in auth_result['checks'].values() if result['is_valid']),
+            "total_alerts": len(auth_result['alerts'])
         }
-        
-        # Perform checks
-        if CheckType.SPF in check_types:
-            spf_result = self.check_spf(domain)
-            results['checks']['SPF'] = spf_result
-            if not spf_result['is_valid']:
-                results['alerts'].append({
-                    'type': AlertType.SPF_MISSING if not spf_result['record_found'] else AlertType.SPF_INVALID,
-                    'level': AlertLevel.ERROR,
-                    'message': spf_result['check_data'].get('error', 'SPF validation failed')
-                })
-        
-        if CheckType.DKIM in check_types:
-            # Try common DKIM selectors
-            common_selectors = ["default", "google", "selector1", "selector2", "k1", "k2"]
-            dkim_result = None
-            found_selector = None
-            
-            for selector in common_selectors:
-                dkim_result = self.check_dkim(domain, selector)
-                if dkim_result['record_found']:
-                    found_selector = selector
-                    break
-            
-            # If no DKIM record found with any selector, create a clean result
-            if not dkim_result or not dkim_result['record_found']:
-                dkim_result = {
-                    'record_found': False,
-                    'is_valid': False,
-                    'check_data': {
-                        'error': 'No DKIM record found for any common selector',
-                        'recommendation': f'Add DKIM record for default._domainkey.{domain}',
-                        'tried_selectors': common_selectors
-                    }
-                }
-            else:
-                # Add the found selector to the result
-                dkim_result['check_data']['found_selector'] = found_selector
-            
-            results['checks']['DKIM'] = dkim_result
-            if not dkim_result['is_valid']:
-                results['alerts'].append({
-                    'type': AlertType.DKIM_MISSING if not dkim_result['record_found'] else AlertType.DKIM_INVALID,
-                    'level': AlertLevel.ERROR,
-                    'message': dkim_result['check_data'].get('error', 'DKIM validation failed')
-                })
-        
-        if CheckType.DMARC in check_types:
-            dmarc_result = self.check_dmarc(domain)
-            results['checks']['DMARC'] = dmarc_result
-            if not dmarc_result['is_valid']:
-                results['alerts'].append({
-                    'type': AlertType.DMARC_MISSING,
-                    'level': AlertLevel.ERROR,
-                    'message': dmarc_result['check_data'].get('error', 'DMARC validation failed')
-                })
-            elif dmarc_result['check_data'].get('policy') == 'none':
-                results['alerts'].append({
-                    'type': AlertType.DMARC_PERMISSIVE,
-                    'level': AlertLevel.WARNING,
-                    'message': 'DMARC policy is set to "none". Consider upgrading to "quarantine" or "reject"'
-                })
-        
-        # Determine overall status
-        if any(alert['level'] == AlertLevel.ERROR for alert in results['alerts']):
-            results['overall_status'] = 'error'
-        elif any(alert['level'] == AlertLevel.WARNING for alert in results['alerts']):
-            results['overall_status'] = 'warning'
-        
-        return results
+    }
 
-    def save_domain_auth_check(self, domain_id: int, check_type: CheckType, result: Dict[str, Any]):
-        """
-        Save domain authentication check result to database
-        """
-        # Update or create auth check record
-        auth_check = self.db.query(DomainAuthCheck).filter(
-            DomainAuthCheck.domain_id == domain_id,
-            DomainAuthCheck.check_type == check_type.value
-        ).first()
-        
-        if auth_check:
-            auth_check.record_found = result['record_found']
-            auth_check.is_valid = result['is_valid']
-            auth_check.last_checked = datetime.utcnow()
-            auth_check.check_data = result.get('check_data', {})
-        else:
-            auth_check = DomainAuthCheck(
-                domain_id=domain_id,
-                check_type=check_type.value,
-                record_found=result['record_found'],
-                is_valid=result['is_valid'],
-                last_checked=datetime.utcnow(),
-                check_data=result.get('check_data', {})
-            )
-            self.db.add(auth_check)
-        
-        self.db.commit()
-        return auth_check
-
-    def create_domain_alert(self, domain_id: int, alert_type: AlertType, level: AlertLevel, message: str):
-        """
-        Create domain alert in database
-        """
-        alert = DomainAlert(
-            domain_id=domain_id,
-            alert_type=alert_type.value,
-            level=level.value,
-            message=message,
-            is_resolved=False
+@router.post("/domains/{domain_id}/generate-dkim", response_model=DKIMKeyPair)
+async def generate_dkim_keys(
+    domain_id: int,
+    selector: str = "default",
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Generate DKIM key pair for a domain
+    """
+    domain = db.query(Domain).filter(
+        Domain.id == domain_id,
+        Domain.user_id == current_user.id
+    ).first()
+    
+    if not domain:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Domain not found"
         )
-        self.db.add(alert)
-        self.db.commit()
-        return alert
+    
+    auth_service = DomainAuthService(db)
+    dkim_keys = auth_service.generate_dkim_keys(domain.domain_name, selector)
+    
+    # Update domain with DKIM selector
+    domain.dkim_selector = selector
+    domain.dkim_private_key = dkim_keys.private_key
+    domain.dkim_public_key = dkim_keys.public_key
+    domain.updated_at = datetime.utcnow()
+    
+    db.commit()
+    
+    return dkim_keys
 
-    def resolve_domain_alert(self, alert_id: int):
-        """
-        Mark domain alert as resolved
-        """
-        alert = self.db.query(DomainAlert).filter(DomainAlert.id == alert_id).first()
-        if alert:
-            alert.is_resolved = True
-            alert.resolved_at = datetime.utcnow()
-            self.db.commit()
-        return alert 
+@router.get("/domains/{domain_id}/configuration", response_model=DomainConfiguration)
+async def get_domain_configuration(
+    domain_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get domain configuration with DNS records and recommendations
+    """
+    domain = db.query(Domain).filter(
+        Domain.id == domain_id,
+        Domain.user_id == current_user.id
+    ).first()
+    
+    if not domain:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Domain not found"
+        )
+    
+    auth_service = DomainAuthService(db)
+    auth_result = auth_service.check_domain_auth(domain.domain_name)
+    
+    configuration = {
+        "domain_name": domain.domain_name,
+        "spf_record": None,
+        "dkim_record": None,
+        "dmarc_record": None,
+        "recommendations": []
+    }
+    
+    # Extract DNS records
+    if 'SPF' in auth_result['checks']:
+        spf_data = auth_result['checks']['SPF']['check_data']
+        configuration['spf_record'] = spf_data.get('spf_record')
+        if not auth_result['checks']['SPF']['is_valid']:
+            configuration['recommendations'].append(spf_data.get('recommendation', 'Configure SPF record'))
+    
+    if 'DKIM' in auth_result['checks']:
+        dkim_data = auth_result['checks']['DKIM']['check_data']
+        configuration['dkim_record'] = dkim_data.get('dkim_record')
+        if not auth_result['checks']['DKIM']['is_valid']:
+            configuration['recommendations'].append(dkim_data.get('recommendation', 'Configure DKIM record'))
+    
+    if 'DMARC' in auth_result['checks']:
+        dmarc_data = auth_result['checks']['DMARC']['check_data']
+        configuration['dmarc_record'] = dmarc_data.get('dmarc_record')
+        if not auth_result['checks']['DMARC']['is_valid']:
+            configuration['recommendations'].append(dmarc_data.get('recommendation', 'Configure DMARC record'))
+    
+    # Add recommendations from alerts
+    for alert in auth_result['alerts']:
+        if alert['level'] in ['warning', 'error']:
+            configuration['recommendations'].append(alert['message'])
+    
+    return configuration
+
+@router.post("/domains/{domain_id}/alerts/{alert_id}/resolve")
+async def resolve_domain_alert(
+    domain_id: int,
+    alert_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Mark a domain alert as resolved
+    """
+    # Verify domain ownership
+    domain = db.query(Domain).filter(
+        Domain.id == domain_id,
+        Domain.user_id == current_user.id
+    ).first()
+    
+    if not domain:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Domain not found"
+        )
+    
+    auth_service = DomainAuthService(db)
+    alert = auth_service.resolve_domain_alert(alert_id)
+    
+    if not alert:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Alert not found"
+        )
+    
+    return {"message": "Alert resolved successfully"}
+
+@router.get("/domains/{domain_id}/alerts")
+async def get_domain_alerts(
+    domain_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all alerts for a domain
+    """
+    domain = db.query(Domain).filter(
+        Domain.id == domain_id,
+        Domain.user_id == current_user.id
+    ).first()
+    
+    if not domain:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Domain not found"
+        )
+    
+    alerts = db.query(DomainAlert).filter(DomainAlert.domain_id == domain_id).all()
+    return alerts
+
+@router.post("/domains/{domain_id}/check-now")
+async def check_domain_now(
+    domain_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Trigger immediate authentication check for a domain
+    """
+    domain = db.query(Domain).filter(
+        Domain.id == domain_id,
+        Domain.user_id == current_user.id
+    ).first()
+    
+    if not domain:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Domain not found"
+        )
+    
+    # Import here to avoid circular imports
+    from ...services.domain_auth_scheduler import domain_auth_scheduler
+    
+    # Trigger immediate check
+    await domain_auth_scheduler.check_domain_immediately(domain_id)
+    
+    return {"message": f"Authentication check triggered for domain {domain.domain_name}"}
+
+@router.post("/domains/check-all")
+async def check_all_user_domains(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Trigger authentication check for all domains of the current user
+    """
+    # Import here to avoid circular imports
+    from ...services.domain_auth_scheduler import domain_auth_scheduler
+    
+    # Trigger check for all user domains
+    await domain_auth_scheduler.check_user_domains(current_user.id)
+    
+    return {"message": "Authentication check triggered for all user domains"} 
