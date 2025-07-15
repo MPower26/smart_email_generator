@@ -176,8 +176,5 @@ async def validate_domain_dns(request: DomainDNSValidationRequest = Body(...)):
         dmarc_found=dmarc_found,
         dmarc_record=dmarc_record,
         blacklist_hits=blacklist_hits
-<<<<<<< HEAD
     ) 
-=======
-    ) 
->>>>>>> 2c2b0e7ac39fe3542924d01d9342b8c892c645b3
+
