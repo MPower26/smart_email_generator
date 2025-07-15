@@ -33,7 +33,7 @@ class DomainAuthService {
    */
   async getUserDomains() {
     try {
-      const response = await apiClient.get('/domains');
+      const response = await apiClient.get('/api/domains');
       return response.data;
     } catch (error) {
       console.error('Error fetching user domains:', error);
@@ -46,7 +46,7 @@ class DomainAuthService {
    */
   async createDomain(domainData) {
     try {
-      const response = await apiClient.post('/domains', domainData);
+      const response = await apiClient.post('/api/domains', domainData);
       return response.data;
     } catch (error) {
       console.error('Error creating domain:', error);
@@ -59,7 +59,7 @@ class DomainAuthService {
    */
   async updateDomain(domainId, domainData) {
     try {
-      const response = await apiClient.put(`/domains/${domainId}`, domainData);
+      const response = await apiClient.put(`/api/domains/${domainId}`, domainData);
       return response.data;
     } catch (error) {
       console.error('Error updating domain:', error);
@@ -72,7 +72,7 @@ class DomainAuthService {
    */
   async deleteDomain(domainId) {
     try {
-      const response = await apiClient.delete(`/domains/${domainId}`);
+      const response = await apiClient.delete(`/api/domains/${domainId}`);
       return response.data;
     } catch (error) {
       console.error('Error deleting domain:', error);
@@ -89,7 +89,7 @@ class DomainAuthService {
         domain_name: '', // This will be ignored by the backend
         check_types: checkTypes
       };
-      const response = await apiClient.post(`/domains/${domainId}/check-auth`, requestData);
+      const response = await apiClient.post(`/api/domains/${domainId}/check-auth`, requestData);
       return response.data;
     } catch (error) {
       console.error('Error checking domain auth:', error);
@@ -102,7 +102,7 @@ class DomainAuthService {
    */
   async generateDkimKeys(domainId, selector = 'default') {
     try {
-      const response = await apiClient.post(`/domains/${domainId}/generate-dkim?selector=${selector}`);
+      const response = await apiClient.post(`/api/domains/${domainId}/generate-dkim?selector=${selector}`);
       return response.data;
     } catch (error) {
       console.error('Error generating DKIM keys:', error);
@@ -115,7 +115,7 @@ class DomainAuthService {
    */
   async getDomainConfiguration(domainId) {
     try {
-      const response = await apiClient.get(`/domains/${domainId}/configuration`);
+      const response = await apiClient.get(`/api/domains/${domainId}/configuration`);
       return response.data;
     } catch (error) {
       console.error('Error getting domain configuration:', error);
@@ -128,7 +128,7 @@ class DomainAuthService {
    */
   async getDomainAlerts(domainId) {
     try {
-      const response = await apiClient.get(`/domains/${domainId}/alerts`);
+      const response = await apiClient.get(`/api/domains/${domainId}/alerts`);
       return response.data;
     } catch (error) {
       console.error('Error fetching domain alerts:', error);
@@ -141,7 +141,7 @@ class DomainAuthService {
    */
   async resolveDomainAlert(domainId, alertId) {
     try {
-      const response = await apiClient.post(`/domains/${domainId}/alerts/${alertId}/resolve`);
+      const response = await apiClient.post(`/api/domains/${domainId}/alerts/${alertId}/resolve`);
       return response.data;
     } catch (error) {
       console.error('Error resolving domain alert:', error);
@@ -154,7 +154,7 @@ class DomainAuthService {
    */
   async checkDomainNow(domainId) {
     try {
-      const response = await apiClient.post(`/domains/${domainId}/check-now`);
+      const response = await apiClient.post(`/api/domains/${domainId}/check-now`);
       return response.data;
     } catch (error) {
       console.error('Error triggering domain check:', error);
@@ -167,7 +167,7 @@ class DomainAuthService {
    */
   async checkAllUserDomains() {
     try {
-      const response = await apiClient.post('/domains/check-all');
+      const response = await apiClient.post('/api/domains/check-all');
       return response.data;
     } catch (error) {
       console.error('Error checking all user domains:', error);
