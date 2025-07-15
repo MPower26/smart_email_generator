@@ -164,7 +164,10 @@ const AuthScreen = () => {
               <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem', alignSelf: 'flex-start' }}>
                 <img src="/logo00.png" alt="Logo" style={{ height: '56px', width: '56px', marginRight: '12px' }} />
               </div>
-              <h2 className="text-center mb-4" style={{ color: '#D8400D', fontFamily: 'Poppins, sans-serif', fontSize: '3.2rem', textAlign: 'center', width: '100%' }}>Automated Email Generator</h2>
+              <div style={{ width: '100%' }}>
+                <div className="hermes-title">HERMES</div>
+                <div className="hermes-subtitle">By Wesi.ltd</div>
+              </div>
               <div className="text-center mb-4 fade-in-opacity" style={{ color: '#555', fontSize: '0.97rem', fontFamily: 'Poppins, sans-serif', maxWidth: '90%', margin: '0 auto', lineHeight: 1.5, width: '100%' }}>
                 Harness AI to generate personalized, impactful emails tailored to each recipient. Effortlessly manage your contact lists, schedule and track follow-ups, and receive timely reminders for every stage of your outreach.
               </div>
