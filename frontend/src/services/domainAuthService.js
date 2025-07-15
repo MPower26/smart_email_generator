@@ -1,4 +1,31 @@
-import { apiClient } from './api';
+import axios from 'axios';
+
+// Configuration de l'API client
+let API_BASE_URL = (
+  process.env.REACT_APP_API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  'https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net'
+).replace(/^http:\/\//i, 'https://');
+
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  withCredentials: false,
+});
+
+// Intercepteur pour l'authentification
+apiClient.interceptors.request.use(
+  (config) => {
+    const email = localStorage.getItem('userEmail');
+    if (email) {
+      config.headers.Authorization = `Bearer ${email}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 class DomainAuthService {
   /**
