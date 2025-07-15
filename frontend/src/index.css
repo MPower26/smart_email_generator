@@ -1,11 +1,40 @@
+@font-face {
+  font-family: 'Syne';
+  src: url('/assets/fonts/Syne-ExtraBold.ttf') format('truetype');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 body {
   margin: 0;
   padding: 0;
-  font-family: 'Roboto', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Azeret Mono', monospace, 'Inter', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: #1a1a1a;
   color: #ffffff;
+}
+
+.hermes-title {
+  font-family: 'Syne', 'Azeret Mono', monospace, 'Inter', Arial, sans-serif;
+  font-weight: 800;
+  font-size: 3.2rem;
+  color: #D8400D;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: center;
+  margin-bottom: 0.2em;
+}
+
+.hermes-subtitle {
+  font-family: 'Azeret Mono', monospace, 'Inter', Arial, sans-serif;
+  font-size: 0.85rem;
+  color: #888;
+  letter-spacing: 0.08em;
+  text-align: center;
+  margin-top: -0.7em;
+  margin-bottom: 1.2em;
 }
 
 /* General styles */
