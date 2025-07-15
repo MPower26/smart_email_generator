@@ -48,11 +48,22 @@ const Navigation = () => {
             >
               Settings
             </Nav.Link>
+            <Nav.Link 
+              as={Link} 
+              to="/domains" 
+              className={location.pathname.includes('/domains') ? 'active' : ''}
+            >
+              Domains
+            </Nav.Link>
           </Nav>
         </Navbar.Collapse>
       </Container>
     </Navbar>
   );
+};
+
+export default Navigation; 
+
 };
 
 export default Navigation; 
