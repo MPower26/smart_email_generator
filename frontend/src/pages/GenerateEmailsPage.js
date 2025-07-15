@@ -858,7 +858,7 @@ const GenerateEmailsPage = () => {
                             setIsGenerating(false);
                             setGenerationProgress(null);
                           } catch (err) {
-                            alert('Erreur lors de l\'annulation : ' + (err?.response?.data?.detail || err.message));
+                            alert('Error during cancellation: ' + (err?.response?.data?.detail || err.message));
                           }
                         }}
                       >
@@ -870,9 +870,9 @@ const GenerateEmailsPage = () => {
 
                 {/* Anti-spam warning before generation */}
                 {antiSpamWarnings.length > 0 && (
-                  <Alert variant="warning" className="mt-3">
-                    <Alert.Heading>⚠️ Attention Anti-Spam</Alert.Heading>
-                    <p>Avant de générer des emails, veuillez noter les avertissements suivants :</p>
+                  <Alert variant="warning" className="mb-4">
+                    <Alert.Heading>⚠️ Anti-Spam Warning</Alert.Heading>
+                    <p>Before generating emails, please note the following warnings:</p>
                     <ul>
                       {antiSpamWarnings.map((warning, index) => (
                         <li key={index}>{warning}</li>
