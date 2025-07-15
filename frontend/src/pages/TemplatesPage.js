@@ -39,7 +39,7 @@ const TemplatesPage = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('outreach');
   
-  // Variables pour l'aperçu des placeholders
+  // Variables for placeholder preview
   const [activeTab, setActiveTab] = useState('editor');
   const placeholderData = {
     'Recipient Name': 'John Smith',
@@ -87,7 +87,7 @@ const TemplatesPage = () => {
 
   const thumbnailInputRefs = useRef({});
 
-  // Charger les templates au chargement de la page
+  // Load templates when page loads
   useEffect(() => {
     loadTemplates();
     loadSignature();
@@ -119,12 +119,10 @@ const TemplatesPage = () => {
     }
   };
 
-  // Fonction pour charger les templates
+  // Function to load templates
   const loadTemplates = async () => {
-    setLoading(true);
-    setError('');
-    
     try {
+      setLoading(true);
       const response = await templateService.getTemplatesByCategory();
       setTemplatesByCategory(response.data);
     } catch (err) {
@@ -135,7 +133,7 @@ const TemplatesPage = () => {
     }
   };
 
-  // Ouvrir le modal de création de template
+  // Open the template creation modal
   const handleNewTemplate = (category) => {
     setSelectedCategory(category);
     setCurrentTemplate({
@@ -150,7 +148,7 @@ const TemplatesPage = () => {
     setActiveTab('editor');
   };
 
-  // Ouvrir le modal d'édition avec un template existant
+  // Open the edit modal with an existing template
   const handleEditTemplate = (template) => {
     setCurrentTemplate({
       id: template.id,
@@ -165,7 +163,7 @@ const TemplatesPage = () => {
     setActiveTab('editor');
   };
 
-  // Mettre à jour les champs du formulaire
+  // Update form fields
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
     setCurrentTemplate({
@@ -183,7 +181,7 @@ const TemplatesPage = () => {
     });
   };
 
-  // Sauvegarder un template (création ou modification)
+  // Save a template (creation or modification)
   const handleSaveTemplate = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -193,16 +191,16 @@ const TemplatesPage = () => {
       let response;
       
       if (isEditing) {
-        // Mettre à jour un template existant
+        // Update an existing template
         response = await templateService.updateTemplate(currentTemplate.id, currentTemplate);
         setSuccess('Template updated successfully!');
       } else {
-        // Créer un nouveau template
+        // Create a new template
         response = await templateService.createTemplate(currentTemplate);
         setSuccess('New template created successfully!');
       }
       
-      // Recharger la liste des templates
+      // Reload template list
       await loadTemplates();
       setShowModal(false);
     } catch (err) {
@@ -213,7 +211,7 @@ const TemplatesPage = () => {
     }
   };
 
-  // Supprimer un template
+  // Delete a template
   const handleDeleteTemplate = async (id) => {
     if (!window.confirm('Are you sure you want to delete this template?')) return;
     
@@ -223,7 +221,7 @@ const TemplatesPage = () => {
     try {
       await templateService.deleteTemplate(id);
       setSuccess('Template deleted successfully!');
-      // Recharger la liste des templates
+      // Reload template list
       await loadTemplates();
     } catch (err) {
       setError('Failed to delete template. Please try again.');
@@ -250,13 +248,13 @@ const TemplatesPage = () => {
     }
   };
 
-  // Fonction pour afficher l'aperçu avec les placeholders remplacés
+  // Function to display the preview with placeholders replaced
   const getPreviewContent = (content) => {
     if (!content) return '';
     
     let preview = content;
     
-    // Remplacer les placeholders par les valeurs d'exemple
+    // Replace placeholders with example values
     Object.entries(placeholderData).forEach(([key, value]) => {
       const regex = new RegExp(`\\[${key}\\]`, 'gi');
       preview = preview.replace(regex, value);
@@ -389,15 +387,15 @@ const TemplatesPage = () => {
     try {
       // Upload attachment (image or video)
       const res = await uploadAttachmentFile(attachmentFile, attachmentPlaceholder, attachmentCategory);
-      // Si c'est une vidéo et qu'un thumbnail est sélectionné, upload du thumbnail
+      // If it's a video and a thumbnail is selected, upload the thumbnail
       if (res && res.data && attachmentFile.type.startsWith('video') && attachmentThumbnail) {
         const attachmentId = res.data.id;
         if (attachmentId) {
-          // 1. Demander un token JWT temporaire pour l'upload du thumbnail
+          // 1. Request a temporary JWT for thumbnail upload
           const tokenRes = await fetch(`${API_BASE_URL}/api/templates/attachments/${attachmentId}/thumbnail-token`, {
             method: 'POST',
             headers: {
-              Authorization: `Bearer ${localStorage.getItem('userEmail')}` // Authentification classique (email)
+              Authorization: `Bearer ${localStorage.getItem('userEmail')}` // Classic authentication (email)
             }
           });
           console.log('thumbnail-token response status:', tokenRes.status);
@@ -418,7 +416,7 @@ const TemplatesPage = () => {
             setAttachmentError('Upload token is null.');
             return;
           }
-          // 2. Uploader le thumbnail avec ce token JWT
+          // 2. Upload the thumbnail with this JWT
           const formData = new FormData();
           formData.append('thumbnail', attachmentThumbnail);
           const uploadRes = await fetch(`${API_BASE_URL}/api/templates/attachments/${attachmentId}/thumbnail`, {
@@ -891,7 +889,7 @@ Your signature text here..."
         </Accordion.Item>
       </Accordion>
       
-      {/* Modal pour créer/éditer un template */}
+      {/* Modal for creating/editing a template */}
       <Modal 
         show={showModal} 
         onHide={() => setShowModal(false)}
