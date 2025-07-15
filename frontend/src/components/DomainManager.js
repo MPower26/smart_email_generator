@@ -10,6 +10,7 @@ const DomainManager = () => {
   const [newDomain, setNewDomain] = useState({ domain_name: '', is_primary: false });
   const [selectedDomain, setSelectedDomain] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   useEffect(() => {
     loadDomains();
@@ -85,6 +86,51 @@ const DomainManager = () => {
     }
   };
 
+  const HelpSection = () => (
+    <div className="help-section">
+      <div className="help-header">
+        <h3>🔍 What is Domain Authentication?</h3>
+        <button onClick={() => setShowHelp(false)} className="close-btn">&times;</button>
+      </div>
+      
+      <div className="help-content">
+        <div className="help-card">
+          <h4>🛡️ SPF (Sender Policy Framework)</h4>
+          <p>Prevents email spoofing by specifying which servers can send emails from your domain.</p>
+          <div className="example">
+            <strong>Example:</strong> <code>v=spf1 include:_spf.google.com ~all</code>
+          </div>
+        </div>
+
+        <div className="help-card">
+          <h4>🔐 DKIM (DomainKeys Identified Mail)</h4>
+          <p>Digitally signs your emails to prove they came from your domain and weren't altered.</p>
+          <div className="example">
+            <strong>Example:</strong> <code>v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC...</code>
+          </div>
+        </div>
+
+        <div className="help-card">
+          <h4>📊 DMARC (Domain-based Message Authentication)</h4>
+          <p>Tells receiving servers what to do with emails that fail SPF or DKIM checks.</p>
+          <div className="example">
+            <strong>Example:</strong> <code>v=DMARC1; p=quarantine; rua=mailto:dmarc@yourdomain.com</code>
+          </div>
+        </div>
+
+        <div className="help-benefits">
+          <h4>🎯 Benefits of Proper Authentication:</h4>
+          <ul>
+            <li>✅ Higher email deliverability</li>
+            <li>✅ Protection against phishing attacks</li>
+            <li>✅ Better sender reputation</li>
+            <li>✅ Reduced spam filtering</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+
   const DomainCard = ({ domain }) => {
     const statusSummary = domainAuthService.getDomainStatusSummary(domain);
     const statusIcon = domainAuthService.getDomainStatusIcon(statusSummary.status);
@@ -95,55 +141,69 @@ const DomainManager = () => {
         <div className="domain-header">
           <div className="domain-info">
             <h3>{domain.domain_name}</h3>
-            <span className={`status-badge ${statusSummary.status}`}>
-              {statusIcon.icon} {statusIcon.text}
-            </span>
-            {domain.is_primary && <span className="primary-badge">Primary</span>}
+            <div className="status-indicators">
+              <span className={`status-badge ${statusSummary.status}`}>
+                {statusIcon.icon} {statusIcon.text}
+              </span>
+              {domain.is_primary && <span className="primary-badge">⭐ Primary</span>}
+            </div>
           </div>
           <div className="domain-actions">
             <button 
               onClick={() => handleCheckAuth(domain.id)}
               disabled={checkingAuth}
               className="btn btn-secondary"
+              title="Check current authentication status"
             >
-              {checkingAuth ? 'Checking...' : 'Check Auth'}
+              🔄 {checkingAuth ? 'Checking...' : 'Check Now'}
             </button>
             <button 
               onClick={() => handleGenerateDkim(domain.id)}
               className="btn btn-secondary"
+              title="Generate new DKIM keys"
             >
-              Generate DKIM
+              🔑 Generate DKIM
             </button>
             <button 
               onClick={() => setSelectedDomain(domain)}
               className="btn btn-primary"
+              title="View detailed information"
             >
-              View Details
+              📋 Details
             </button>
             <button 
               onClick={() => handleDeleteDomain(domain.id)}
               className="btn btn-danger"
+              title="Remove domain"
             >
-              Delete
+              🗑️ Delete
             </button>
           </div>
         </div>
 
         <div className="domain-status">
           <div className="status-summary">
-            <span>Authentication: {statusSummary.validChecks}/{statusSummary.totalChecks} passed</span>
-            <div className="progress-bar">
-              <div 
-                className="progress-fill" 
-                style={{ width: `${statusSummary.completionPercentage}%` }}
-              ></div>
+            <div className="status-text">
+              <span className="status-label">Authentication Status:</span>
+              <span className="status-value">
+                {statusSummary.validChecks} of {statusSummary.totalChecks} checks passed
+              </span>
+            </div>
+            <div className="progress-container">
+              <div className="progress-bar">
+                <div 
+                  className={`progress-fill ${statusSummary.status}`}
+                  style={{ width: `${statusSummary.completionPercentage}%` }}
+                ></div>
+              </div>
+              <span className="progress-text">{Math.round(statusSummary.completionPercentage)}%</span>
             </div>
           </div>
           
           {statusSummary.unresolvedAlerts > 0 && (
             <div className="alerts-summary">
               <span className="alert-count">
-                ⚠️ {statusSummary.unresolvedAlerts} unresolved alerts
+                ⚠️ {statusSummary.unresolvedAlerts} issue{statusSummary.unresolvedAlerts > 1 ? 's' : ''} detected
               </span>
             </div>
           )}
@@ -151,14 +211,23 @@ const DomainManager = () => {
 
         {recommendations.length > 0 && (
           <div className="recommendations">
-            <h4>Recommendations:</h4>
-            <ul>
+            <h4>💡 Recommendations:</h4>
+            <div className="recommendations-grid">
               {recommendations.map((rec, index) => (
-                <li key={index} className={`priority-${rec.priority}`}>
-                  <strong>{rec.type}:</strong> {rec.message}
-                </li>
+                <div key={index} className={`recommendation-item priority-${rec.priority}`}>
+                  <div className="recommendation-header">
+                    <span className="recommendation-type">{rec.type}</span>
+                    <span className={`priority-badge ${rec.priority}`}>
+                      {rec.priority === 'high' ? '🔴' : rec.priority === 'medium' ? '🟡' : '🟢'} {rec.priority}
+                    </span>
+                  </div>
+                  <p className="recommendation-message">{rec.message}</p>
+                  <div className="recommendation-action">
+                    <strong>Action:</strong> {rec.action}
+                  </div>
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
         )}
       </div>
@@ -203,7 +272,7 @@ const DomainManager = () => {
       return (
         <div className="modal-overlay">
           <div className="modal-content">
-            <div className="loading">Loading domain details...</div>
+            <div className="loading">🔄 Loading domain details...</div>
           </div>
         </div>
       );
@@ -213,32 +282,38 @@ const DomainManager = () => {
       <div className="modal-overlay" onClick={onClose}>
         <div className="modal-content" onClick={e => e.stopPropagation()}>
           <div className="modal-header">
-            <h2>Domain Details: {domain.domain_name}</h2>
+            <h2>📋 Domain Details: {domain.domain_name}</h2>
             <button onClick={onClose} className="close-btn">&times;</button>
           </div>
 
           <div className="modal-body">
             <div className="dns-records">
-              <h3>DNS Records</h3>
+              <h3>🌐 DNS Records</h3>
               
               <div className="record-section">
-                <h4>SPF Record</h4>
+                <h4>🛡️ SPF Record</h4>
+                <div className="record-description">
+                  Prevents email spoofing by specifying authorized sending servers.
+                </div>
                 <div className="record-value">
                   {configuration?.spf_record ? (
                     <code>{domainAuthService.formatDnsRecord(configuration.spf_record, 'SPF')}</code>
                   ) : (
-                    <span className="not-configured">Not configured</span>
+                    <span className="not-configured">❌ Not configured</span>
                   )}
                 </div>
               </div>
 
               <div className="record-section">
-                <h4>DKIM Record</h4>
+                <h4>🔐 DKIM Record</h4>
+                <div className="record-description">
+                  Digitally signs emails to prove authenticity and prevent tampering.
+                </div>
                 <div className="record-value">
                   {configuration?.dkim_record ? (
                     <code>{domainAuthService.formatDnsRecord(configuration.dkim_record, 'DKIM')}</code>
                   ) : (
-                    <span className="not-configured">Not configured</span>
+                    <span className="not-configured">❌ Not configured</span>
                   )}
                 </div>
                 {domain.dkim_selector && (
@@ -249,12 +324,15 @@ const DomainManager = () => {
               </div>
 
               <div className="record-section">
-                <h4>DMARC Record</h4>
+                <h4>📊 DMARC Record</h4>
+                <div className="record-description">
+                  Defines policy for handling emails that fail authentication checks.
+                </div>
                 <div className="record-value">
                   {configuration?.dmarc_record ? (
                     <code>{domainAuthService.formatDnsRecord(configuration.dmarc_record, 'DMARC')}</code>
                   ) : (
-                    <span className="not-configured">Not configured</span>
+                    <span className="not-configured">❌ Not configured</span>
                   )}
                 </div>
               </div>
@@ -262,24 +340,27 @@ const DomainManager = () => {
 
             {configuration?.recommendations?.length > 0 && (
               <div className="recommendations-section">
-                <h3>Recommendations</h3>
-                <ul>
+                <h3>💡 Recommendations</h3>
+                <div className="recommendations-list">
                   {configuration.recommendations.map((rec, index) => (
-                    <li key={index}>{rec}</li>
+                    <div key={index} className="recommendation-item">
+                      <span className="recommendation-icon">💡</span>
+                      <span className="recommendation-text">{rec}</span>
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
             )}
 
             {alerts.length > 0 && (
               <div className="alerts-section">
-                <h3>Alerts</h3>
+                <h3>⚠️ Alerts</h3>
                 <div className="alerts-list">
                   {alerts.map(alert => (
                     <div key={alert.id} className={`alert-item ${alert.level}`}>
                       <div className="alert-header">
                         <span className={`alert-level ${alert.level}`}>
-                          {alert.level.toUpperCase()}
+                          {alert.level === 'error' ? '🔴' : alert.level === 'warning' ? '🟡' : '🟢'} {alert.level.toUpperCase()}
                         </span>
                         <span className="alert-date">
                           {new Date(alert.created_at).toLocaleDateString()}
@@ -291,7 +372,7 @@ const DomainManager = () => {
                           onClick={() => handleResolveAlert(alert.id)}
                           className="btn btn-small"
                         >
-                          Mark as Resolved
+                          ✅ Mark as Resolved
                         </button>
                       )}
                     </div>
@@ -306,41 +387,61 @@ const DomainManager = () => {
   };
 
   if (loading && domains.length === 0) {
-    return <div className="loading">Loading domains...</div>;
+    return (
+      <div className="loading-container">
+        <div className="loading-spinner"></div>
+        <p>🔄 Loading your domains...</p>
+      </div>
+    );
   }
 
   return (
     <div className="domain-manager">
       <div className="domain-manager-header">
-        <h1>Domain Authentication</h1>
+        <div className="header-content">
+          <h1>🌐 Domain Authentication</h1>
+          <p className="header-description">
+            Monitor and improve your email deliverability with SPF, DKIM, and DMARC authentication
+          </p>
+        </div>
         <div className="header-actions">
+          <button 
+            onClick={() => setShowHelp(true)}
+            className="btn btn-help"
+            title="Learn about domain authentication"
+          >
+            ❓ Help
+          </button>
           <button 
             onClick={() => setShowAddDomain(true)}
             className="btn btn-primary"
           >
-            Add Domain
+            ➕ Add Domain
           </button>
           <button 
             onClick={() => domainAuthService.checkAllUserDomains()}
             className="btn btn-secondary"
           >
-            Check All Domains
+            🔄 Check All
           </button>
         </div>
       </div>
 
       {error && (
         <div className="error-message">
-          {error}
-          <button onClick={() => setError(null)}>&times;</button>
+          <span className="error-icon">❌</span>
+          <span className="error-text">{error}</span>
+          <button onClick={() => setError(null)} className="error-close">&times;</button>
         </div>
       )}
+
+      {showHelp && <HelpSection />}
 
       {showAddDomain && (
         <div className="modal-overlay" onClick={() => setShowAddDomain(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Add New Domain</h2>
+              <h2>➕ Add New Domain</h2>
               <button onClick={() => setShowAddDomain(false)} className="close-btn">&times;</button>
             </div>
             <form onSubmit={handleAddDomain} className="add-domain-form">
@@ -354,20 +455,23 @@ const DomainManager = () => {
                   placeholder="example.com"
                   required
                 />
+                <small>Enter your domain without http:// or www</small>
               </div>
               <div className="form-group">
-                <label>
+                <label className="checkbox-label">
                   <input
                     type="checkbox"
                     checked={newDomain.is_primary}
                     onChange={(e) => setNewDomain({...newDomain, is_primary: e.target.checked})}
                   />
+                  <span className="checkmark"></span>
                   Set as primary domain
                 </label>
+                <small>Primary domains are used as the default sender for emails</small>
               </div>
               <div className="form-actions">
                 <button type="submit" className="btn btn-primary" disabled={loading}>
-                  {loading ? 'Adding...' : 'Add Domain'}
+                  {loading ? '🔄 Adding...' : '➕ Add Domain'}
                 </button>
                 <button 
                   type="button" 
@@ -392,8 +496,15 @@ const DomainManager = () => {
       <div className="domains-list">
         {domains.length === 0 ? (
           <div className="empty-state">
-            <p>No domains configured yet.</p>
-            <p>Add your first domain to start monitoring email authentication.</p>
+            <div className="empty-icon">🌐</div>
+            <h3>No domains configured yet</h3>
+            <p>Add your first domain to start monitoring email authentication and improve deliverability.</p>
+            <button 
+              onClick={() => setShowAddDomain(true)}
+              className="btn btn-primary"
+            >
+              ➕ Add Your First Domain
+            </button>
           </div>
         ) : (
           domains.map(domain => (
