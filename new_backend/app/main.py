@@ -16,6 +16,7 @@ from app.api.endpoints import emails, friends, auth_gmail, user_settings, templa
 from app.api import auth
 from app.db.database import engine, get_db
 from app.models.models import Base
+from app.models import Domain, DomainAuthCheck, DomainAlert
 from app.routers import users
 from app.services.followup_tasks import check_and_notify_followups
 from app.websocket_manager import manager
