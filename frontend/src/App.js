@@ -36,7 +36,7 @@ const ProtectedRoutes = () => {
   if (isMobileDevice()) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fff', color: '#D8400D', fontSize: '1.5rem', fontWeight: 600, textAlign: 'center', padding: '2rem' }}>
-        <img src="/logo02.png" alt="Wesi Logo" style={{ height: 80, width: 80, marginBottom: 24 }} />
+        <img src="/hermesslogo.svg" alt="Hermes Logo" className="hermes-logo-animated" style={{ height: 80, width: 80, marginBottom: 24 }} />
         <div>This app is only available on desktop devices.<br />Please access it from a computer.</div>
       </div>
     );
@@ -66,7 +66,7 @@ function App() {
       <Router>
         <div className="App d-flex flex-column min-vh-100">
           {/* Background logo for all pages */}
-          <img src="/logo01.png" alt="Background Logo" className="background-logo" />
+          <img src="/hermesslogo.svg" alt="Background Logo" className="background-logo" />
           <Routes>
             <Route path="/dev-preview" element={<DevPreviewPage />} />
             <Route path="/gmail/success" element={<GmailSuccess />} />
@@ -81,4 +81,3 @@ function App() {
 }
 
 export default App; 
-
