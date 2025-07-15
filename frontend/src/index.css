@@ -1,6 +1,6 @@
 @font-face {
   font-family: 'Syne';
-  src: url('syne-extra-bold.ttf') format('truetype');
+  src: url('./syne-extra-bold.ttf') format('truetype');
   font-weight: 800;
   font-style: normal;
   font-display: swap;
