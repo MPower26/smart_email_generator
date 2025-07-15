@@ -1,4 +1,4 @@
-import dns.resolver
+              import dns.resolver
 import dns.exception
 import re
 import json
@@ -393,15 +393,28 @@ class DomainAuthService:
             # Try common DKIM selectors
             common_selectors = ["default", "google", "selector1", "selector2", "k1", "k2"]
             dkim_result = None
+            found_selector = None
             
             for selector in common_selectors:
                 dkim_result = self.check_dkim(domain, selector)
                 if dkim_result['record_found']:
+                    found_selector = selector
                     break
             
-            # If no DKIM record found with any selector, use the last result
-            if not dkim_result:
-                dkim_result = self.check_dkim(domain, "default")
+            # If no DKIM record found with any selector, create a clean result
+            if not dkim_result or not dkim_result['record_found']:
+                dkim_result = {
+                    'record_found': False,
+                    'is_valid': False,
+                    'check_data': {
+                        'error': 'No DKIM record found for any common selector',
+                        'recommendation': f'Add DKIM record for default._domainkey.{domain}',
+                        'tried_selectors': common_selectors
+                    }
+                }
+            else:
+                # Add the found selector to the result
+                dkim_result['check_data']['found_selector'] = found_selector
             
             results['checks']['DKIM'] = dkim_result
             if not dkim_result['is_valid']:
