@@ -115,8 +115,20 @@ class DomainAuthService:
                 }
             }
             
+        except dns.resolver.NXDOMAIN:
+            # Domain doesn't exist - this is expected for many DKIM selectors
+            return {
+                'record_found': False,
+                'is_valid': False,
+                'check_data': {
+                    'error': f'No DKIM record found for selector {selector}',
+                    'recommendation': f'Add DKIM record for {dkim_domain}'
+                }
+            }
         except dns.exception.DNSException as e:
-            logger.error(f"DNS error checking DKIM for {domain}: {e}")
+            # Only log as error if it's not a "domain not found" type error
+            if "does not exist" not in str(e) and "NXDOMAIN" not in str(e):
+                logger.error(f"DNS error checking DKIM for {domain}: {e}")
             return {
                 'record_found': False,
                 'is_valid': False,
@@ -378,7 +390,19 @@ class DomainAuthService:
                 })
         
         if CheckType.DKIM in check_types:
-            dkim_result = self.check_dkim(domain)
+            # Try common DKIM selectors
+            common_selectors = ["default", "google", "selector1", "selector2", "k1", "k2"]
+            dkim_result = None
+            
+            for selector in common_selectors:
+                dkim_result = self.check_dkim(domain, selector)
+                if dkim_result['record_found']:
+                    break
+            
+            # If no DKIM record found with any selector, use the last result
+            if not dkim_result:
+                dkim_result = self.check_dkim(domain, "default")
+            
             results['checks']['DKIM'] = dkim_result
             if not dkim_result['is_valid']:
                 results['alerts'].append({
