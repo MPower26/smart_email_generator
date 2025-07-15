@@ -15,6 +15,10 @@ import DevPreviewPage from './pages/DevPreviewPage';
 import Footer from './components/Footer';
 import './App.css';
 
+function isMobileDevice() {
+  return /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
 // Composant de routes protégées
 const ProtectedRoutes = () => {
   const { authenticated, loading } = useUser();
@@ -27,6 +31,15 @@ const ProtectedRoutes = () => {
   // If user is not authenticated, redirect to home page
   if (!authenticated) {
     return <AuthScreen />;
+  }
+
+  if (isMobileDevice()) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fff', color: '#D8400D', fontSize: '1.5rem', fontWeight: 600, textAlign: 'center', padding: '2rem' }}>
+        <img src="/logo02.png" alt="Wesi Logo" style={{ height: 80, width: 80, marginBottom: 24 }} />
+        <div>This app is only available on desktop devices.<br />Please access it from a computer.</div>
+      </div>
+    );
   }
   
   // Sinon, on affiche les routes protégées
@@ -68,3 +81,4 @@ function App() {
 }
 
 export default App; 
+
