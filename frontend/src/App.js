@@ -18,12 +18,12 @@ import './App.css';
 const ProtectedRoutes = () => {
   const { authenticated, loading } = useUser();
   
-  // Si le chargement est en cours, on n'affiche rien
+  // If loading is in progress, don't display anything
   if (loading) {
-    return <div className="text-center p-5">Chargement...</div>;
+    return <div className="text-center p-5">Loading...</div>;
   }
   
-  // Si l'utilisateur n'est pas authentifié, on le redirige vers la page d'accueil
+  // If user is not authenticated, redirect to home page
   if (!authenticated) {
     return <AuthScreen />;
   }
@@ -66,4 +66,3 @@ function App() {
 }
 
 export default App; 
-
