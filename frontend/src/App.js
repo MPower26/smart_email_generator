@@ -14,6 +14,7 @@ import GmailSuccess from './pages/GmailSuccess';
 import DevPreviewPage from './pages/DevPreviewPage';
 import Footer from './components/Footer';
 import './App.css';
+import DomainManager from './components/DomainManager';
 
 function isMobileDevice() {
   return /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -71,6 +72,7 @@ function App() {
             <Route path="/dev-preview" element={<DevPreviewPage />} />
             <Route path="/gmail/success" element={<GmailSuccess />} />
             <Route path="/watch" element={<WatchPage />} />
+            <Route path="/domains" element={<DomainManager />} />
             <Route path="/*" element={<ProtectedRoutes />} />
           </Routes>
           <Footer />
