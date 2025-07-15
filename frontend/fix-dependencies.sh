@@ -1,34 +1,24 @@
 #!/bin/bash
 
-echo "🔧 Correction des dépendances et vulnérabilités npm..."
-
-# Nettoyer le cache npm
-echo "📦 Nettoyage du cache npm..."
-npm cache clean --force
+echo "🧹 Nettoyage des dépendances..."
 
 # Supprimer node_modules et package-lock.json
-echo "🗑️ Suppression des modules existants..."
-rm -rf node_modules package-lock.json
+rm -rf node_modules
+rm -f package-lock.json
 
-# Installer les dépendances avec audit fix
-echo "📥 Installation des dépendances..."
+# Installer les nouvelles dépendances Babel
+npm install --save-dev @babel/plugin-transform-private-methods@^7.23.3
+npm install --save-dev @babel/plugin-transform-optional-chaining@^7.23.4
+npm install --save-dev @babel/plugin-transform-nullish-coalescing-operator@^7.23.4
+npm install --save-dev @babel/plugin-transform-numeric-separator@^7.23.4
+npm install --save-dev @babel/plugin-transform-class-properties@^7.23.3
+npm install --save-dev @babel/plugin-transform-private-property-in-object@^7.23.4
+
+# Installer toutes les dépendances
 npm install
 
 # Corriger les vulnérabilités automatiquement
-echo "🔒 Correction des vulnérabilités..."
 npm audit fix
 
-# Si il reste des vulnérabilités, essayer avec --force
-echo "🔒 Correction forcée des vulnérabilités restantes..."
-npm audit fix --force
-
-# Vérifier le build
-echo "🏗️ Test du build..."
-npm run build
-
-echo "✅ Correction terminée!"
-echo "📋 Résumé des actions :"
-echo "  - Cache npm nettoyé"
-echo "  - Modules réinstallés"
-echo "  - Vulnérabilités corrigées"
-echo "  - Build testé" 
+echo "✅ Dépendances nettoyées et mises à jour !"
+echo "🚀 Vous pouvez maintenant faire: npm run build" 
