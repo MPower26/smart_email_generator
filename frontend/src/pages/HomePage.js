@@ -12,7 +12,10 @@ const HomePage = () => {
       {/* Hero Section */}
       <Row className="mb-5 text-center section-bg fade-in-up">
         <Col>
-          <h1 className="display-4 mb-4 section-title fade-in-up">Personalized Email Generator</h1>
+          <div style={{ marginBottom: '2rem' }}>
+            <div className="hermes-title">HERMES</div>
+            <div className="hermes-subtitle">By Wesi.ltd</div>
+          </div>
           <p className="lead mb-4 fade-in-scale">
             Generate targeted, personalized emails for your prospects using AI and customizable templates.
             Save time and increase engagement with professionally crafted messages.
