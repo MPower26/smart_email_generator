@@ -25,7 +25,7 @@ class DomainAuthCheckData(BaseModel):
     check_type: CheckType
     record_found: bool
     is_valid: bool
-    last_checked: datetime
+    last_checked: Optional[datetime] = None
     next_check: Optional[datetime] = None
     check_data: Optional[Dict[str, Any]] = None
 
@@ -34,7 +34,7 @@ class DomainAlertData(BaseModel):
     level: AlertLevel
     message: str
     is_resolved: bool = False
-    created_at: datetime
+    created_at: Optional[datetime] = None
     resolved_at: Optional[datetime] = None
 
 class DomainBase(BaseModel):
@@ -71,7 +71,7 @@ class DomainResponse(DomainBase):
     dkim_selector: Optional[str] = None
     dkim_public_key: Optional[str] = None
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
     auth_checks: List[DomainAuthCheckData] = []
     alerts: List[DomainAlertData] = []
 
