@@ -10,7 +10,7 @@ const Navigation = () => {
       <Container>
         <Navbar.Brand>
           <a href="https://wesi.ltd/" target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', color: 'inherit' }}>
-            <img src="/logo02.png" alt="Logo" style={{ height: '50px', width: '50px', marginRight: '10px', verticalAlign: 'middle' }} />
+            <img src="/hermesslogo.svg" alt="Hermes Logo" className="hermes-logo-animated" style={{ height: '50px', width: '50px', marginRight: '10px', verticalAlign: 'middle' }} />
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
               <span className="hermes-title-compact">HERMES</span>
               <span className="hermes-subtitle-compact">By Wesi.ltd</span>
