@@ -11,7 +11,10 @@ const Navigation = () => {
         <Navbar.Brand>
           <a href="https://wesi.ltd/" target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', color: 'inherit' }}>
             <img src="/logo02.png" alt="Logo" style={{ height: '40px', width: '40px', marginRight: '10px', verticalAlign: 'middle' }} />
-            Automated Email Generator
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+              <span className="hermes-title">HERMES</span>
+              <span className="hermes-subtitle">By Wesi.ltd</span>
+            </div>
           </a>
         </Navbar.Brand>
         <Navbar.Toggle aria-controls="basic-navbar-nav" />
