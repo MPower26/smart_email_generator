@@ -90,6 +90,9 @@ class User(Base):
     email_daily_limits = relationship("EmailDailyLimit", back_populates="user")
     sender_reputation = relationship("SenderReputation", back_populates="user", uselist=False)
     email_send_logs = relationship("EmailSendLog", back_populates="user")
+    
+    # Domain authentication relationships
+    domains = relationship("Domain", back_populates="user", cascade="all, delete-orphan")
 
 class VerificationCode(Base):
     __tablename__ = "verification_codes"

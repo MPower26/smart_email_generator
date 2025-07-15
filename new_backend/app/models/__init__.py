@@ -7,4 +7,7 @@ from .models import (
 from .anti_spam_models import (
     EmailDailyLimit, SenderReputation, AuthorizedDomain, 
     EmailSendLog, EmailLimitRule
+)
+from .domain_auth_models import (
+    Domain, DomainAuthCheck, DomainAlert
 ) 
