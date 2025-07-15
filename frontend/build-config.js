@@ -1,23 +1,20 @@
-// Configuration pour optimiser le build et éviter les erreurs
+// Configuration pour le build de production
 module.exports = {
-  // Ignorer les avertissements Babel
+  // Désactiver la génération de source maps
+  generateSourceMap: false,
+  
+  // Ignorer les avertissements ESLint
   ignoreWarnings: [
-    /Failed to parse source map/,
-    /@babel\/plugin-proposal-class-properties/,
-    /@babel\/plugin-proposal-numeric-separator/,
+    /eslint/,
+    /@humanwhocodes/,
+    /@babel\/plugin-proposal/,
   ],
   
-  // Configuration pour le build de production
-  webpack: {
-    configure: (webpackConfig) => {
-      // Ignorer les avertissements de source map
-      webpackConfig.ignoreWarnings = [
-        /Failed to parse source map/,
-        /@babel\/plugin-proposal-class-properties/,
-        /@babel\/plugin-proposal-numeric-separator/,
-      ];
-      
-      return webpackConfig;
+  // Configuration pour optimiser le build
+  optimization: {
+    minimize: true,
+    splitChunks: {
+      chunks: 'all',
     },
   },
 }; 
