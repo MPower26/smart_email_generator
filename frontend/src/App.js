@@ -12,6 +12,7 @@ import AuthScreen from './components/AuthScreen';
 import { UserProvider, useUser } from './contexts/UserContext';
 import GmailSuccess from './pages/GmailSuccess';
 import DevPreviewPage from './pages/DevPreviewPage';
+import Footer from './components/Footer';
 import './App.css';
 
 // Composant de routes protégées
@@ -59,6 +60,7 @@ function App() {
             <Route path="/watch" element={<WatchPage />} />
             <Route path="/*" element={<ProtectedRoutes />} />
           </Routes>
+          <Footer />
         </div>
       </Router>
     </UserProvider>
