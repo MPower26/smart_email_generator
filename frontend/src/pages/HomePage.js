@@ -8,11 +8,11 @@ const HomePage = () => {
   };
 
   return (
-    <Container>
+    <Container style={{ marginTop: '2rem' }}>
       {/* Hero Section */}
-      <Row className="mb-5 text-center section-bg fade-in-up">
+      <Row className="mb-5 text-center section-bg fade-in-up" style={{ marginTop: '1rem' }}>
         <Col>
-          <div style={{ marginBottom: '2rem' }}>
+          <div style={{ marginBottom: '3rem' }}>
             <div className="hermes-title">HERMES</div>
             <div className="hermes-subtitle">By Wesi.ltd</div>
           </div>
