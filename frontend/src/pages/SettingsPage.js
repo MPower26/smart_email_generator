@@ -2,6 +2,8 @@ import React, { useState, useContext, useEffect } from 'react';
 import { Container, Row, Col, Form, Button, Card, Alert, Spinner } from 'react-bootstrap';
 import { emailService } from '../services/api';
 import { UserContext } from '../contexts/UserContext';
+import { useNavigate } from 'react-router-dom';
+import Modal from 'react-bootstrap/Modal';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://smart-email-backend-d8dcejbqe5h9bdcq.westeurope-01.azurewebsites.net';
 
@@ -21,6 +23,11 @@ const SettingsPage = () => {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [gmailConnected, setGmailConnected] = useState(false);
   const [gmailLoading, setGmailLoading] = useState(false);
+  const navigate = useNavigate();
+  const [showGmailPopup, setShowGmailPopup] = useState(() => {
+    return !sessionStorage.getItem('hermes_gmail_popup_shown');
+  });
+  const [pendingGmailConnect, setPendingGmailConnect] = useState(false);
 
   // Charger le profil utilisateur au démarrage
   useEffect(() => {
@@ -112,6 +119,11 @@ const SettingsPage = () => {
 
   // Gmail connection handler
   const handleConnectGmail = async () => {
+    if (!sessionStorage.getItem('hermes_gmail_popup_shown')) {
+      setShowGmailPopup(true);
+      setPendingGmailConnect(true);
+      return;
+    }
     setGmailLoading(true);
     try {
       const res = await fetch(`${BACKEND_URL}/api/gmail/auth/start?email=${encodeURIComponent(userProfile.email)}`);
@@ -370,6 +382,31 @@ const SettingsPage = () => {
           </Card.Body>
         </Card>
       </div>
+
+      <Modal show={showGmailPopup} onHide={() => setShowGmailPopup(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Before you connect Gmail</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p>
+            <strong>For best deliverability, we recommend testing your email address before connecting and sending emails.</strong><br/>
+            Use the <b>Spam Verification</b> tool to check your domain's health and avoid spam issues.<br/>
+            <a href="#" onClick={e => { e.preventDefault(); setShowGmailPopup(false); navigate('/spam-verification'); }}>Go to Spam Verification</a>
+          </p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="primary" onClick={() => {
+            sessionStorage.setItem('hermes_gmail_popup_shown', '1');
+            setShowGmailPopup(false);
+            if (pendingGmailConnect) {
+              setPendingGmailConnect(false);
+              setTimeout(() => handleConnectGmail(), 0);
+            }
+          }}>
+            Continue to Gmail connection
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </Container>
   );
 };
