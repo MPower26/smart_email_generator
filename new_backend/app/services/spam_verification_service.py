@@ -8,6 +8,26 @@ try:
 except ImportError:
     whois = None
 
+FREE_EMAIL_DOMAINS = set([
+    'gmail.com', 'googlemail.com', 'outlook.com', 'hotmail.com', 'yahoo.com', 'aol.com', 'icloud.com', 'mail.com', 'gmx.com', 'protonmail.com', 'zoho.com', 'yandex.com', 'msn.com', 'live.com', 'comcast.net', 'me.com', 'mac.com', 'rocketmail.com', 'mail.ru', 'qq.com', 'naver.com', '163.com', '126.com', 'sina.com', 'rediffmail.com', 'web.de', 'cox.net', 'bellsouth.net', 'earthlink.net', 'charter.net', 'shaw.ca', 'blueyonder.co.uk', 'btinternet.com', 'virginmedia.com', 'ntlworld.com', 'talktalk.net', 'sky.com', 'optonline.net', 'orange.fr', 'wanadoo.fr', 'free.fr', 'laposte.net', 'sfr.fr', 'neuf.fr', 'aliceadsl.fr', 't-online.de', 'arcor.de', 'libero.it', 'virgilio.it', 'tin.it', 'tiscali.it', 'alice.it', 'live.it', 'email.it', 'fastwebnet.it', 'inwind.it', 'iol.it', 'tele2.it', 'poste.it', 'vodafone.it', 'mail.bg', 'abv.bg', 'dir.bg', 'mail.ee', 'mail.kz', 'bk.ru', 'list.ru', 'inbox.ru', 'mail.ua', 'ukr.net', 'rambler.ru',
+])
+
+RBL_DELIST_LINKS = {
+    'zen.spamhaus.org': 'https://www.spamhaus.org/lookup/',
+    'bl.spamcop.net': 'https://www.spamcop.net/bl.shtml',
+    'b.barracudacentral.org': 'https://www.barracudacentral.org/lookups',
+    'dnsbl.sorbs.net': 'https://www.sorbs.net/lookup.shtml',
+    'psbl.surriel.com': 'https://psbl.org/',
+    'spam.abuse.ch': 'https://abuse.ch/blacklist/',
+    'cbl.abuseat.org': 'https://www.abuseat.org/lookup.cgi',
+    'dnsbl-1.uceprotect.net': 'https://www.uceprotect.net/en/rblcheck.php',
+    'dnsbl.spfbl.net': 'https://spfbl.net/en/check/',
+    'ubl.unsubscore.com': 'https://www.unsubscore.com/blacklist/',
+    'rbl.realtimeblacklist.com': 'https://www.realtimeblacklist.com/',
+    'dnsbl.dronebl.org': 'https://dronebl.org/lookup',
+    'dnsbl.invaluement.com': 'https://www.invaluement.com/lookup/',
+}
+
 class SpamVerificationService:
     @staticmethod
     def extract_domain(email: str) -> str:
@@ -182,16 +202,7 @@ class SpamVerificationService:
             "Blacklist (RBL) checks determine if your sending IP is listed on public spam blacklists. "
             "If your IP is blacklisted, your emails are likely to be rejected or marked as spam."
         )
-        rbls = [
-            'zen.spamhaus.org',
-            'bl.spamcop.net',
-            'b.barracudacentral.org',
-            'dnsbl.sorbs.net',
-            'psbl.surriel.com',
-            'spam.abuse.ch',
-            'cbl.abuseat.org',
-            'dnsbl-1.uceprotect.net',
-        ]
+        rbls = list(RBL_DELIST_LINKS.keys())
         try:
             # Get the IP address of the domain
             ip = socket.gethostbyname(domain)
@@ -354,6 +365,11 @@ class SpamVerificationService:
     @classmethod
     def analyze_email(cls, email: str, dkim_selector: Optional[str] = None) -> Dict[str, Any]:
         domain = cls.extract_domain(email)
+        # Block free/public email domains
+        if domain in FREE_EMAIL_DOMAINS:
+            return {
+                'error': 'Please enter a professional email address (e.g., user@yourcompany.com). Free email addresses like Gmail, Outlook, Yahoo, etc. are not supported for bulk sending checks.'
+            }
         spf = cls.check_spf(domain)
         dkim = cls.check_dkim(domain, dkim_selector)
         dmarc = cls.check_dmarc(domain)
@@ -369,6 +385,9 @@ class SpamVerificationService:
             'how_to_fix': 'Check your domain DNS and try again.',
             'ptr': None
         }
+        # PTR shared host explanation
+        if ptr['status'] == 'fail' and ptr.get('ptr') and any(x in ptr['ptr'] for x in ['wixsite.com', 'shopify', 'squarespace', 'weebly', 'wordpress']):
+            ptr['how_to_fix'] += ' This PTR record indicates your domain is hosted on a website builder (e.g., Wix, Shopify, Squarespace). For best deliverability, use a dedicated email provider (like Google Workspace, Microsoft 365, or a transactional email service) for bulk sending.'
         mx = cls.check_mx(domain)
         domain_age = cls.check_domain_age(domain)
 
@@ -403,9 +422,16 @@ class SpamVerificationService:
         for name, check in summary['checks'].items():
             if check['status'] == 'fail':
                 if name == 'BLACKLIST' and check.get('blacklisted_on'):
+                    links = []
+                    for rbl in check['blacklisted_on']:
+                        link = RBL_DELIST_LINKS.get(rbl)
+                        if link:
+                            links.append(f"<a href='{link}' target='_blank'>{rbl}</a>")
+                        else:
+                            links.append(rbl)
                     alerts.append({
                         'level': 'error',
-                        'message': f"Your sending IP ({check.get('ip')}) is blacklisted on: {', '.join(check['blacklisted_on'])}. Request delisting or contact your provider."
+                        'message': f"Your sending IP ({check.get('ip')}) is blacklisted on: {', '.join(links)}. Request delisting or contact your provider."
                     })
                 else:
                     alerts.append({
