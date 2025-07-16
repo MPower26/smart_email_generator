@@ -197,31 +197,43 @@ class SpamVerificationService:
             }
 
     @staticmethod
-    def check_blacklists(domain: str) -> Dict[str, Any]:
+    def check_blacklists(domain: str, sending_ip: str = None) -> Dict[str, Any]:
         explanation = (
-            "Blacklist (RBL) checks determine if your sending IP is listed on public spam blacklists. "
-            "If your IP is blacklisted, your emails are likely to be rejected or marked as spam."
+            "Blacklist (RBL) checks determine if your sending IP or domain is listed on public spam blacklists. "
+            "If your IP is blacklisted, your emails are likely to be rejected or marked as spam. "
+            "This tool checks your domain name in DNSBLs. For the most accurate results, you should also check your actual sending IP address (the IP shown in your email headers). "
+            "If you know your sending IP, you can provide it for a more accurate check."
         )
         rbls = list(RBL_DELIST_LINKS.keys())
+        blacklisted = []
+        checked_value = sending_ip if sending_ip else domain
+        # If sending_ip is provided, check that IP; otherwise, check the domain name
         try:
-            # Get the IP address of the domain
-            ip = socket.gethostbyname(domain)
-            reversed_ip = '.'.join(reversed(ip.split('.')))
-            blacklisted = []
-            for rbl in rbls:
-                query = f"{reversed_ip}.{rbl}"
-                try:
-                    dns.resolver.resolve(query, 'A')
-                    blacklisted.append(rbl)
-                except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.Timeout):
-                    continue
+            if sending_ip:
+                reversed_ip = '.'.join(reversed(sending_ip.split('.')))
+                for rbl in rbls:
+                    query = f"{reversed_ip}.{rbl}"
+                    try:
+                        dns.resolver.resolve(query, 'A')
+                        blacklisted.append(rbl)
+                    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.Timeout):
+                        continue
+            else:
+                # Check the domain name in RBLs (not as accurate for deliverability, but useful for domain-based blacklists)
+                for rbl in rbls:
+                    query = f"{domain}.{rbl}"
+                    try:
+                        dns.resolver.resolve(query, 'A')
+                        blacklisted.append(rbl)
+                    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.Timeout):
+                        continue
             if blacklisted:
                 return {
                     'status': 'fail',
                     'explanation': explanation,
-                    'how_to_fix': 'Your sending IP is listed on one or more public blacklists. You should request delisting from the RBLs shown below, or contact your hosting provider.',
+                    'how_to_fix': 'Your domain or sending IP is listed on one or more public blacklists. You should request delisting from the RBLs shown below, or contact your provider.',
                     'blacklisted_on': blacklisted,
-                    'ip': ip
+                    'checked_value': checked_value
                 }
             else:
                 return {
@@ -229,7 +241,7 @@ class SpamVerificationService:
                     'explanation': explanation,
                     'how_to_fix': '',
                     'blacklisted_on': [],
-                    'ip': ip
+                    'checked_value': checked_value
                 }
         except Exception as e:
             return {
@@ -237,7 +249,7 @@ class SpamVerificationService:
                 'explanation': explanation,
                 'how_to_fix': f'Error checking blacklists: {e}',
                 'blacklisted_on': None,
-                'ip': None
+                'checked_value': checked_value
             }
 
     @staticmethod
@@ -363,7 +375,7 @@ class SpamVerificationService:
             }
 
     @classmethod
-    def analyze_email(cls, email: str, dkim_selector: Optional[str] = None) -> Dict[str, Any]:
+    def analyze_email(cls, email: str, dkim_selector: Optional[str] = None, sending_ip: str = None) -> Dict[str, Any]:
         domain = cls.extract_domain(email)
         # Block free/public email domains
         if domain in FREE_EMAIL_DOMAINS:
@@ -373,7 +385,7 @@ class SpamVerificationService:
         spf = cls.check_spf(domain)
         dkim = cls.check_dkim(domain, dkim_selector)
         dmarc = cls.check_dmarc(domain)
-        blacklist = cls.check_blacklists(domain)
+        blacklist = cls.check_blacklists(domain, sending_ip)
         # Get IP for PTR
         try:
             ip = socket.gethostbyname(domain)
@@ -420,8 +432,8 @@ class SpamVerificationService:
         # Add global alerts
         alerts = []
         for name, check in summary['checks'].items():
-            if check['status'] == 'fail':
-                if name == 'BLACKLIST' and check.get('blacklisted_on'):
+            if name == 'BLACKLIST':
+                if check.get('blacklisted_on'):
                     links = []
                     for rbl in check['blacklisted_on']:
                         link = RBL_DELIST_LINKS.get(rbl)
@@ -431,17 +443,27 @@ class SpamVerificationService:
                             links.append(rbl)
                     alerts.append({
                         'level': 'error',
-                        'message': f"Your sending IP ({check.get('ip')}) is blacklisted on: {', '.join(links)}. Request delisting or contact your provider."
+                        'message': f"Your domain or sending IP ({check.get('checked_value')}) is blacklisted on: {', '.join(links)}. Request delisting or contact your provider. If this is not your actual sending IP, please check the IP shown in your email headers for the most accurate result."
                     })
                 else:
                     alerts.append({
-                        'level': 'error',
-                        'message': f"{name} check failed: {check['how_to_fix']}"
+                        'level': 'info',
+                        'message': 'Your domain and (if provided) sending IP are not blacklisted in major RBLs.'
                     })
+            elif check['status'] == 'fail':
+                alerts.append({
+                    'level': 'error',
+                    'message': f"{name} check failed: {check['how_to_fix']}"
+                })
             elif check['status'] == 'warning':
                 alerts.append({
                     'level': 'warning',
                     'message': f"{name} warning: {check['how_to_fix']}"
                 })
+        # Add user guidance for sending IP
+        alerts.append({
+            'level': 'info',
+            'message': 'For the most accurate blacklist check, provide your actual sending IP address (the IP shown in the Received header of your sent email). If you use Google Workspace, Microsoft 365, or a bulk email provider, this is not your website IP. Learn how to find your sending IP: https://mxtoolbox.com/Public/Content/EmailHeaders/'
+        })
         summary['alerts'] = alerts
         return summary 
