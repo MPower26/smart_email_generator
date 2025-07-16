@@ -167,12 +167,6 @@
   background-color: #fff; /* White background */
   box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075); /* Subtle shadow */
   overflow: hidden; /* Ensures child elements respect the rounded corners */
-  transition: box-shadow 0.2s, transform 0.18s cubic-bezier(0.4,0,0.2,1);
-}
-
-.email-item-container:hover {
-  box-shadow: 0 0.25rem 0.5rem rgba(0,0,0,0.12);
-  transform: translateY(-2px) scale(1.01);
 }
 
 .email-item-header {

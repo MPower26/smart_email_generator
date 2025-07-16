@@ -47,9 +47,6 @@ wsproto>=1.2.0
 # Azure Blob Storage for signature image uploads
 azure-storage-blob==12.19.0
 
-# DNS resolution for domain authentication
-dnspython==2.7.0
-
 
 
 

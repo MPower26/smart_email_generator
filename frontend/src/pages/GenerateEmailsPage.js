@@ -4,7 +4,6 @@ import FileUpload from '../components/FileUpload';
 import EmailPreview from '../components/EmailPreview';
 import ProgressTracker from '../components/ProgressTracker';
 import GroupedEmails from '../components/GroupedEmails';
-import AntiSpamWarnings from '../components/AntiSpamWarnings';
 import { emailService, templateService } from '../services/api';
 import { UserContext } from '../contexts/UserContext';
 import '../styles/GroupedEmails.css';
@@ -98,9 +97,6 @@ const GenerateEmailsPage = () => {
   const progressSectionRef = useRef(null);
 
   const pausedRef = useRef(false);
-
-  // Anti-spam warnings state
-  const [antiSpamWarnings, setAntiSpamWarnings] = useState([]);
 
   // Load emails by stage - moved before functions that reference it
   const loadEmailsByStage = async () => {
@@ -730,11 +726,6 @@ const GenerateEmailsPage = () => {
                 </Button>
               </Alert>
               
-              {/* Anti-Spam Warnings */}
-              <div className="mb-4">
-                <AntiSpamWarnings onWarningChange={setAntiSpamWarnings} />
-              </div>
-
               <Form>
                 <Form.Group className="mb-3">
                   <Form.Label>Email Stage</Form.Label>
@@ -858,7 +849,7 @@ const GenerateEmailsPage = () => {
                             setIsGenerating(false);
                             setGenerationProgress(null);
                           } catch (err) {
-                            alert('Error during cancellation: ' + (err?.response?.data?.detail || err.message));
+                            alert('Erreur lors de l\'annulation : ' + (err?.response?.data?.detail || err.message));
                           }
                         }}
                       >
@@ -866,19 +857,6 @@ const GenerateEmailsPage = () => {
                       </button>
                     )}
                   </div>
-                )}
-
-                {/* Anti-spam warning before generation */}
-                {antiSpamWarnings.length > 0 && (
-                  <Alert variant="warning" className="mb-4">
-                    <Alert.Heading>⚠️ Anti-Spam Warning</Alert.Heading>
-                    <p>Before generating emails, please note the following warnings:</p>
-                    <ul>
-                      {antiSpamWarnings.map((warning, index) => (
-                        <li key={index}>{warning}</li>
-                      ))}
-                    </ul>
-                  </Alert>
                 )}
 
                 <div className="d-grid mt-4">

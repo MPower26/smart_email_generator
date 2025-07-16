@@ -30,10 +30,7 @@ const EmailGenerator = () => {
 
   return (
     <div className="email-generator">
-      <div style={{ marginBottom: '2rem' }}>
-        <div className="hermes-title">HERMES</div>
-        <div className="hermes-subtitle">By Wesi.ltd</div>
-      </div>
+      <h2>Generate Emails</h2>
       <form onSubmit={handleSubmit}>
         <div>
           <label htmlFor="file">Upload Contacts CSV:</label>

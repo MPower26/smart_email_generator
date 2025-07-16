@@ -6,15 +6,12 @@ const Navigation = () => {
   const location = useLocation();
   
   return (
-    <Navbar expand="lg" className="mb-4" style={{ padding: '0.5rem 0' }}>
+    <Navbar expand="lg" className="mb-4">
       <Container>
         <Navbar.Brand>
           <a href="https://wesi.ltd/" target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', color: 'inherit' }}>
-            <img src="/hermesslogo.svg" alt="Hermes Logo" className="hermes-logo-animated" style={{ height: '50px', width: '50px', marginRight: '10px', verticalAlign: 'middle' }} />
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-              <span className="hermes-title-compact">HERMES</span>
-              <span className="hermes-subtitle-compact">By Wesi.ltd</span>
-            </div>
+            <img src="/logo02.png" alt="Logo" style={{ height: '40px', width: '40px', marginRight: '10px', verticalAlign: 'middle' }} />
+            Automated Email Generator
           </a>
         </Navbar.Brand>
         <Navbar.Toggle aria-controls="basic-navbar-nav" />
@@ -47,13 +44,6 @@ const Navigation = () => {
               className={location.pathname.includes('/settings') ? 'active' : ''}
             >
               Settings
-            </Nav.Link>
-            <Nav.Link 
-              as={Link} 
-              to="/domains" 
-              className={location.pathname.includes('/domains') ? 'active' : ''}
-            >
-              Domains
             </Nav.Link>
           </Nav>
         </Navbar.Collapse>

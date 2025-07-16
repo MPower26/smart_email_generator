@@ -113,17 +113,6 @@ async def request_verification_code(request: VerificationRequest, db: Session = 
                 db.commit()
                 db.refresh(user)
                 logger.info(f"Created new user with email: {request.email}")
-                
-                # Initialize anti-spam data for new user
-                try:
-                    from ..services.anti_spam_service import AntiSpamService
-                    anti_spam_service = AntiSpamService(db)
-                    anti_spam_service.initialize_user_anti_spam(user.id)
-                    logger.info(f"Initialized anti-spam data for user {user.id}")
-                except Exception as anti_spam_error:
-                    logger.warning(f"Failed to initialize anti-spam data for user {user.id}: {str(anti_spam_error)}")
-                    # Don't fail the user creation if anti-spam initialization fails
-                
             except Exception as create_error:
                 logger.error(f"User creation error: {str(create_error)}")
                 raise HTTPException(

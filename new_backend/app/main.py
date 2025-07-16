@@ -12,11 +12,10 @@ import time
 import httpx
 import urllib.parse
 
-from app.api.endpoints import emails, friends, auth_gmail, user_settings, templates, anti_spam, domain_auth
+from app.api.endpoints import emails, friends, auth_gmail, user_settings, templates
 from app.api import auth
 from app.db.database import engine, get_db
 from app.models.models import Base
-from app.models import Domain, DomainAuthCheck, DomainAlert
 from app.routers import users
 from app.services.followup_tasks import check_and_notify_followups
 from app.websocket_manager import manager
@@ -140,9 +139,6 @@ app.include_router(users.router, prefix="/api/users", tags=["Users"])
 app.include_router(auth_gmail.router, prefix="/api", tags=["Gmail Auth"])
 app.include_router(user_settings.router, prefix="/api", tags=["User Settings"])
 app.include_router(templates.router, prefix="/api/templates", tags=["Templates"])
-app.include_router(anti_spam.router, prefix="/api/anti-spam", tags=["Anti-Spam"])
-app.include_router(anti_spam.router, prefix="/api", tags=["Anti-Spam Validation"])
-app.include_router(domain_auth.router, prefix="/api", tags=["Domain Authentication"])
 
 @app.get("/")
 async def root():

@@ -12,35 +12,20 @@ import AuthScreen from './components/AuthScreen';
 import { UserProvider, useUser } from './contexts/UserContext';
 import GmailSuccess from './pages/GmailSuccess';
 import DevPreviewPage from './pages/DevPreviewPage';
-import Footer from './components/Footer';
 import './App.css';
-import DomainManager from './components/DomainManager';
-
-function isMobileDevice() {
-  return /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-}
 
 // Composant de routes protégées
 const ProtectedRoutes = () => {
   const { authenticated, loading } = useUser();
   
-  // If loading is in progress, don't display anything
+  // Si le chargement est en cours, on n'affiche rien
   if (loading) {
-    return <div className="text-center p-5">Loading...</div>;
+    return <div className="text-center p-5">Chargement...</div>;
   }
   
-  // If user is not authenticated, redirect to home page
+  // Si l'utilisateur n'est pas authentifié, on le redirige vers la page d'accueil
   if (!authenticated) {
     return <AuthScreen />;
-  }
-
-  if (isMobileDevice()) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fff', color: '#D8400D', fontSize: '1.5rem', fontWeight: 600, textAlign: 'center', padding: '2rem' }}>
-        <img src="/hermesslogo.svg" alt="Hermes Logo" className="hermes-logo-animated" style={{ height: 80, width: 80, marginBottom: 24 }} />
-        <div>This app is only available on desktop devices.<br />Please access it from a computer.</div>
-      </div>
-    );
   }
   
   // Sinon, on affiche les routes protégées
@@ -67,15 +52,13 @@ function App() {
       <Router>
         <div className="App d-flex flex-column min-vh-100">
           {/* Background logo for all pages */}
-          <img src="/hermesslogo.svg" alt="Background Logo" className="background-logo" />
+          <img src="/logo01.png" alt="Background Logo" className="background-logo" />
           <Routes>
             <Route path="/dev-preview" element={<DevPreviewPage />} />
             <Route path="/gmail/success" element={<GmailSuccess />} />
             <Route path="/watch" element={<WatchPage />} />
-            <Route path="/domains" element={<DomainManager />} />
             <Route path="/*" element={<ProtectedRoutes />} />
           </Routes>
-          <Footer />
         </div>
       </Router>
     </UserProvider>
@@ -83,3 +66,4 @@ function App() {
 }
 
 export default App; 
+
