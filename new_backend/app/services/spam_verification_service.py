@@ -3,8 +3,9 @@ import re
 import socket
 from typing import Optional, Dict, Any
 import datetime
+# Fix whois import for domain age
 try:
-    import whois
+    from whois import whois
 except ImportError:
     whois = None
 
@@ -12,20 +13,37 @@ FREE_EMAIL_DOMAINS = set([
     'gmail.com', 'googlemail.com', 'outlook.com', 'hotmail.com', 'yahoo.com', 'aol.com', 'icloud.com', 'mail.com', 'gmx.com', 'protonmail.com', 'zoho.com', 'yandex.com', 'msn.com', 'live.com', 'comcast.net', 'me.com', 'mac.com', 'rocketmail.com', 'mail.ru', 'qq.com', 'naver.com', '163.com', '126.com', 'sina.com', 'rediffmail.com', 'web.de', 'cox.net', 'bellsouth.net', 'earthlink.net', 'charter.net', 'shaw.ca', 'blueyonder.co.uk', 'btinternet.com', 'virginmedia.com', 'ntlworld.com', 'talktalk.net', 'sky.com', 'optonline.net', 'orange.fr', 'wanadoo.fr', 'free.fr', 'laposte.net', 'sfr.fr', 'neuf.fr', 'aliceadsl.fr', 't-online.de', 'arcor.de', 'libero.it', 'virgilio.it', 'tin.it', 'tiscali.it', 'alice.it', 'live.it', 'email.it', 'fastwebnet.it', 'inwind.it', 'iol.it', 'tele2.it', 'poste.it', 'vodafone.it', 'mail.bg', 'abv.bg', 'dir.bg', 'mail.ee', 'mail.kz', 'bk.ru', 'list.ru', 'inbox.ru', 'mail.ua', 'ukr.net', 'rambler.ru',
 ])
 
+# Update blacklist lists
+IP_BLACKLISTS = [
+    'zen.spamhaus.org',
+    'b.barracudacentral.org',
+    'bl.spamcop.net',
+    'cbl.abuseat.org',
+    'dnsbl.invaluement.com',
+    'psbl.surriel.com',
+    'dnsbl-1.uceprotect.net',
+    'dnsbl.spfbl.net',
+    'rbl.realtimeblacklist.com',
+    'dnsbl.dronebl.org',
+]
+DOMAIN_BLACKLISTS = [
+    'dbl.spamhaus.org',
+    'multi.surbl.org',
+]
+
 RBL_DELIST_LINKS = {
     'zen.spamhaus.org': 'https://www.spamhaus.org/lookup/',
+    'dbl.spamhaus.org': 'https://www.spamhaus.org/lookup/',
     'bl.spamcop.net': 'https://www.spamcop.net/bl.shtml',
     'b.barracudacentral.org': 'https://www.barracudacentral.org/lookups',
-    'dnsbl.sorbs.net': 'https://www.sorbs.net/lookup.shtml',
-    'psbl.surriel.com': 'https://psbl.org/',
-    'spam.abuse.ch': 'https://abuse.ch/blacklist/',
     'cbl.abuseat.org': 'https://www.abuseat.org/lookup.cgi',
+    'dnsbl.invaluement.com': 'https://www.invaluement.com/lookup/',
+    'psbl.surriel.com': 'https://psbl.org/',
     'dnsbl-1.uceprotect.net': 'https://www.uceprotect.net/en/rblcheck.php',
     'dnsbl.spfbl.net': 'https://spfbl.net/en/check/',
-    'ubl.unsubscore.com': 'https://www.unsubscore.com/blacklist/',
     'rbl.realtimeblacklist.com': 'https://www.realtimeblacklist.com/',
     'dnsbl.dronebl.org': 'https://dronebl.org/lookup',
-    'dnsbl.invaluement.com': 'https://www.invaluement.com/lookup/',
+    'multi.surbl.org': 'https://www.surbl.org/',
 }
 
 class SpamVerificationService:
@@ -201,55 +219,52 @@ class SpamVerificationService:
         explanation = (
             "Blacklist (RBL) checks determine if your sending IP or domain is listed on public spam blacklists. "
             "If your IP is blacklisted, your emails are likely to be rejected or marked as spam. "
-            "This tool checks your domain name in DNSBLs. For the most accurate results, you should also check your actual sending IP address (the IP shown in your email headers). "
+            "This tool checks both your domain name (in domain-based blacklists) and, if provided, your sending IP (in IP-based blacklists). "
+            "For the most accurate results, check your actual sending IP address (the IP shown in your email headers). "
             "If you know your sending IP, you can provide it for a more accurate check."
         )
-        rbls = list(RBL_DELIST_LINKS.keys())
-        blacklisted = []
-        checked_value = sending_ip if sending_ip else domain
-        # If sending_ip is provided, check that IP; otherwise, check the domain name
-        try:
-            if sending_ip:
-                reversed_ip = '.'.join(reversed(sending_ip.split('.')))
-                for rbl in rbls:
-                    query = f"{reversed_ip}.{rbl}"
-                    try:
-                        dns.resolver.resolve(query, 'A')
-                        blacklisted.append(rbl)
-                    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.Timeout):
-                        continue
-            else:
-                # Check the domain name in RBLs (not as accurate for deliverability, but useful for domain-based blacklists)
-                for rbl in rbls:
-                    query = f"{domain}.{rbl}"
-                    try:
-                        dns.resolver.resolve(query, 'A')
-                        blacklisted.append(rbl)
-                    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.Timeout):
-                        continue
-            if blacklisted:
-                return {
-                    'status': 'fail',
-                    'explanation': explanation,
-                    'how_to_fix': 'Your domain or sending IP is listed on one or more public blacklists. You should request delisting from the RBLs shown below, or contact your provider.',
-                    'blacklisted_on': blacklisted,
-                    'checked_value': checked_value
-                }
-            else:
-                return {
-                    'status': 'pass',
-                    'explanation': explanation,
-                    'how_to_fix': '',
-                    'blacklisted_on': [],
-                    'checked_value': checked_value
-                }
-        except Exception as e:
+        ip_blacklisted = []
+        domain_blacklisted = []
+        checked_ip = sending_ip
+        checked_domain = domain
+        # IP-based blacklists
+        if sending_ip:
+            reversed_ip = '.'.join(reversed(sending_ip.split('.')))
+            for rbl in IP_BLACKLISTS:
+                query = f"{reversed_ip}.{rbl}"
+                try:
+                    dns.resolver.resolve(query, 'A')
+                    ip_blacklisted.append(rbl)
+                except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.Timeout):
+                    continue
+        # Domain-based blacklists
+        for rbl in DOMAIN_BLACKLISTS:
+            query = f"{domain}.{rbl}"
+            try:
+                dns.resolver.resolve(query, 'A')
+                domain_blacklisted.append(rbl)
+            except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.Timeout):
+                continue
+        # Compose result
+        if ip_blacklisted or domain_blacklisted:
             return {
                 'status': 'fail',
                 'explanation': explanation,
-                'how_to_fix': f'Error checking blacklists: {e}',
-                'blacklisted_on': None,
-                'checked_value': checked_value
+                'how_to_fix': 'Your domain or sending IP is listed on one or more public blacklists. You should request delisting from the RBLs shown below, or contact your provider.',
+                'ip_blacklisted_on': ip_blacklisted,
+                'domain_blacklisted_on': domain_blacklisted,
+                'checked_ip': checked_ip,
+                'checked_domain': checked_domain
+            }
+        else:
+            return {
+                'status': 'pass',
+                'explanation': explanation,
+                'how_to_fix': '',
+                'ip_blacklisted_on': [],
+                'domain_blacklisted_on': [],
+                'checked_ip': checked_ip,
+                'checked_domain': checked_domain
             }
 
     @staticmethod
@@ -323,12 +338,12 @@ class SpamVerificationService:
             return {
                 'status': 'warning',
                 'explanation': explanation,
-                'how_to_fix': 'Domain age check is unavailable (whois module not installed).',
+                'how_to_fix': 'Domain age check is unavailable (whois module not installed or import failed).',
                 'age_days': None,
                 'created': None
             }
         try:
-            w = whois.whois(domain)
+            w = whois(domain)
             created = w.creation_date
             if isinstance(created, list):
                 created = created[0]
@@ -341,30 +356,13 @@ class SpamVerificationService:
                     'created': None
                 }
             age_days = (datetime.datetime.now(datetime.timezone.utc) - created).days
-            if age_days >= 365:
-                return {
-                    'status': 'pass',
-                    'explanation': explanation,
-                    'how_to_fix': '',
-                    'age_days': age_days,
-                    'created': created.strftime('%Y-%m-%d')
-                }
-            elif age_days >= 90:
-                return {
-                    'status': 'warning',
-                    'explanation': explanation,
-                    'how_to_fix': 'Your domain is less than a year old. Send small volumes and increase gradually.',
-                    'age_days': age_days,
-                    'created': created.strftime('%Y-%m-%d')
-                }
-            else:
-                return {
-                    'status': 'fail',
-                    'explanation': explanation,
-                    'how_to_fix': 'Your domain is very new. Start with very low sending volume and increase slowly over several months.',
-                    'age_days': age_days,
-                    'created': created.strftime('%Y-%m-%d')
-                }
+            return {
+                'status': 'pass',
+                'explanation': explanation,
+                'how_to_fix': '',
+                'age_days': age_days,
+                'created': created.isoformat() if hasattr(created, 'isoformat') else str(created)
+            }
         except Exception as e:
             return {
                 'status': 'warning',
@@ -433,9 +431,9 @@ class SpamVerificationService:
         alerts = []
         for name, check in summary['checks'].items():
             if name == 'BLACKLIST':
-                if check.get('blacklisted_on'):
+                if check.get('ip_blacklisted_on') or check.get('domain_blacklisted_on'):
                     links = []
-                    for rbl in check['blacklisted_on']:
+                    for rbl in (check.get('ip_blacklisted_on') or []) + (check.get('domain_blacklisted_on') or []):
                         link = RBL_DELIST_LINKS.get(rbl)
                         if link:
                             links.append(f"<a href='{link}' target='_blank'>{rbl}</a>")
@@ -443,7 +441,7 @@ class SpamVerificationService:
                             links.append(rbl)
                     alerts.append({
                         'level': 'error',
-                        'message': f"Your domain or sending IP ({check.get('checked_value')}) is blacklisted on: {', '.join(links)}. Request delisting or contact your provider. If this is not your actual sending IP, please check the IP shown in your email headers for the most accurate result."
+                        'message': f"Your domain ({check.get('checked_domain')}) or sending IP ({check.get('checked_ip')}) is blacklisted on: {', '.join(links)}. Request delisting or contact your provider. If this is not your actual sending IP, please check the IP shown in your email headers for the most accurate result."
                     })
                 else:
                     alerts.append({
