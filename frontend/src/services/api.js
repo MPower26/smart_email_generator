@@ -312,5 +312,13 @@ export const attachmentService = {
   resolvePlaceholder: (placeholder) => api.get(`/api/templates/attachments/resolve/${placeholder}`),
 };
 
+export async function fetchEmailLimitsStatus() {
+  const response = await fetch('/api/email-limits/status', {
+    credentials: 'include'
+  });
+  if (!response.ok) throw new Error('Failed to fetch email limits status');
+  return await response.json();
+}
+
 export default api;
 export { API_BASE_URL };
