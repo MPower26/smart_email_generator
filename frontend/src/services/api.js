@@ -85,29 +85,29 @@ api.interceptors.response.use(
 // Service d'API pour les emails
 export const emailService = {
   // Get templates
-  getTemplates: () => api.get('/api/emails/templates'),
+  getTemplates: () => api.get('/api/templates'),
   
   // Get templates by category
   getTemplatesByCategory: (category) => api.get(`/api/templates?category=${category}`),
   
   // Get emails by stage (consolidated method) - NO trailing slash to match backend
-  getEmailsByStage: (stage) => api.get(`/api/emails/by-stage/${stage}`),
+  getEmailsByStage: (stage) => api.get(`/api/by-stage/${stage}`),
   
   // Get emails by stage and group_id
-  getEmailsByStageAndGroup: (stage, groupId) => api.get(`/api/emails/by-stage/${stage}?group_id=${groupId}`),
+  getEmailsByStageAndGroup: (stage, groupId) => api.get(`/api/by-stage/${stage}?group_id=${groupId}`),
   
   // Get emails grouped by group_id for followup and lastchance stages
-  getEmailsByStageGrouped: (stage) => api.get(`/api/emails/by-stage/${stage}/groups`),
+  getEmailsByStageGrouped: (stage) => api.get(`/api/by-stage/${stage}/groups`),
   
   // Send all emails in a specific group
-  sendAllByGroup: (stage, groupId) => api.post(`/api/emails/send_all_by_group/${stage}/${groupId}`),
+  sendAllByGroup: (stage, groupId) => api.post(`/api/send_all_by_group/${stage}/${groupId}`),
   
   // Re-generate all emails in a group
-  regenerateGroupEmails: (groupId, prompt) => api.post(`/api/emails/regenerate_group/${groupId}`, { prompt }),
+  regenerateGroupEmails: (groupId, prompt) => api.post(`/api/regenerate_group/${groupId}`, { prompt }),
   
   // Cache management
-  getCacheInfo: () => api.get('/api/emails/cache'),
-  clearCache: () => api.delete('/api/emails/cache'),
+  getCacheInfo: () => api.get('/api/cache'),
+  clearCache: () => api.delete('/api/cache'),
   
   // Generate emails
   generateEmails: (file, templateId, stage, avoidDuplicates, onUploadProgress) => {
@@ -120,7 +120,7 @@ export const emailService = {
       formData.append('template_id', templateId);
     }
     
-    return api.post('/api/emails/generate', formData, {
+    return api.post('/api/generate', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -130,30 +130,30 @@ export const emailService = {
   },
   
   // Update email status (mark as sent, etc.)
-  updateEmailStatus: (emailId, data) => api.put(`/api/emails/${emailId}/status`, data),
+  updateEmailStatus: (emailId, data) => api.put(`/api/${emailId}/status`, data),
   
   // Update email content (for editing)
-  updateEmailContent: (emailId, data) => api.put(`/api/emails/${emailId}/content`, data),
+  updateEmailContent: (emailId, data) => api.put(`/api/${emailId}/content`, data),
   
   // Send all emails in a stage via Gmail
-  sendAllViaGmail: (stage) => api.post(`/api/emails/send_all_via_gmail/${stage}`),
+  sendAllViaGmail: (stage) => api.post(`/api/send_all_via_gmail/${stage}`),
   
   // Get email generation progress
-  getGenerationProgress: () => api.get('/api/emails/generation-progress', { 
+  getGenerationProgress: () => api.get('/api/generation-progress', { 
     timeout: parseInt(process.env.REACT_APP_INITIAL_PROGRESS_TIMEOUT) || 30000 
   }), // Configurable timeout for initial check
-  getGenerationProgressById: (progressId) => api.get(`/api/emails/generation-progress/${progressId}`, { 
+  getGenerationProgressById: (progressId) => api.get(`/api/generation-progress/${progressId}`, { 
     timeout: parseInt(process.env.REACT_APP_POLLING_TIMEOUT) || 15000 
   }), // Configurable timeout for polling
   
   // Delete email
-  deleteEmail: (emailId) => api.delete(`/api/emails/${emailId}`),
+  deleteEmail: (emailId) => api.delete(`/api/${emailId}`),
 
-  sendEmail: (emailId) => api.post(`/api/emails/send/${emailId}`),
+  sendEmail: (emailId) => api.post(`/api/send/${emailId}`),
 
   // Batch send emails (new endpoint)
   sendBatch: (stage, limit = 120, groupId = null) => {
-    return api.post('/api/emails/send_batch', {
+    return api.post('/api/send_batch', {
       stage,
       limit,
       group_id: groupId
@@ -161,9 +161,13 @@ export const emailService = {
   },
 
   // Pause/resume group progress
-  pauseGroupProgress: (progressId) => api.post(`/api/emails/progress/${progressId}/pause`),
-  resumeGroupProgress: (progressId) => api.post(`/api/emails/progress/${progressId}/resume`),
-  cancelGeneration: (progressId) => api.post(`/api/emails/progress/${progressId}/cancel`),
+  pauseGroupProgress: (progressId) => api.post(`/api/progress/${progressId}/pause`),
+  resumeGroupProgress: (progressId) => api.post(`/api/progress/${progressId}/resume`),
+  cancelGeneration: (progressId) => api.post(`/api/progress/${progressId}/cancel`),
+
+  // Add spam verification API call
+  spamVerification: (email, dkim_selector = undefined) =>
+    api.post('/api/spam-verification', { email, dkim_selector }),
 };
 
 // Template API - Fixed to match backend routes exactly

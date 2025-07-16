@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Form, Button, Alert, Card, Spinner, Row, Col } from 'react-bootstrap';
 import axios from 'axios';
+import { emailService } from '../services/api';
 
 const DKIM_HELP = `A DKIM selector is a string (like 'default', 'mail', or a custom name) that identifies which DKIM key to use for signing emails.\nYou can usually find your selector in your email sending service settings (e.g., Google Workspace, SendGrid, Mailgun, etc.). If you don't know it, try 'default' or check your provider's documentation.`;
 
@@ -17,10 +18,7 @@ const SpamVerificationPage = () => {
     setError('');
     setResult(null);
     try {
-      const res = await axios.post('/api/spam-verification', {
-        email,
-        dkim_selector: dkimSelector || undefined,
-      });
+      const res = await emailService.spamVerification(email, dkimSelector || undefined);
       setResult(res.data);
     } catch (err) {
       setError(err.response?.data?.detail || 'An error occurred.');
