@@ -2,6 +2,11 @@ import dns.resolver
 import re
 import socket
 from typing import Optional, Dict, Any
+import datetime
+try:
+    import whois
+except ImportError:
+    whois = None
 
 class SpamVerificationService:
     @staticmethod
@@ -224,6 +229,128 @@ class SpamVerificationService:
                 'ip': None
             }
 
+    @staticmethod
+    def check_ptr(ip: str, domain: str) -> Dict[str, Any]:
+        explanation = (
+            "PTR (reverse DNS) records map an IP address back to a domain name. "
+            "Many spam filters require that your sending IP has a PTR record matching your domain."
+        )
+        try:
+            ptr = socket.gethostbyaddr(ip)[0].rstrip('.')
+            if domain in ptr:
+                return {
+                    'status': 'pass',
+                    'explanation': explanation,
+                    'how_to_fix': '',
+                    'ptr': ptr
+                }
+            else:
+                return {
+                    'status': 'fail',
+                    'explanation': explanation,
+                    'how_to_fix': f"Your sending IP's PTR record is '{ptr}', which does not match your domain. Ask your hosting provider to set the PTR to your domain.",
+                    'ptr': ptr
+                }
+        except Exception as e:
+            return {
+                'status': 'fail',
+                'explanation': explanation,
+                'how_to_fix': f"No PTR record found for your sending IP. Ask your hosting provider to set a PTR (reverse DNS) record to your domain. Error: {e}",
+                'ptr': None
+            }
+
+    @staticmethod
+    def check_mx(domain: str) -> Dict[str, Any]:
+        explanation = (
+            "MX (Mail Exchange) records specify the mail servers responsible for receiving email for your domain. "
+            "Having valid MX records is important for deliverability and reputation."
+        )
+        try:
+            answers = dns.resolver.resolve(domain, 'MX')
+            mx_records = [str(r.exchange).rstrip('.') for r in answers]
+            if mx_records:
+                return {
+                    'status': 'pass',
+                    'explanation': explanation,
+                    'how_to_fix': '',
+                    'mx_records': mx_records
+                }
+            else:
+                return {
+                    'status': 'fail',
+                    'explanation': explanation,
+                    'how_to_fix': 'No MX records found. Add MX records in your DNS to receive email and improve reputation.',
+                    'mx_records': []
+                }
+        except Exception as e:
+            return {
+                'status': 'fail',
+                'explanation': explanation,
+                'how_to_fix': f'Error checking MX records: {e}. Add MX records in your DNS to receive email and improve reputation.',
+                'mx_records': []
+            }
+
+    @staticmethod
+    def check_domain_age(domain: str) -> Dict[str, Any]:
+        explanation = (
+            "Domain age is a factor in email reputation. New domains are more likely to be flagged as spam. "
+            "Older domains are generally more trusted."
+        )
+        if not whois:
+            return {
+                'status': 'warning',
+                'explanation': explanation,
+                'how_to_fix': 'Domain age check is unavailable (whois module not installed).',
+                'age_days': None,
+                'created': None
+            }
+        try:
+            w = whois.whois(domain)
+            created = w.creation_date
+            if isinstance(created, list):
+                created = created[0]
+            if not created:
+                return {
+                    'status': 'warning',
+                    'explanation': explanation,
+                    'how_to_fix': 'Could not determine domain creation date from WHOIS.',
+                    'age_days': None,
+                    'created': None
+                }
+            age_days = (datetime.datetime.now(datetime.timezone.utc) - created).days
+            if age_days >= 365:
+                return {
+                    'status': 'pass',
+                    'explanation': explanation,
+                    'how_to_fix': '',
+                    'age_days': age_days,
+                    'created': created.strftime('%Y-%m-%d')
+                }
+            elif age_days >= 90:
+                return {
+                    'status': 'warning',
+                    'explanation': explanation,
+                    'how_to_fix': 'Your domain is less than a year old. Send small volumes and increase gradually.',
+                    'age_days': age_days,
+                    'created': created.strftime('%Y-%m-%d')
+                }
+            else:
+                return {
+                    'status': 'fail',
+                    'explanation': explanation,
+                    'how_to_fix': 'Your domain is very new. Start with very low sending volume and increase slowly over several months.',
+                    'age_days': age_days,
+                    'created': created.strftime('%Y-%m-%d')
+                }
+        except Exception as e:
+            return {
+                'status': 'warning',
+                'explanation': explanation,
+                'how_to_fix': f'Error checking domain age: {e}',
+                'age_days': None,
+                'created': None
+            }
+
     @classmethod
     def analyze_email(cls, email: str, dkim_selector: Optional[str] = None) -> Dict[str, Any]:
         domain = cls.extract_domain(email)
@@ -231,14 +358,45 @@ class SpamVerificationService:
         dkim = cls.check_dkim(domain, dkim_selector)
         dmarc = cls.check_dmarc(domain)
         blacklist = cls.check_blacklists(domain)
+        # Get IP for PTR
+        try:
+            ip = socket.gethostbyname(domain)
+        except Exception:
+            ip = None
+        ptr = cls.check_ptr(ip, domain) if ip else {
+            'status': 'fail',
+            'explanation': 'PTR (reverse DNS) check skipped: could not resolve IP.',
+            'how_to_fix': 'Check your domain DNS and try again.',
+            'ptr': None
+        }
+        mx = cls.check_mx(domain)
+        domain_age = cls.check_domain_age(domain)
+
+        # Sending volume advice
+        advice = []
+        if any(check['status'] == 'fail' for check in [spf, dkim, dmarc, blacklist, ptr, mx]):
+            advice.append("Your domain or IP is not fully healthy. Fix all errors above before sending bulk emails.")
+            advice.append("Once all checks are green, start with 20-50 emails/day and increase by 20% every few days if you see no deliverability issues.")
+        elif any(check['status'] == 'warning' for check in [spf, dkim, dmarc, blacklist, ptr, mx, domain_age]):
+            advice.append("Your setup is almost ready. Start with a low volume (20-50 emails/day) and increase slowly. Monitor for bounces and spam complaints.")
+        elif domain_age['status'] == 'fail':
+            advice.append("Your domain is very new. Start with 5-10 emails/day and increase very slowly over several months.")
+        else:
+            advice.append("Your domain and IP are healthy! You can start with 50-100 emails/day and increase by 20% every few days if you see no issues.")
+        advice.append("Always monitor your open rates, bounces, and spam complaints. If you see problems, pause and investigate.")
+
         summary = {
             'domain': domain,
             'checks': {
                 'SPF': spf,
                 'DKIM': dkim,
                 'DMARC': dmarc,
-                'BLACKLIST': blacklist
-            }
+                'BLACKLIST': blacklist,
+                'PTR': ptr,
+                'MX': mx,
+                'DOMAIN_AGE': domain_age
+            },
+            'sending_volume_advice': ' '.join(advice)
         }
         # Add global alerts
         alerts = []
