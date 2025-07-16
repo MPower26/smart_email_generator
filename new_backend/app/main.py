@@ -133,7 +133,7 @@ async def https_redirect(request: Request, call_next):
 
 # Include API routers
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
-app.include_router(emails.router, prefix="/api/emails", tags=["Emails"])
+app.include_router(emails.router, prefix="/api", tags=["Emails"])
 app.include_router(friends.router, prefix="/api/friends", tags=["Friends"])
 app.include_router(users.router, prefix="/api/users", tags=["Users"])
 app.include_router(auth_gmail.router, prefix="/api", tags=["Gmail Auth"])
@@ -295,4 +295,3 @@ async def video_proxy(video_path: str, request: Request):
     except Exception as e:
         logger.error(f"Error serving video {video_path}: {str(e)}")
         raise HTTPException(status_code=500, detail="Error serving video") 
-
