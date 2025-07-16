@@ -166,8 +166,8 @@ export const emailService = {
   cancelGeneration: (progressId) => api.post(`/api/progress/${progressId}/cancel`),
 
   // Add spam verification API call
-  spamVerification: (email, dkim_selector = undefined) =>
-    api.post('/api/spam-verification', { email, dkim_selector }),
+  spamVerification: (email, dkim_selector = undefined, sending_ip = undefined) =>
+    api.post('/api/spam-verification', { email, dkim_selector, sending_ip }),
 };
 
 // Template API - Fixed to match backend routes exactly

@@ -355,7 +355,11 @@ class SpamVerificationService:
                     'age_days': None,
                     'created': None
                 }
-            age_days = (datetime.datetime.now(datetime.timezone.utc) - created).days
+            # Ensure both datetimes are timezone-aware (UTC)
+            now = datetime.datetime.now(datetime.timezone.utc)
+            if created.tzinfo is None or created.tzinfo.utcoffset(created) is None:
+                created = created.replace(tzinfo=datetime.timezone.utc)
+            age_days = (now - created).days
             return {
                 'status': 'pass',
                 'explanation': explanation,
