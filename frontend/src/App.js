@@ -14,6 +14,7 @@ import GmailSuccess from './pages/GmailSuccess';
 import DevPreviewPage from './pages/DevPreviewPage';
 import SpamVerificationPage from './pages/SpamVerificationPage';
 import './App.css';
+import Footer from './components/Footer';
 
 // Composant de routes protégées
 const ProtectedRoutes = () => {
@@ -54,13 +55,14 @@ function App() {
       <Router>
         <div className="App d-flex flex-column min-vh-100">
           {/* Background logo for all pages */}
-          <img src="/logo01.png" alt="Background Logo" className="background-logo" />
+          <img src="/hermesslogo.svg" alt="Background Logo" className="background-logo" />
           <Routes>
             <Route path="/dev-preview" element={<DevPreviewPage />} />
             <Route path="/gmail/success" element={<GmailSuccess />} />
             <Route path="/watch" element={<WatchPage />} />
             <Route path="/*" element={<ProtectedRoutes />} />
           </Routes>
+          <Footer />
         </div>
       </Router>
     </UserProvider>

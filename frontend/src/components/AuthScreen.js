@@ -158,13 +158,16 @@ const AuthScreen = () => {
     <>
       {showContent && (
         <Container className="d-flex justify-content-center align-items-center" style={{ minHeight: '70vh' }}>
-          <img src="/logo01.png" alt="Background Logo" className="background-logo" />
+          <img src="/hermesslogo.svg" alt="Background Logo" className="background-logo" />
           <Card className="shadow fade-in-down" style={{ width: '900px', minHeight: '480px', transform: 'translateY(30px)' }}>
             <Card.Body className="p-4" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', height: '100%' }}>
               <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem', alignSelf: 'flex-start' }}>
-                <img src="/logo00.png" alt="Logo" style={{ height: '56px', width: '56px', marginRight: '12px' }} />
+                <img src="/hermesslogo.svg" alt="Logo" style={{ height: '56px', width: '56px', marginRight: '12px' }} />
               </div>
-              <h2 className="text-center mb-4" style={{ color: '#D8400D', fontFamily: 'Poppins, sans-serif', fontSize: '3.2rem', textAlign: 'center', width: '100%' }}>Automated Email Generator</h2>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', marginBottom: '1.5rem' }}>
+                <span style={{ fontFamily: 'Syne-ExtraBold, Syne, Poppins, sans-serif', fontWeight: 800, fontSize: '3.2rem', letterSpacing: '0.03em', textTransform: 'uppercase', color: '#D8400D', marginRight: '12px' }}>Hermes</span>
+                <span style={{ fontSize: '1.1rem', color: '#888', fontWeight: 400, letterSpacing: '0.01em', alignSelf: 'flex-end' }}>powered by wesi</span>
+              </div>
               <div className="text-center mb-4 fade-in-opacity" style={{ color: '#555', fontSize: '0.97rem', fontFamily: 'Poppins, sans-serif', maxWidth: '90%', margin: '0 auto', lineHeight: 1.5, width: '100%' }}>
                 Harness AI to generate personalized, impactful emails tailored to each recipient. Effortlessly manage your contact lists, schedule and track follow-ups, and receive timely reminders for every stage of your outreach.
               </div>

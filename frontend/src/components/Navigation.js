@@ -10,8 +10,9 @@ const Navigation = () => {
       <Container>
         <Navbar.Brand>
           <a href="https://wesi.ltd/" target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', color: 'inherit' }}>
-            <img src="/logo02.png" alt="Logo" style={{ height: '40px', width: '40px', marginRight: '10px', verticalAlign: 'middle' }} />
-            Automated Email Generator
+            <img src="/hermesslogo.svg" alt="Logo" style={{ height: '40px', width: '40px', marginRight: '10px', verticalAlign: 'middle' }} />
+            <span style={{ fontFamily: 'Syne-ExtraBold, Syne, Poppins, sans-serif', fontWeight: 800, fontSize: '2rem', letterSpacing: '0.03em', textTransform: 'uppercase', color: '#D8400D', marginRight: '10px' }}>Hermes</span>
+            <span style={{ fontSize: '0.95rem', color: '#888', fontWeight: 400, letterSpacing: '0.01em', marginLeft: '2px', alignSelf: 'flex-end' }}>powered by wesi</span>
           </a>
         </Navbar.Brand>
         <Navbar.Toggle aria-controls="basic-navbar-nav" />
