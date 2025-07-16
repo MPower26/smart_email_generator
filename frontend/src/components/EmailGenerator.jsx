@@ -11,10 +11,15 @@ const EmailGenerator = () => {
   const [limitsError, setLimitsError] = useState(null);
   const [showLimitAlert, setShowLimitAlert] = useState(false);
 
-  useEffect(() => {
+  // Rafraîchir le quota à chaque génération et à chaque ouverture de pop-up
+  const refreshLimits = () => {
     fetchEmailLimitsStatus()
       .then(setLimits)
       .catch(() => setLimitsError('Unable to fetch email limits status'));
+  };
+
+  useEffect(() => {
+    refreshLimits();
   }, []);
 
   const handleFileChange = (e) => {
@@ -31,14 +36,14 @@ const EmailGenerator = () => {
     if (limits && (limits.is_suspended || limits.user_remaining <= 0 || limits.domain_remaining <= 0)) {
       setShowLimitAlert(true);
       setLoading(false);
+      refreshLimits();
       return;
     }
 
     try {
       const response = await emailService.generateEmails(file, templateId);
       setEmails(response.emails);
-      // Rafraîchir le statut après génération
-      fetchEmailLimitsStatus().then(setLimits);
+      refreshLimits();
     } catch (err) {
       setError('Error generating emails. Please try again.');
       console.error(err);
@@ -47,37 +52,53 @@ const EmailGenerator = () => {
     }
   };
 
+  // Détermination du blocage
+  const isBlocked = limits && (limits.is_suspended || limits.user_remaining <= 0 || limits.domain_remaining <= 0);
+  let blockReason = '';
+  if (limits) {
+    if (limits.is_suspended) {
+      blockReason = limits.alert || limits.suspension_reason || 'Your account is suspended.';
+    } else if (limits.user_remaining <= 0) {
+      blockReason = 'You have reached your daily email quota.';
+    } else if (limits.domain_remaining <= 0) {
+      blockReason = 'Your domain has reached its daily quota.';
+    } else if (limits.alert) {
+      blockReason = limits.alert;
+    }
+  }
+
   return (
     <div className="email-generator">
       <h2>Generate Emails</h2>
 
-      {/* Affichage du statut warm-up/quota */}
-      {limits && (
-        <div className="email-limits-status" style={{ marginBottom: 16 }}>
-          <strong>Daily quota:</strong> {limits.user_quota} (remaining: {limits.user_remaining})<br />
-          <strong>Domain quota:</strong> {limits.domain_quota} (remaining: {limits.domain_remaining})<br />
-          {limits.is_suspended && (
-            <div className="alert alert-danger" style={{ color: 'red', marginTop: 8 }}>
-              <b>Sending suspended:</b> {limits.alert || limits.suspension_reason}
-            </div>
-          )}
-          {limits.alert && !limits.is_suspended && (
-            <div className="alert alert-warning" style={{ color: 'orange', marginTop: 8 }}>{limits.alert}</div>
-          )}
+      {/* Statut warm-up/quota toujours visible */}
+      <div className="email-limits-status" style={{ marginBottom: 16, background: '#f7f7f7', padding: 12, borderRadius: 6 }}>
+        {limits ? (
+          <>
+            <strong>Daily quota:</strong> {limits.user_quota} (remaining: {limits.user_remaining})<br />
+            <strong>Domain quota:</strong> {limits.domain_quota} (remaining: {limits.domain_remaining})<br />
+          </>
+        ) : limitsError ? (
+          <span style={{ color: 'red' }}>{limitsError}</span>
+        ) : (
+          <span>Loading quota status...</span>
+        )}
+      </div>
+
+      {/* Message préventif si suspension ou quota gelé */}
+      {limits && (limits.is_suspended || (limits.alert && (limits.user_remaining <= 0 || limits.domain_remaining <= 0))) && (
+        <div style={{ background: '#ffeaea', color: '#b30000', padding: 10, borderRadius: 6, marginBottom: 16, fontWeight: 'bold' }}>
+          {blockReason}
         </div>
       )}
-      {limitsError && <div className="alert alert-danger">{limitsError}</div>}
 
       {/* Pop-up d'alerte quota/suspension */}
       {showLimitAlert && (
         <div className="modal" style={{ background: 'rgba(0,0,0,0.5)', position: 'fixed', top:0, left:0, right:0, bottom:0, zIndex:1000 }}>
           <div style={{ background: 'white', padding: 24, borderRadius: 8, maxWidth: 400, margin: '100px auto', textAlign: 'center' }}>
             <h3>Sending Blocked</h3>
-            <p>
-              {limits && limits.is_suspended && (limits.alert || limits.suspension_reason)}
-              {limits && !limits.is_suspended && (limits.alert || 'Your daily or domain quota has been reached.')}
-            </p>
-            <button onClick={() => setShowLimitAlert(false)}>Close</button>
+            <p>{blockReason}</p>
+            <button onClick={() => { setShowLimitAlert(false); refreshLimits(); }}>Close</button>
           </div>
         </div>
       )}
@@ -104,10 +125,14 @@ const EmailGenerator = () => {
         </div>
         <button
           type="submit"
-          disabled={loading || (limits && (limits.is_suspended || limits.user_remaining <= 0 || limits.domain_remaining <= 0))}
+          disabled={loading || isBlocked}
         >
           {loading ? 'Generating...' : 'Generate Emails'}
         </button>
+        {/* Message sous le bouton si bloqué */}
+        {isBlocked && (
+          <div style={{ color: '#b30000', marginTop: 8, fontWeight: 'bold' }}>{blockReason}</div>
+        )}
       </form>
 
       {error && <div className="error">{error}</div>}
