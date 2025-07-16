@@ -64,7 +64,10 @@ class SpamVerificationService:
         try:
             answers = dns.resolver.resolve(dkim_domain, 'TXT')
             for rdata in answers:
-                txt = ''.join(rdata.strings if hasattr(rdata, 'strings') else rdata)
+                txt = ''.join(
+                    s.decode('utf-8') if isinstance(s, bytes) else str(s)
+                    for s in (rdata.strings if hasattr(rdata, 'strings') else rdata)
+                )
                 if 'p=' in txt:
                     return {
                         'status': 'pass',
@@ -81,10 +84,30 @@ class SpamVerificationService:
                 'record': None
             }
         except Exception as e:
+            # Custom message for DNS query name does not exist
+            err_msg = str(e)
+            if 'The DNS query name does not exist' in err_msg or 'NXDOMAIN' in err_msg:
+                how_to_fix = (
+                    f"No DKIM record found for selector '{selector}'.\n"
+                    "How to set up DKIM for your domain:\n"
+                    "1. Log in to your email provider's admin console (e.g., Google Workspace Admin, Microsoft 365, SendGrid, etc.).\n"
+                    "2. Find the DKIM or domain authentication section.\n"
+                    "3. Locate or generate your DKIM selector (it may be a random string, not 'default').\n"
+                    "4. Copy the DNS TXT record details provided by your provider.\n"
+                    "5. Go to your domain registrar's DNS management page.\n"
+                    f"6. Add a TXT record with name: '{{selector}}._domainkey.{domain}' and the value provided.\n"
+                    "7. Save and publish your DNS changes.\n"
+                    "8. Wait for DNS propagation, then verify DKIM in your provider's admin panel.\n"
+                    "\nFor Google Workspace: https://support.google.com/a/answer/180504?hl=en\n"
+                    "For Microsoft 365: https://learn.microsoft.com/en-us/microsoft-365/security/office-365-security/use-dkim-to-validate-outbound-email\n"
+                    "For SendGrid: https://docs.sendgrid.com/ui/account-and-settings/how-to-set-up-domain-authentication\n"
+                )
+            else:
+                how_to_fix = f'Error checking DKIM: {e}'
             return {
                 'status': 'fail',
                 'explanation': explanation,
-                'how_to_fix': f'Error checking DKIM: {e}',
+                'how_to_fix': how_to_fix,
                 'selector': selector,
                 'record': None
             }
