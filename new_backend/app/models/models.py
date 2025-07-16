@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime, Table, Text
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime, Table, Text, Date, DateTime, Numeric
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from ..db.database import Base
@@ -201,3 +201,55 @@ class SentHistory(Base):
     completed_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="sent_histories")
+
+# --- Warm-up & Anti-spam: External SQL tables ---
+
+class EmailDailyLimits(Base):
+    __tablename__ = "email_daily_limits"
+    __table_args__ = {'schema': 'dbo'}
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=False)
+    send_date = Column(Date, nullable=False)
+    emails_sent = Column(Integer, nullable=True)
+    unique_recipients = Column(Integer, nullable=True)
+    last_updated = Column(DateTime, nullable=True)
+
+class EmailLimitRules(Base):
+    __tablename__ = "email_limit_rules"
+    __table_args__ = {'schema': 'dbo'}
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    rule_name = Column(String, nullable=False)
+    rule_type = Column(String, nullable=False)
+    default_value = Column(Integer, nullable=False)
+    warmup_value = Column(Integer, nullable=False)
+    max_value = Column(Integer, nullable=False)
+    description = Column(String, nullable=True)
+    is_active = Column(Boolean, nullable=True)
+
+class EmailSendingLimits(Base):
+    __tablename__ = "email_sending_limits"
+    __table_args__ = {'schema': 'dbo'}
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=False)
+    daily_limit = Column(Integer, nullable=True)
+    hourly_limit = Column(Integer, nullable=True)
+    current_tier = Column(String, nullable=True)
+    warm_up_started_at = Column(DateTime, nullable=True)
+    last_limit_increase = Column(DateTime, nullable=True)
+    is_suspended = Column(Integer, nullable=True)  # tinyint (0/1)
+    suspension_reason = Column(String, nullable=True)
+    created_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, nullable=True)
+
+class EmailSendingStats(Base):
+    __tablename__ = "email_sending_stats"
+    __table_args__ = {'schema': 'dbo'}
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=False)
+    date = Column(Date, nullable=False)
+    emails_sent = Column(Integer, nullable=True)
+    emails_bounced = Column(Integer, nullable=True)
+    emails_complained = Column(Integer, nullable=True)
+    reputation_score = Column(Numeric, nullable=True)
+    created_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, nullable=True)
