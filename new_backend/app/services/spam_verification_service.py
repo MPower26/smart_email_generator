@@ -16,7 +16,10 @@ class SpamVerificationService:
         try:
             answers = dns.resolver.resolve(domain, 'TXT')
             for rdata in answers:
-                txt = ''.join(rdata.strings if hasattr(rdata, 'strings') else rdata)
+                txt = ''.join(
+                    s.decode('utf-8') if isinstance(s, bytes) else str(s)
+                    for s in (rdata.strings if hasattr(rdata, 'strings') else rdata)
+                )
                 if txt.startswith('v=spf1'):
                     # Check for include, a, mx, or ip4 mechanisms
                     if re.search(r'(include:|a|mx|ip4:)', txt):
@@ -96,7 +99,10 @@ class SpamVerificationService:
         try:
             answers = dns.resolver.resolve(dmarc_domain, 'TXT')
             for rdata in answers:
-                txt = ''.join(rdata.strings if hasattr(rdata, 'strings') else rdata)
+                txt = ''.join(
+                    s.decode('utf-8') if isinstance(s, bytes) else str(s)
+                    for s in (rdata.strings if hasattr(rdata, 'strings') else rdata)
+                )
                 if txt.startswith('v=DMARC1'):
                     # Extract policy
                     match = re.search(r'p=([a-zA-Z]+)', txt)
