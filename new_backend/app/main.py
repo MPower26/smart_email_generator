@@ -295,3 +295,4 @@ async def video_proxy(video_path: str, request: Request):
     except Exception as e:
         logger.error(f"Error serving video {video_path}: {str(e)}")
         raise HTTPException(status_code=500, detail="Error serving video") 
+
