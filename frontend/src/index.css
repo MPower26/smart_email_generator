@@ -1,3 +1,11 @@
+@font-face {
+  font-family: 'Syne-ExtraBold';
+  src: url('./syne-extra-bold.ttf') format('truetype');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 body {
   margin: 0;
   padding: 0;
