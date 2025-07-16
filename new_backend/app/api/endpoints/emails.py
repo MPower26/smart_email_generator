@@ -22,6 +22,7 @@ from app.services.email_service import send_verification_email, EMAIL_CONFIG, se
 from app.services.gmail_service import send_gmail_email
 from app.websocket_manager import manager
 from pydantic import BaseModel, EmailStr
+from app.services.spam_verification_service import SpamVerificationService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -54,6 +55,15 @@ class GroupedEmailResponse(BaseModel):
 
 class RegeneratePrompt(BaseModel):
     prompt: str
+
+class SpamVerificationRequest(BaseModel):
+    email: EmailStr
+    dkim_selector: Optional[str] = None
+
+class SpamVerificationResponse(BaseModel):
+    domain: str
+    checks: Dict[str, Any]
+    alerts: list
 
 @router.get("/cache")
 async def get_cache_info(
@@ -1420,3 +1430,14 @@ async def send_batch_emails(
         "total": total_to_send,
         "batch_size": len(emails_to_send)
     } 
+
+@router.post("/spam-verification", response_model=SpamVerificationResponse)
+async def spam_verification(
+    req: SpamVerificationRequest
+):
+    """
+    Analyze the domain of the provided email for SPF, DKIM, and DMARC configuration.
+    Returns a user-friendly explanation and actionable advice for each check.
+    """
+    result = SpamVerificationService.analyze_email(req.email, req.dkim_selector)
+    return result 

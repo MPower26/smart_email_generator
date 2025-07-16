@@ -40,6 +40,13 @@ const Navigation = () => {
             </Nav.Link>
             <Nav.Link 
               as={Link} 
+              to="/spam-verification" 
+              className={location.pathname.includes('/spam-verification') ? 'active' : ''}
+            >
+              Spam Verification
+            </Nav.Link>
+            <Nav.Link 
+              as={Link} 
               to="/settings" 
               className={location.pathname.includes('/settings') ? 'active' : ''}
             >

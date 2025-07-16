@@ -12,6 +12,7 @@ import AuthScreen from './components/AuthScreen';
 import { UserProvider, useUser } from './contexts/UserContext';
 import GmailSuccess from './pages/GmailSuccess';
 import DevPreviewPage from './pages/DevPreviewPage';
+import SpamVerificationPage from './pages/SpamVerificationPage';
 import './App.css';
 
 // Composant de routes protégées
@@ -37,6 +38,7 @@ const ProtectedRoutes = () => {
           <Route path="/" element={<HomePage />} />
           <Route path="/generate-emails" element={<GenerateEmailsPage />} />
           <Route path="/templates" element={<TemplatesPage />} />
+          <Route path="/spam-verification" element={<SpamVerificationPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
