@@ -1,5 +1,6 @@
 import dns.resolver
 import re
+import socket
 from typing import Optional, Dict, Any
 
 class SpamVerificationService:
@@ -170,28 +171,89 @@ class SpamVerificationService:
                 'record': None
             }
 
+    @staticmethod
+    def check_blacklists(domain: str) -> Dict[str, Any]:
+        explanation = (
+            "Blacklist (RBL) checks determine if your sending IP is listed on public spam blacklists. "
+            "If your IP is blacklisted, your emails are likely to be rejected or marked as spam."
+        )
+        rbls = [
+            'zen.spamhaus.org',
+            'bl.spamcop.net',
+            'b.barracudacentral.org',
+            'dnsbl.sorbs.net',
+            'psbl.surriel.com',
+            'spam.abuse.ch',
+            'cbl.abuseat.org',
+            'dnsbl-1.uceprotect.net',
+        ]
+        try:
+            # Get the IP address of the domain
+            ip = socket.gethostbyname(domain)
+            reversed_ip = '.'.join(reversed(ip.split('.')))
+            blacklisted = []
+            for rbl in rbls:
+                query = f"{reversed_ip}.{rbl}"
+                try:
+                    dns.resolver.resolve(query, 'A')
+                    blacklisted.append(rbl)
+                except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.Timeout):
+                    continue
+            if blacklisted:
+                return {
+                    'status': 'fail',
+                    'explanation': explanation,
+                    'how_to_fix': 'Your sending IP is listed on one or more public blacklists. You should request delisting from the RBLs shown below, or contact your hosting provider.',
+                    'blacklisted_on': blacklisted,
+                    'ip': ip
+                }
+            else:
+                return {
+                    'status': 'pass',
+                    'explanation': explanation,
+                    'how_to_fix': '',
+                    'blacklisted_on': [],
+                    'ip': ip
+                }
+        except Exception as e:
+            return {
+                'status': 'fail',
+                'explanation': explanation,
+                'how_to_fix': f'Error checking blacklists: {e}',
+                'blacklisted_on': None,
+                'ip': None
+            }
+
     @classmethod
     def analyze_email(cls, email: str, dkim_selector: Optional[str] = None) -> Dict[str, Any]:
         domain = cls.extract_domain(email)
         spf = cls.check_spf(domain)
         dkim = cls.check_dkim(domain, dkim_selector)
         dmarc = cls.check_dmarc(domain)
+        blacklist = cls.check_blacklists(domain)
         summary = {
             'domain': domain,
             'checks': {
                 'SPF': spf,
                 'DKIM': dkim,
-                'DMARC': dmarc
+                'DMARC': dmarc,
+                'BLACKLIST': blacklist
             }
         }
         # Add global alerts
         alerts = []
         for name, check in summary['checks'].items():
             if check['status'] == 'fail':
-                alerts.append({
-                    'level': 'error',
-                    'message': f"{name} check failed: {check['how_to_fix']}"
-                })
+                if name == 'BLACKLIST' and check.get('blacklisted_on'):
+                    alerts.append({
+                        'level': 'error',
+                        'message': f"Your sending IP ({check.get('ip')}) is blacklisted on: {', '.join(check['blacklisted_on'])}. Request delisting or contact your provider."
+                    })
+                else:
+                    alerts.append({
+                        'level': 'error',
+                        'message': f"{name} check failed: {check['how_to_fix']}"
+                    })
             elif check['status'] == 'warning':
                 alerts.append({
                     'level': 'warning',
