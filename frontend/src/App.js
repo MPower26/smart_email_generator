@@ -7,6 +7,7 @@ import GenerateEmailsPage from './pages/GenerateEmailsPage';
 import TemplatesPage from './pages/TemplatesPage';
 import SettingsPage from './pages/SettingsPage';
 import WatchPage from './pages/WatchPage';
+import WaitlistPage from './pages/WaitlistPage';
 import FriendsButton from './components/FriendsButton';
 import AuthScreen from './components/AuthScreen';
 import { UserProvider, useUser } from './contexts/UserContext';
@@ -60,6 +61,7 @@ function App() {
             <Route path="/dev-preview" element={<DevPreviewPage />} />
             <Route path="/gmail/success" element={<GmailSuccess />} />
             <Route path="/watch" element={<WatchPage />} />
+            <Route path="/waitlist" element={<WaitlistPage />} />
             <Route path="/*" element={<ProtectedRoutes />} />
           </Routes>
           <Footer />

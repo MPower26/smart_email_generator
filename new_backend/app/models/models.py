@@ -253,3 +253,17 @@ class EmailSendingStats(Base):
     reputation_score = Column(Numeric, nullable=True)
     created_at = Column(DateTime, nullable=True)
     updated_at = Column(DateTime, nullable=True)
+
+class Waitlist(Base):
+    __tablename__ = "waitlist"
+
+    id = Column(Integer, primary_key=True, index=True)
+    first_name = Column(String(255), nullable=False)
+    last_name = Column(String(255), nullable=False)
+    company = Column(String(255), nullable=False)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    subscribe_to_updates = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    def __repr__(self):
+        return f"<Waitlist(id={self.id}, email={self.email}, company={self.company})>"

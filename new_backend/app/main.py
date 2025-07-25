@@ -12,7 +12,7 @@ import time
 import httpx
 import urllib.parse
 
-from app.api.endpoints import emails, friends, auth_gmail, user_settings, templates
+from app.api.endpoints import emails, friends, auth_gmail, user_settings, templates, waitlist
 from app.api import auth
 from app.db.database import engine, get_db
 from app.models.models import Base
@@ -139,6 +139,7 @@ app.include_router(users.router, prefix="/api/users", tags=["Users"])
 app.include_router(auth_gmail.router, prefix="/api", tags=["Gmail Auth"])
 app.include_router(user_settings.router, prefix="/api", tags=["User Settings"])
 app.include_router(templates.router, prefix="/api/templates", tags=["Templates"])
+app.include_router(waitlist.router, prefix="/api/waitlist", tags=["Waitlist"])
 
 @app.get("/")
 async def root():
