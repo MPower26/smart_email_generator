@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime, Table, Text, Date, DateTime, Numeric
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime, Table, Text, Date, DateTime, Numeric, NVARCHAR
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from ..db.database import Base
@@ -22,6 +22,17 @@ class FriendRequest(Base):
     status = Column(String(20), default='pending')  # pending, accepted, rejected
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, onupdate=func.now())
+
+class Waitlist(Base):
+    __tablename__ = "waitlist"
+
+    id = Column(Integer, primary_key=True, index=True)
+    first_name = Column(String(255), nullable=False)
+    last_name = Column(String(255), nullable=False)
+    company = Column(String(255), nullable=False)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    subscribe_to_updates = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class User(Base):
     __tablename__ = "users"
