@@ -4,10 +4,19 @@ from ...db.database import get_db
 from ...models.models import Waitlist
 from ...schemas.waitlist import WaitlistCreate, WaitlistResponse
 
-router = APIRouter()
+router = APIRouter(
+    prefix="",  # The prefix will be added in main.py
+    tags=["Waitlist"]
+)
+
+@router.options("/")
+async def waitlist_options():
+    """Handle OPTIONS request for CORS preflight"""
+    return {}
 
 @router.post("/", response_model=WaitlistResponse)
-def create_waitlist_entry(waitlist_data: WaitlistCreate, db: Session = Depends(get_db)):
+async def create_waitlist_entry(waitlist_data: WaitlistCreate, db: Session = Depends(get_db)):
+    """Create a new waitlist entry"""
     # Check if email already exists
     existing_entry = db.query(Waitlist).filter(Waitlist.email == waitlist_data.email).first()
     if existing_entry:

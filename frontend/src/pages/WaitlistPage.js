@@ -4,11 +4,11 @@ import api from '../services/api';
 
 const WaitlistPage = () => {
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
+    first_name: '',
+    last_name: '',
     company: '',
     email: '',
-    subscribeToUpdates: false
+    subscribe_to_updates: false
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState({ type: '', message: '' });
@@ -33,11 +33,11 @@ const WaitlistPage = () => {
         message: 'Thank you for joining our waitlist! We will keep you updated.'
       });
       setFormData({
-        firstName: '',
-        lastName: '',
+        first_name: '',
+        last_name: '',
         company: '',
         email: '',
-        subscribeToUpdates: false
+        subscribe_to_updates: false
       });
     } catch (error) {
       setSubmitStatus({
@@ -64,8 +64,8 @@ const WaitlistPage = () => {
               <Form.Label>First Name</Form.Label>
               <Form.Control
                 type="text"
-                name="firstName"
-                value={formData.firstName}
+                name="first_name"
+                value={formData.first_name}
                 onChange={handleChange}
                 required
                 placeholder="Enter your first name"
@@ -76,8 +76,8 @@ const WaitlistPage = () => {
               <Form.Label>Last Name</Form.Label>
               <Form.Control
                 type="text"
-                name="lastName"
-                value={formData.lastName}
+                name="last_name"
+                value={formData.last_name}
                 onChange={handleChange}
                 required
                 placeholder="Enter your last name"
@@ -111,8 +111,8 @@ const WaitlistPage = () => {
             <Form.Group className="mb-4">
               <Form.Check
                 type="checkbox"
-                name="subscribeToUpdates"
-                checked={formData.subscribeToUpdates}
+                name="subscribe_to_updates"
+                checked={formData.subscribe_to_updates}
                 onChange={handleChange}
                 label="Keep me updated about new features and tool updates"
               />
