@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Form, Button, Container, Card, Alert } from 'react-bootstrap';
-import { api } from '../services/api';
+import api from '../services/api';
 
 const WaitlistPage = () => {
   const [formData, setFormData] = useState({
@@ -27,7 +27,7 @@ const WaitlistPage = () => {
     setSubmitStatus({ type: '', message: '' });
 
     try {
-      await api.post('/waitlist', formData);
+      await api.post('/api/waitlist', formData);
       setSubmitStatus({
         type: 'success',
         message: 'Thank you for joining our waitlist! We will keep you updated.'
