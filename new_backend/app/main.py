@@ -12,7 +12,7 @@ import time
 import httpx
 import urllib.parse
 
-from app.api.endpoints import emails, friends, auth_gmail, user_settings, templates, waitlist
+from app.api.endpoints import emails, friends, auth_gmail, user_settings, templates
 from app.api import auth
 from app.db.database import engine, get_db
 from app.models.models import Base
@@ -26,10 +26,6 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
-
-# Debug: Check if waitlist module is imported
-logger.info(f"Waitlist module imported: {waitlist}")
-logger.info(f"Waitlist router: {waitlist.router}")
 
 # Create FastAPI app
 app = FastAPI(title="Smart Email Generator API", redirect_slashes=False)
@@ -136,7 +132,6 @@ async def https_redirect(request: Request, call_next):
     return response
 
 # Include API routers
-logger.info("Including API routers...")
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(emails.router, prefix="/api", tags=["Emails"])
 app.include_router(friends.router, prefix="/api/friends", tags=["Friends"])
@@ -144,9 +139,6 @@ app.include_router(users.router, prefix="/api/users", tags=["Users"])
 app.include_router(auth_gmail.router, prefix="/api", tags=["Gmail Auth"])
 app.include_router(user_settings.router, prefix="/api", tags=["User Settings"])
 app.include_router(templates.router, prefix="/api/templates", tags=["Templates"])
-logger.info("Including waitlist router...")
-app.include_router(waitlist.router, prefix="/api/waitlist", tags=["Waitlist"])
-logger.info("All routers included successfully")
 
 @app.get("/")
 async def root():
