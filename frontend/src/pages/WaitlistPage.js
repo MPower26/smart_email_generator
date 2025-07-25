@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Container, Card, Form, Button, Alert } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import './WaitlistPage.css';
 
 const WaitlistPage = () => {
   const navigate = useNavigate();
@@ -48,101 +49,135 @@ const WaitlistPage = () => {
   };
 
   return (
-    <Container className="d-flex justify-content-center align-items-center" style={{ minHeight: '70vh' }}>
-      <img src="/hermesslogo.svg" alt="Background Logo" className="background-logo" />
-      <Card className="shadow fade-in-down" style={{ width: '900px', minHeight: '480px', transform: 'translateY(30px)' }}>
-        <Card.Body className="p-5">
-          <div className="text-center mb-4">
-            <h2>Join Our Waitlist</h2>
-            <p className="text-muted">Be among the first to experience our powerful email generation tool.</p>
-          </div>
+    <div className="waitlist-page">
+      <div className="background-pattern"></div>
+      <Container className="waitlist-container">
+        <div className="logo-container">
+          <img src="/hermesslogo.svg" alt="Herm4s Logo" className="logo" />
+        </div>
+        
+        <Card className="waitlist-card">
+          <Card.Body className="p-4 p-md-5">
+            <div className="text-center mb-4">
+              <h1 className="waitlist-title">Join Our Waitlist</h1>
+              <p className="waitlist-subtitle">
+                Be among the first to experience our powerful email generation tool
+              </p>
+            </div>
 
-          {success ? (
-            <div className="text-center">
-              <Alert variant="success">
+            {success ? (
+              <div className="success-message text-center">
+                <div className="success-icon">✓</div>
                 <h4>Thank you for joining our waitlist!</h4>
                 <p>We'll notify you as soon as access becomes available.</p>
-              </Alert>
-            </div>
-          ) : (
-            <Form onSubmit={handleSubmit}>
-              <div className="row">
-                <div className="col-md-6">
-                  <Form.Group className="mb-3">
-                    <Form.Label>First Name</Form.Label>
-                    <Form.Control
-                      type="text"
-                      name="first_name"
-                      value={formData.first_name}
-                      onChange={handleInputChange}
-                      required
-                    />
-                  </Form.Group>
-                </div>
-                <div className="col-md-6">
-                  <Form.Group className="mb-3">
-                    <Form.Label>Last Name</Form.Label>
-                    <Form.Control
-                      type="text"
-                      name="last_name"
-                      value={formData.last_name}
-                      onChange={handleInputChange}
-                      required
-                    />
-                  </Form.Group>
+                <div className="social-links mt-4">
+                  <a href="https://twitter.com/herm4s" target="_blank" rel="noopener noreferrer" className="social-link">
+                    Follow us on Twitter
+                  </a>
+                  <a href="https://linkedin.com/company/herm4s" target="_blank" rel="noopener noreferrer" className="social-link">
+                    Connect on LinkedIn
+                  </a>
                 </div>
               </div>
+            ) : (
+              <Form onSubmit={handleSubmit} className="waitlist-form">
+                <div className="row g-3">
+                  <div className="col-12 col-md-6">
+                    <Form.Group>
+                      <Form.Label>First Name</Form.Label>
+                      <Form.Control
+                        type="text"
+                        name="first_name"
+                        value={formData.first_name}
+                        onChange={handleInputChange}
+                        required
+                        className="form-input"
+                        placeholder="Enter your first name"
+                      />
+                    </Form.Group>
+                  </div>
+                  <div className="col-12 col-md-6">
+                    <Form.Group>
+                      <Form.Label>Last Name</Form.Label>
+                      <Form.Control
+                        type="text"
+                        name="last_name"
+                        value={formData.last_name}
+                        onChange={handleInputChange}
+                        required
+                        className="form-input"
+                        placeholder="Enter your last name"
+                      />
+                    </Form.Group>
+                  </div>
+                </div>
 
-              <Form.Group className="mb-3">
-                <Form.Label>Company</Form.Label>
-                <Form.Control
-                  type="text"
-                  name="company"
-                  value={formData.company}
-                  onChange={handleInputChange}
-                  required
-                />
-              </Form.Group>
+                <Form.Group className="mt-3">
+                  <Form.Label>Company</Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="company"
+                    value={formData.company}
+                    onChange={handleInputChange}
+                    required
+                    className="form-input"
+                    placeholder="Enter your company name"
+                  />
+                </Form.Group>
 
-              <Form.Group className="mb-3">
-                <Form.Label>Email Address</Form.Label>
-                <Form.Control
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  required
-                />
-              </Form.Group>
+                <Form.Group className="mt-3">
+                  <Form.Label>Email Address</Form.Label>
+                  <Form.Control
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    required
+                    className="form-input"
+                    placeholder="Enter your email address"
+                  />
+                </Form.Group>
 
-              <Form.Group className="mb-4">
-                <Form.Check
-                  type="checkbox"
-                  name="subscribe_to_updates"
-                  checked={formData.subscribe_to_updates}
-                  onChange={handleInputChange}
-                  label="Keep me updated about new features and tools"
-                />
-              </Form.Group>
+                <Form.Group className="mt-4 subscription-checkbox">
+                  <Form.Check
+                    type="checkbox"
+                    name="subscribe_to_updates"
+                    checked={formData.subscribe_to_updates}
+                    onChange={handleInputChange}
+                    label="Keep me updated about new features and tools"
+                    className="custom-checkbox"
+                  />
+                </Form.Group>
 
-              {error && <Alert variant="danger" className="mb-3">{error}</Alert>}
+                {error && (
+                  <Alert variant="danger" className="mt-3">
+                    {error}
+                  </Alert>
+                )}
 
-              <div className="text-center">
-                <Button
-                  variant="primary"
-                  type="submit"
-                  size="lg"
-                  disabled={loading}
-                  className="px-5"
-                >
-                  {loading ? 'Submitting...' : 'Join Waitlist'}
-                </Button>
-              </div>
-            </Form>
-          )}
-        </Card.Body>
-      </Card>
-    </Container>
+                <div className="text-center mt-4">
+                  <Button
+                    variant="primary"
+                    type="submit"
+                    disabled={loading}
+                    className="submit-button"
+                  >
+                    {loading ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Joining...
+                      </>
+                    ) : (
+                      'Join Waitlist'
+                    )}
+                  </Button>
+                </div>
+              </Form>
+            )}
+          </Card.Body>
+        </Card>
+      </Container>
+    </div>
   );
 };
 
