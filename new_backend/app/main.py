@@ -12,8 +12,7 @@ import time
 import httpx
 import urllib.parse
 
-from app.api.endpoints import emails, friends, auth_gmail, user_settings, templates
-from app.api import auth
+from app.api.endpoints import emails, friends, auth_gmail, user_settings, templates, auth
 from app.db.database import engine, get_db
 from app.models.models import Base
 from app.routers import users
