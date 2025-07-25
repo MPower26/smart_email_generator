@@ -1,20 +1,12 @@
 .waitlist-page {
   min-height: 100vh;
   position: relative;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  background: white;
   padding: 2rem 1rem;
 }
 
 .background-pattern {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-image: radial-gradient(#dee2e6 1px, transparent 1px);
-  background-size: 30px 30px;
-  opacity: 0.3;
-  pointer-events: none;
+  display: none;
 }
 
 .waitlist-container {
@@ -39,8 +31,7 @@
   border: none;
   border-radius: 16px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
+  background: white;
   margin-bottom: 2rem;
   overflow: hidden;
 }
@@ -87,7 +78,6 @@
 .subscription-checkbox {
   padding: 0.5rem;
   border-radius: 8px;
-  background-color: #f7fafc;
 }
 
 .custom-checkbox .form-check-input {
@@ -167,10 +157,12 @@
 @media (max-width: 768px) {
   .waitlist-page {
     padding: 1rem;
+    background: white;
   }
 
   .waitlist-title {
     font-size: 2rem;
+    color: black;
   }
 
   .waitlist-subtitle {
@@ -184,6 +176,7 @@
   .waitlist-card {
     margin: 0;
     border-radius: 12px;
+    box-shadow: none;
   }
 
   .submit-button {
@@ -198,16 +191,27 @@
     width: 100%;
     text-align: center;
   }
+
+  .subscription-checkbox {
+    background: none;
+    padding: 0;
+  }
+
+  .custom-checkbox .form-check-label {
+    color: black;
+  }
 }
 
 /* Small screens */
 @media (max-width: 480px) {
   .waitlist-title {
     font-size: 1.75rem;
+    color: black;
   }
 
   .waitlist-card {
-    border-radius: 8px;
+    border-radius: 0;
+    box-shadow: none;
   }
 
   .form-input {
@@ -218,63 +222,64 @@
     height: 44px;
     font-size: 1rem;
   }
+
+  .subscription-checkbox {
+    background: none;
+    padding: 0;
+  }
+
+  .custom-checkbox .form-check-label {
+    color: black;
+  }
 }
 
 /* Dark mode support */
 @media (prefers-color-scheme: dark) {
   .waitlist-page {
-    background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
-  }
-
-  .background-pattern {
-    background-image: radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+    background: white;
   }
 
   .waitlist-card {
-    background: rgba(26, 32, 44, 0.95);
+    background: white;
   }
 
   .waitlist-title {
-    color: #f7fafc;
+    color: black;
   }
 
   .waitlist-subtitle {
-    color: #a0aec0;
+    color: #718096;
   }
 
   .form-label {
-    color: #e2e8f0;
+    color: #4a5568;
   }
 
   .form-input {
-    background-color: #2d3748;
-    border-color: #4a5568;
-    color: #f7fafc;
+    background-color: white;
+    border-color: #e2e8f0;
+    color: black;
   }
 
   .form-input::placeholder {
     color: #a0aec0;
   }
 
-  .form-input:focus {
-    border-color: #4299e1;
-  }
-
   .subscription-checkbox {
-    background-color: #2d3748;
+    background: none;
   }
 
   .custom-checkbox .form-check-label {
-    color: #e2e8f0;
+    color: black;
   }
 
   .social-link {
-    background-color: #2d3748;
-    color: #e2e8f0;
+    background-color: #f7fafc;
+    color: #4a5568;
   }
 
   .social-link:hover {
-    background-color: #4a5568;
-    color: #f7fafc;
+    background-color: #edf2f7;
+    color: #2d3748;
   }
 } 
