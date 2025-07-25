@@ -6,7 +6,7 @@
   font-display: swap;
 }
 
-body {
+body:not(.waitlist-page) {
   margin: 0;
   padding: 0;
   font-family: 'Roboto', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -14,6 +14,16 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background-color: #1a1a1a;
   color: #ffffff;
+}
+
+body.waitlist-page {
+  margin: 0;
+  padding: 0;
+  font-family: 'Roboto', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: white !important;
+  color: #111;
 }
 
 /* General styles */

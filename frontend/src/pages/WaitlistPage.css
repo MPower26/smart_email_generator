@@ -1,7 +1,28 @@
+/* Override any global styles */
+body,
+#root,
+.App,
+.waitlist-page,
+.waitlist-page * {
+  background: white !important;
+}
+
+/* Reset the background for specific elements that need different colors */
+.waitlist-page .submit-button {
+  background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%) !important;
+}
+
+.waitlist-page .submit-button:disabled {
+  background: linear-gradient(135deg, #90cdf4 0%, #63b3ed 100%) !important;
+}
+
+.waitlist-page .success-icon {
+  background: #48bb78 !important;
+}
+
 .waitlist-page {
   min-height: 100vh;
   position: relative;
-  background: white;
   padding: 0;
   margin: 0;
 }
