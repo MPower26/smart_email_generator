@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Container, Card, Form, Button, Alert } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
@@ -16,6 +16,16 @@ const WaitlistPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    // Add class to body when component mounts
+    document.body.classList.add('waitlist-page');
+    
+    // Remove class from body when component unmounts
+    return () => {
+      document.body.classList.remove('waitlist-page');
+    };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

@@ -10,7 +10,7 @@
   --transition: 0.4s cubic-bezier(0.4,0,0.2,1);
 }
 
-body, .App {
+body:not(.waitlist-page), .App:not(.waitlist-page) {
   background: #fff1e6 !important;
 }
 
