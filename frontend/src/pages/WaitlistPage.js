@@ -75,10 +75,10 @@ const WaitlistPage = () => {
               <h4>Thank you for joining our waitlist!</h4>
               <p>We'll notify you as soon as access becomes available.</p>
               <div className="social-links mt-4">
-                <a href="https://twitter.com/herm4s" target="_blank" rel="noopener noreferrer" className="social-link">
-                  Follow us on Twitter
+                <a href="https://www.instagram.com/wesiagency/" target="_blank" rel="noopener noreferrer" className="social-link">
+                  Follow us on Instagram
                 </a>
-                <a href="https://linkedin.com/company/herm4s" target="_blank" rel="noopener noreferrer" className="social-link">
+                <a href="https://www.linkedin.com/company/wesi-agency/" target="_blank" rel="noopener noreferrer" className="social-link">
                   Connect on LinkedIn
                 </a>
               </div>
