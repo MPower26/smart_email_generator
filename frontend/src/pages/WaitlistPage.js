@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Card, Form, Button, Alert } from 'react-bootstrap';
+import { Container, Form, Button, Alert } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import './WaitlistPage.css';
@@ -18,10 +18,7 @@ const WaitlistPage = () => {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    // Add class to body when component mounts
     document.body.classList.add('waitlist-page');
-    
-    // Remove class from body when component unmounts
     return () => {
       document.body.classList.remove('waitlist-page');
     };
@@ -35,7 +32,6 @@ const WaitlistPage = () => {
     try {
       await api.post('/auth/waitlist', formData);
       setSuccess(true);
-      // Clear form
       setFormData({
         first_name: '',
         last_name: '',
@@ -148,6 +144,7 @@ const WaitlistPage = () => {
 
               <Form.Group className="mt-4 subscription-checkbox">
                 <Form.Check
+                  id="subscribe-checkbox"
                   type="checkbox"
                   name="subscribe_to_updates"
                   checked={formData.subscribe_to_updates}
